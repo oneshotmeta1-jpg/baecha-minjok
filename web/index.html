@@ -5,82 +5,335 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>상하역 지연 관제</title>
 <style>
+/* 관제실 한 화면: 왼쪽 위 좌표 맵(주인공), 오른쪽 위 CAM, 왼쪽 아래 통합하역작업 탭, 오른쪽 아래 Alert. 1920x1080에서 스크롤 없이. */
 :root{
-  --bg:#0f141a; --panel:#17202a; --panel-2:#1f2a36; --line:#2c3a49;
-  --fg:#e8eef5; --muted:#8fa1b3;
-  --ok:#3fbf7f; --warn:#f2b136; --crit:#ef5350; --accent:#4aa3ff;
-  --sans:"Noto Sans KR","Malgun Gothic",system-ui,sans-serif;
+  --bg:#0e1319; --panel:#151d26; --panel-2:#1c2733; --line:#2a3846; --line-2:#374859;
+  --fg:#e6edf4; --muted:#8c9cad; --dim:#5d6d7e;
+  --accent:#4aa3ff; --ok:#38b97a; --warn:#f0a92e; --crit:#ef5350; --info:#6f8cff;
+  --s-yard:#9fb3c8; --s-moving:#4aa3ff; --s-queue:#f0a92e; --s-working:#38b97a; --s-done:#5d6d7e;
+  --sans:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+  --mono:"Consolas","D2Coding",ui-monospace,monospace;
 }
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px}
-header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
-header h1{margin:0;font-size:16px}
-.chip{font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:10px;color:var(--muted)}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px}
+body{display:flex;flex-direction:column}
+button,select{font:inherit;color:inherit;background:var(--panel-2);border:1px solid var(--line-2);border-radius:4px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#04121f;font-weight:700}
+button.danger{border-color:var(--crit);color:var(--crit)}
+.num{font-variant-numeric:tabular-nums}
+
+header{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{margin:0;font-size:16px;letter-spacing:.02em}
+.chip{font-size:12px;padding:2px 8px;border:1px solid var(--line-2);border-radius:10px;color:var(--muted);white-space:nowrap}
+.clock{font-family:var(--mono);font-size:20px;font-weight:700;min-width:5ch}
+.group{display:flex;gap:6px;align-items:center}
+.sep{width:1px;height:24px;background:var(--line)}
 .sp{flex:1}
-button{font:inherit;color:inherit;background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:5px 10px;cursor:pointer}
-button:disabled{opacity:.5;cursor:not-allowed}
-main{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr);grid-template-rows:auto auto;gap:12px;padding:12px 16px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;min-width:0}
-.card h2{margin:0;padding:8px 12px;font-size:13px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
-.card h2 small{color:var(--muted);font-weight:400}
-.in{padding:10px 12px}
-#map svg{width:100%;height:auto;display:block}
-.cams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.cam{aspect-ratio:16/9;background:#000;border:1px solid var(--line);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;position:relative}
-.cam b{position:absolute;left:6px;top:4px;color:var(--fg);font-size:12px}
-.tabs{display:flex;gap:6px;margin-bottom:10px}
-.tabs button[aria-selected="true"]{border-color:var(--accent);color:var(--accent)}
+.lbl{font-size:12px;color:var(--muted)}
+
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(360px,1fr);grid-template-rows:minmax(0,1.12fr) minmax(0,1fr);gap:10px;padding:10px 16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;min-width:0;min-height:0;display:flex;flex-direction:column}
+.card>h2{margin:0;padding:7px 12px;font-size:13px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:baseline}
+.card>h2 small{color:var(--muted);font-weight:400}
+.card>h2 .sp{flex:1}
+.body{flex:1;min-height:0;padding:8px 12px;overflow:auto}
+
+/* ① 맵 */
+#mapBody{padding:6px;display:flex;flex-direction:column;gap:4px;overflow:hidden}
+#mapSvg{flex:1;min-height:0;width:100%}
+.veh{transition:transform .28s linear}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);padding:0 6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.legend b{display:inline-block;width:14px;height:10px;margin-right:4px;vertical-align:-1px;border-radius:2px}
+
+/* ③ CAM */
+.cams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;height:100%}
+.cam{position:relative;background:#06090c;border:1px solid var(--line);border-radius:4px;min-height:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:12px}
+.cam .t{position:absolute;left:8px;top:6px;color:var(--fg);font-size:12px;font-weight:700}
+.cam .c{position:absolute;left:8px;bottom:6px;color:var(--muted);font-size:12px}
+.cam .rec{position:absolute;right:8px;top:6px;font-size:11px;color:var(--dim)}
+.cam.down{border-color:var(--crit)}
+.cam.down .rec{color:var(--crit)}
+
+/* ② 탭 */
+.tabs{display:flex;gap:4px;padding:6px 12px 0;border-bottom:1px solid var(--line)}
+.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;padding:6px 10px;color:var(--muted)}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent);font-weight:700}
 .sector-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.sc{background:var(--panel-2);border-radius:4px;padding:8px}
-.sc .pct{font-size:20px;font-weight:700}
+.sc{background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.sc.down{border-color:var(--crit)}
+.sc .top{display:flex;align-items:center;gap:8px}
+.sc .pct{font-size:24px;font-weight:700;margin-left:auto}
+.lv{font-size:11px;font-weight:700;padding:1px 7px;border-radius:9px;border:1px solid}
+.lv.ok{color:var(--ok);border-color:var(--ok)} .lv.warn{color:var(--warn);border-color:var(--warn)} .lv.crit{color:var(--crit);border-color:var(--crit)} .lv.down{color:#fff;background:var(--crit);border-color:var(--crit)}
+.cbar{height:6px;background:var(--bg);border-radius:3px;overflow:hidden}
+.cbar i{display:block;height:100%}
+.work{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;font-size:12px}
+.pbar{height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
+.pbar i{display:block;height:100%;background:var(--s-working)}
+.pbar.late i{background:var(--crit)}
+.late-t{color:var(--crit)}
+.meta{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:2px 10px}
+.meta b{color:var(--fg);font-weight:500}
 .empty{color:var(--muted);font-size:13px}
-@media (max-width:900px){main{grid-template-columns:minmax(0,1fr)}.sector-cards{grid-template-columns:minmax(0,1fr)}}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-weight:500;color:var(--muted);font-size:12px;padding:4px 6px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+td.r{text-align:right}
+.badge{font-size:11px;font-weight:700;padding:0 6px;border-radius:3px;background:var(--crit);color:#fff;margin-left:4px}
+.assumed{font-size:11px;color:var(--warn);border:1px solid var(--warn);border-radius:3px;padding:0 5px}
+
+/* ④ Alert */
+.alerts{display:flex;flex-direction:column;gap:6px}
+.al{display:grid;grid-template-columns:4px minmax(0,1fr) auto;gap:2px 10px;background:var(--panel-2);border-radius:4px;padding:6px 8px 6px 0;font-size:13px}
+.al .bar{grid-row:1/3;border-radius:2px}
+.al.crit .bar{background:var(--crit)} .al.warn .bar{background:var(--warn)} .al.info .bar{background:var(--info)}
+.al .h{grid-column:2;grid-row:1;display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;min-width:0}
+.al .h b{font-size:12px}
+.al .act{grid-column:2;grid-row:2;color:var(--muted);font-size:12px}
+.al.ack{opacity:.5}
+.al .btn-slot{grid-column:3;grid-row:1/3;align-self:center}
+.al button{font-size:12px;padding:2px 8px}
+
+@media (max-width:1100px){
+  html,body{height:auto} main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  #mapBody{height:60vw} .cams{height:auto;grid-template-rows:repeat(2,120px)} .sector-cards{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){.veh{transition:none}}
 </style>
 </head>
 <body>
 <header>
   <h1>상하역 지연 관제</h1>
-  <span class="chip" id="ver">v0</span>
-  <span class="chip" id="clock">시뮬레이션 시계 —</span>
+  <span class="chip" id="ver">v1</span>
+  <span class="clock num" id="clock">--:--</span>
+  <div class="group">
+    <button class="primary" id="runBtn">시작</button>
+    <label class="lbl" for="speedSel">배속</label>
+    <select id="speedSel"><option value="30">x30</option><option value="60" selected>x60</option><option value="120">x120</option><option value="300">x300</option></select>
+    <button id="resetBtn">초기화</button>
+  </div>
+  <span class="chip num" id="counts">도착 0 · 대기장 0 · 출차 0/0</span>
   <span class="sp"></span>
-  <button disabled title="다음 라운드에서 연결">섹터 정지</button>
-  <button disabled title="다음 라운드에서 연결">긴급 출하 넣기</button>
+  <div class="group" aria-label="돌발 이벤트 (시연용)">
+    <span class="lbl">돌발</span>
+    <select id="downSel" aria-label="정지할 섹터"></select>
+    <button class="danger" id="downBtn">섹터 정지</button>
+    <button id="urgentBtn">긴급 출하 넣기</button>
+  </div>
 </header>
+
 <main>
-  <section class="card" id="map"><h2>① 시나리오 좌표 맵 <small>섹터 색 = 혼잡도 단계</small></h2><div class="in" id="mapBox"><div class="empty">배치도 불러오는 중…</div></div></section>
-  <section class="card"><h2>③ CAM 4채널 <small>섹터 A·B·C + 대기장</small></h2><div class="in"><div class="cams" id="cams"></div></div></section>
-  <section class="card"><h2>② 통합하역작업 <small>순번 승인 · 효과 비교</small></h2>
-    <div class="in">
-      <div class="tabs" role="tablist">
-        <button role="tab" aria-selected="true">섹터 현황</button>
-        <button role="tab" aria-selected="false" disabled>호출 순번</button>
-        <button role="tab" aria-selected="false" disabled>KPI 비교</button>
-        <button role="tab" aria-selected="false" disabled>가정값</button>
+  <section class="card" aria-label="시나리오 좌표 맵">
+    <h2>① 시나리오 좌표 맵 <small>섹터 색 = 혼잡도 단계 · 점 = 차량 상태</small><span class="sp"></span><small id="conn">연결 중…</small></h2>
+    <div class="body" id="mapBody">
+      <svg id="mapSvg" role="img" aria-label="하역장 배치도와 차량 위치" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="legend">
+        <span><i style="background:var(--s-yard)"></i>대기장 대기</span><span><i style="background:var(--s-moving)"></i>이동 중</span>
+        <span><i style="background:var(--s-queue)"></i>섹터 대기</span><span><i style="background:var(--s-working)"></i>작업 중</span>
+        <span><i style="background:var(--s-done)"></i>출차</span><span><i style="background:none;border:2px solid var(--crit)"></i>긴급</span>
+        <span><b style="background:rgba(56,185,122,.35)"></b>원활 &lt;60%</span><span><b style="background:rgba(240,169,46,.4)"></b>주의 60~85%</span><span><b style="background:rgba(239,83,80,.45)"></b>혼잡 85%+</span>
       </div>
-      <div class="sector-cards" id="sectorCards"></div>
     </div>
   </section>
-  <section class="card"><h2>④ Alert <small>후순위</small></h2><div class="in"><div class="empty">알림 모듈 연결 전입니다.</div></div></section>
+
+  <section class="card" aria-label="CAM 4채널">
+    <h2>③ CAM 4채널 <small>섹터 A·B·C + 대기장</small></h2>
+    <div class="body"><div class="cams" id="cams"></div></div>
+  </section>
+
+  <section class="card" aria-label="통합하역작업">
+    <h2>② 통합하역작업 <small>섹터 현황 · 호출 순번</small></h2>
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="sectors">섹터 현황</button>
+      <button role="tab" aria-selected="false" data-tab="queue">호출 순번 <span id="qCount" class="num"></span></button>
+      <button role="tab" aria-selected="false" data-tab="assume">가정값</button>
+      <button role="tab" aria-selected="false" disabled title="다음 라운드">KPI 비교</button>
+    </div>
+    <div class="body" id="tab-sectors"><div class="sector-cards" id="sectorCards"></div></div>
+    <div class="body" id="tab-queue" hidden></div>
+    <div class="body" id="tab-assume" hidden></div>
+  </section>
+
+  <section class="card" aria-label="Alert">
+    <h2>④ Alert <small id="alertCount"></small><span class="sp"></span><label class="lbl"><input type="checkbox" id="showCalls"> 호출 알림 보기</label></h2>
+    <div class="body"><div class="alerts" id="alerts"><div class="empty">아직 알림이 없습니다.</div></div></div>
+  </section>
 </main>
+
 <script>
 (async function(){
-  const NS='http://www.w3.org/2000/svg';
-  const el=(tag,attrs,text)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text)e.textContent=text;return e;};
-  const pts=p=>p.map(x=>x.join(',')).join(' ');
-  const center=p=>[p.reduce((s,x)=>s+x[0],0)/p.length,p.reduce((s,x)=>s+x[1],0)/p.length];
-  let cfg;
-  try{ cfg=await (await fetch('/api/config')).json(); }
-  catch(e){ document.getElementById('mapBox').innerHTML='<div class="empty">설정을 불러오지 못했습니다.</div>'; return; }
-  document.getElementById('ver').textContent=cfg.version;
-  const S=cfg.sectors, svg=el('svg',{viewBox:'0 0 '+S.map.width+' '+S.map.height,role:'img','aria-label':'하역장 배치도'});
-  svg.appendChild(el('rect',{x:0,y:0,width:S.map.width,height:S.map.height,fill:'#121a22'}));
-  S.roads.forEach(r=>svg.appendChild(el('polyline',{points:pts(r.points),fill:'none',stroke:'#3a4a5a','stroke-width':22,'stroke-linejoin':'round'})));
-  const draw=(z,fill)=>{const c=center(z.poly);svg.appendChild(el('polygon',{points:pts(z.poly),fill,stroke:'#5a6b7c','stroke-width':3}));svg.appendChild(el('text',{x:c[0],y:c[1],fill:'#e8eef5','font-size':34,'text-anchor':'middle','dominant-baseline':'middle'},z.name));};
-  S.zones.forEach(z=>draw(z,'#1f2a36'));
-  S.sectors.forEach(z=>draw(z,'rgba(63,191,127,.25)'));
-  const box=document.getElementById('mapBox'); box.innerHTML=''; box.appendChild(svg);
-  document.getElementById('cams').innerHTML=S.cams.map(c=>'<div class="cam"><b>'+c.id+' · '+c.name+'</b>영상 연결 전</div>').join('');
-  document.getElementById('sectorCards').innerHTML=S.sectors.map(s=>'<div class="sc"><b>'+s.name+'</b><div class="pct">— %</div><div class="empty">베이 '+s.bays+' · 대기 슬롯 '+s.queue_slots+'<br>'+s.cargo.join(', ')+'</div></div>').join('');
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const NS='http://www.w3.org/2000/svg';
+const el=(tag,attrs,text)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text!=null)e.textContent=text;return e;};
+const pts=p=>p.map(x=>x.join(',')).join(' ');
+const center=p=>[p.reduce((s,x)=>s+x[0],0)/p.length,p.reduce((s,x)=>s+x[1],0)/p.length];
+const hhmm=iso=>iso?iso.slice(11,16):'';
+const STATE_COLOR={arrived:'var(--s-yard)',yard:'var(--s-yard)',moving:'var(--s-moving)',queue:'var(--s-queue)',working:'var(--s-working)',done:'var(--s-done)'};
+const LV_FILL={ok:'rgba(56,185,122,.22)',warn:'rgba(240,169,46,.30)',crit:'rgba(239,83,80,.36)'};
+const LV_TEXT={ok:'원활',warn:'주의',crit:'혼잡',down:'정지'};
+
+const cfg=await (await fetch('/api/config')).json();
+const S=cfg.sectors;
+$('#ver').textContent=cfg.version;
+$('#downSel').innerHTML=S.sectors.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('');
+
+/* ---------- 맵 (한 번 그리고, 상태는 색과 위치만 바꿈) ---------- */
+const svg=$('#mapSvg');
+svg.setAttribute('viewBox','0 0 '+S.map.width+' '+S.map.height);
+const defs=el('defs',{});
+const pat=el('pattern',{id:'hatch',width:24,height:24,patternUnits:'userSpaceOnUse',patternTransform:'rotate(45)'});
+pat.appendChild(el('rect',{width:24,height:24,fill:'rgba(239,83,80,.18)'}));
+pat.appendChild(el('rect',{width:8,height:24,fill:'rgba(239,83,80,.45)'}));
+defs.appendChild(pat); svg.appendChild(defs);
+svg.appendChild(el('rect',{x:0,y:0,width:S.map.width,height:S.map.height,fill:'#111922',rx:8}));
+S.roads.forEach(r=>{svg.appendChild(el('polyline',{points:pts(r.points),fill:'none',stroke:'#2b3a49','stroke-width':26,'stroke-linejoin':'round','stroke-linecap':'round'}));
+  svg.appendChild(el('polyline',{points:pts(r.points),fill:'none',stroke:'#4a5d70','stroke-width':2,'stroke-dasharray':'14 12'}));});
+S.zones.forEach(z=>{const c=center(z.poly);svg.appendChild(el('polygon',{points:pts(z.poly),fill:'#1a2430',stroke:'#4a5d70','stroke-width':3}));
+  svg.appendChild(el('text',{x:c[0],y:z.id==='YARD'?z.poly[0][1]-14:c[1]-90,fill:'#c9d5e1','font-size':30,'text-anchor':'middle'},z.name));});
+const secShape={};
+S.sectors.forEach(s=>{
+  const g=el('g',{});
+  const poly=el('polygon',{points:pts(s.poly),fill:LV_FILL.ok,stroke:'#4a5d70','stroke-width':3});
+  const xs=s.poly.map(p=>p[0]),ys=s.poly.map(p=>p[1]);
+  const name=el('text',{x:Math.max(...xs)-16,y:Math.min(...ys)+40,fill:'#e6edf4','font-size':30,'font-weight':700,'text-anchor':'end'},s.name);
+  const pct=el('text',{x:Math.max(...xs)-16,y:Math.max(...ys)-18,fill:'#e6edf4','font-size':30,'text-anchor':'end','font-family':'Consolas,monospace'},'0%');
+  g.appendChild(poly);g.appendChild(name);g.appendChild(pct);svg.appendChild(g);
+  secShape[s.id]={poly,pct};
+});
+const vehLayer=el('g',{}); svg.appendChild(vehLayer);
+const vehNodes={};
+function drawVehicles(vs){
+  const seen=new Set();
+  vs.forEach(v=>{
+    if(!v.xy) return;
+    seen.add(v.id);
+    let n=vehNodes[v.id];
+    if(!n){
+      n=el('g',{class:'veh'});
+      n.appendChild(el('circle',{r:15,'stroke-width':4}));
+      n.appendChild(el('text',{y:36,'font-size':17,'text-anchor':'middle',fill:'#c9d5e1','font-family':'Consolas,monospace'}));
+      n.appendChild(el('title',{}));
+      vehLayer.appendChild(n); vehNodes[v.id]=n;
+    }
+    n.style.transform='translate('+v.xy[0]+'px,'+v.xy[1]+'px)';
+    const c=n.firstChild;
+    c.setAttribute('fill',STATE_COLOR[v.state]||'#999');
+    c.setAttribute('stroke',v.urgent?'#ef5350':'#0e1319');
+    n.childNodes[1].textContent=v.id.slice(-3);
+    n.childNodes[2].textContent=v.id+' · '+v.cargo+' · '+v.state;
+  });
+  Object.keys(vehNodes).forEach(id=>{ if(!seen.has(id)){ vehNodes[id].remove(); delete vehNodes[id]; } });
+}
+
+/* ---------- CAM 자리 ---------- */
+$('#cams').innerHTML=S.cams.map(c=>'<div class="cam" id="cam-'+c.id+'"><span class="t">'+esc(c.id)+' · '+esc(c.name)+'</span><span class="rec">● 영상 준비 중</span>영상 소스 연결 전<span class="c num"></span></div>').join('');
+const camSector=Object.fromEntries(S.sectors.map(s=>[s.cam_id,s.id]));
+
+/* ---------- 가정값 탭 (설정 파일 그대로) ---------- */
+const st=cfg.settings;
+$('#tab-assume').innerHTML='<p class="lbl">모든 수치는 <span class="assumed">가정값</span>입니다. 현장 데이터가 생기면 data/*.json 값만 바꾸면 됩니다.</p>'+
+ '<table><thead><tr><th>항목</th><th class="r">값</th></tr></thead><tbody>'+
+ [['혼잡도 주의 / 혼잡 기준',st.congestion.warn_pct+'% / '+st.congestion.crit_pct+'%'],['혼잡 알림: 지속 시간',st.congestion.crit_hold_min+'분'],
+  ['목표 대기시간',st.wait.target_min+'분'],['작업 지연 기준','표준 x '+st.delay.factor],['호출 여유시간',st.call.margin_min+'분'],
+  ['대기 단가 (다음 라운드 KPI용)',st.cost.wait_won_per_hour.toLocaleString()+'원/시간'],['섹터 유휴 단가 (다음 라운드 KPI용)',st.cost.sector_idle_won_per_hour.toLocaleString()+'원/시간']]
+  .map(r=>'<tr><td>'+esc(r[0])+'</td><td class="r num">'+esc(r[1])+'</td></tr>').join('')+'</tbody></table>'+
+ '<table style="margin-top:10px"><thead><tr><th>차종</th><th>화물</th><th class="r">표준 작업시간</th></tr></thead><tbody>'+
+ cfg.std_times.items.map(i=>'<tr><td>'+esc(i.vehicle)+'</td><td>'+esc(i.cargo)+'</td><td class="r num">'+i.minutes+'분</td></tr>').join('')+'</tbody></table>'+
+ '<table style="margin-top:10px"><thead><tr><th>섹터</th><th>취급 화물</th><th class="r">베이</th><th class="r">대기 슬롯</th><th class="r">대기장→섹터</th></tr></thead><tbody>'+
+ S.sectors.map(s=>'<tr><td>'+esc(s.name)+'</td><td>'+esc(s.cargo.join(', '))+'</td><td class="r num">'+s.bays+'</td><td class="r num">'+s.queue_slots+'</td><td class="r num">'+s.travel_min+'분</td></tr>').join('')+'</tbody></table>';
+
+/* ---------- 탭 ---------- */
+document.querySelectorAll('.tabs button[data-tab]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.tabs button[data-tab]').forEach(x=>x.setAttribute('aria-selected',x===b?'true':'false'));
+  ['sectors','queue','assume'].forEach(k=>$('#tab-'+k).hidden=(k!==b.dataset.tab));
+}));
+
+/* ---------- 상태 그리기 ---------- */
+let last=null;
+function render(s){
+  last=s;
+  $('#clock').textContent=hhmm(s.clock);
+  $('#runBtn').textContent=s.running?'일시정지':'시작';
+  $('#speedSel').value=String(s.speed);
+  const c=s.counts;
+  $('#counts').textContent='도착 '+c.arrived+' · 대기장 '+c.yard+' · 출차 '+c.exited+'/'+c.total;
+  const sel=s.sectors.find(x=>x.id===$('#downSel').value);
+  $('#downBtn').textContent=sel&&sel.status==='down'?'섹터 복구':'섹터 정지';
+
+  s.sectors.forEach(x=>{
+    const sh=secShape[x.id];
+    sh.poly.setAttribute('fill',x.status==='down'?'url(#hatch)':LV_FILL[x.level]);
+    sh.poly.setAttribute('stroke',x.status==='down'?'#ef5350':'#4a5d70');
+    sh.pct.textContent=x.status==='down'?'정지':x.congestion_pct+'%';
+  });
+  drawVehicles(s.vehicles);
+
+  $('#sectorCards').innerHTML=s.sectors.map(x=>{
+    const lv=x.status==='down'?'down':x.level;
+    const work=x.working.length?x.working.map(w=>{
+      const late=w.elapsed_min>w.std;
+      return '<span class="num">'+esc(w.vehicle_id)+'</span><div class="pbar'+(w.delayed?' late':'')+'" title="진척도 '+w.progress_pct+'%"><i style="width:'+w.progress_pct+'%"></i></div>'+
+        '<span class="num'+(late?' late-t':'')+'">'+(late?'표준 +'+Math.round(w.elapsed_min-w.std)+'분':w.progress_pct+'% · 남은 '+Math.ceil(w.remain_min)+'분')+'</span>';
+    }).join(''):'<span class="empty" style="grid-column:1/-1">작업 중인 차량 없음</span>';
+    return '<div class="sc'+(x.status==='down'?' down':'')+'"><div class="top"><b>'+esc(x.name)+'</b><span class="lv '+lv+'">'+LV_TEXT[lv]+'</span><span class="pct num">'+x.congestion_pct+'%</span></div>'+
+      '<div class="cbar" title="혼잡도"><i style="width:'+Math.min(x.congestion_pct,100)+'%;background:var(--'+(lv==='down'?'crit':lv)+')"></i></div>'+
+      '<div class="work">'+work+'</div>'+
+      '<div class="meta"><span>섹터 대기 <b class="num">'+x.queue.length+'</b></span><span>이동 중 <b class="num">'+x.moving.length+'</b></span><span>베이 <b class="num">'+x.working.length+'/'+x.bays+'</b></span><span>다음 호출 <b class="num">'+(x.next_call_at||'—')+'</b></span></div></div>';
+  }).join('');
+
+  $('#qCount').textContent=s.queue.length?'('+s.queue.length+')':'';
+  $('#tab-queue').innerHTML=s.queue.length?'<table><thead><tr><th class="r">순번</th><th>차량</th><th>화물</th><th>섹터</th><th class="r">호출 예정</th><th class="r">대기</th><th>추천 이유</th></tr></thead><tbody>'+
+    s.queue.map(q=>'<tr><td class="r num">'+q.rank+'</td><td class="num">'+esc(q.vehicle_id)+(q.urgent?'<span class="badge">긴급</span>':'')+'</td><td>'+esc(q.cargo)+'</td><td>'+esc(q.sector_id||'보류')+'</td>'+
+      '<td class="r num">'+esc(q.call_at||'—')+'</td><td class="r num">'+Math.floor(q.wait_min)+'분</td><td>'+esc(q.reason)+'</td></tr>').join('')+'</tbody></table>'
+    :'<div class="empty">대기장에 순번을 기다리는 차량이 없습니다. 시작을 누르면 차량이 도착합니다.</div>';
+
+  S.cams.forEach(cm=>{
+    const box=$('#cam-'+cm.id), cnt=box.querySelector('.c'), sid=camSector[cm.id];
+    if(sid){ const x=s.sectors.find(y=>y.id===sid); box.classList.toggle('down',x.status==='down'); box.querySelector('.rec').textContent=x.status==='down'?'● 섹터 정지':'● 영상 준비 중';
+      cnt.textContent='작업 '+x.working.length+' · 대기 '+x.queue.length; }
+    else cnt.textContent='대기장 '+s.counts.yard+'대';
+  });
+  renderAlerts();
+}
+function renderAlerts(){
+  if(!last) return;
+  const show=$('#showCalls').checked;
+  const list=last.alerts.filter(a=>show||a.kind!=='호출');
+  const open=last.alerts.filter(a=>!a.ack&&a.kind!=='호출').length;
+  $('#alertCount').textContent=open?'확인 안 한 알림 '+open+'건':'';
+  $('#alerts').innerHTML=list.length?list.map(a=>'<div class="al '+a.level+(a.ack?' ack':'')+'"><span class="bar"></span><div class="h"><span class="num lbl">'+esc(a.ts)+'</span><b>'+esc(a.kind)+'</b><span>'+esc(a.text)+'</span></div>'+
+    '<span class="btn-slot">'+(a.ack?'<span class="lbl">확인함</span>':'<button data-ack="'+esc(a.id)+'">확인</button>')+'</span>'+'<div class="act">권장 조치: '+esc(a.action)+'</div></div>').join('')
+    :'<div class="empty">아직 알림이 없습니다.</div>';
+}
+$('#showCalls').addEventListener('change',renderAlerts);
+
+/* ---------- 조작 ---------- */
+const post=(u)=>fetch(u,{method:'POST'}).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); });
+const refresh=()=>fetch('/api/state').then(r=>r.json()).then(render).catch(()=>{});
+$('#runBtn').addEventListener('click',()=>post(last&&last.running?'/api/sim/pause':'/api/sim/start').then(refresh));
+$('#speedSel').addEventListener('change',e=>post('/api/sim/speed?value='+e.target.value).then(refresh));
+$('#resetBtn').addEventListener('click',()=>post('/api/sim/reset').then(()=>{ Object.keys(vehNodes).forEach(id=>{vehNodes[id].remove();delete vehNodes[id];}); refresh(); }));
+$('#downSel').addEventListener('change',()=>last&&render(last));
+$('#downBtn').addEventListener('click',()=>{ const id=$('#downSel').value, x=last&&last.sectors.find(y=>y.id===id);
+  post('/api/events/'+(x&&x.status==='down'?'sector_up':'sector_down')+'?sector_id='+encodeURIComponent(id)).then(refresh); });
+$('#urgentBtn').addEventListener('click',()=>post('/api/events/urgent').then(refresh));
+$('#alerts').addEventListener('click',e=>{ const b=e.target.closest('[data-ack]'); if(b) post('/api/alerts/'+encodeURIComponent(b.dataset.ack)+'/ack').then(refresh); });
+
+/* ---------- 실시간 연결 (WebSocket, 끊기면 1초 폴링) ---------- */
+let poll=null;
+function connect(){
+  const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws');
+  ws.onopen=()=>{ $('#conn').textContent='실시간 연결됨'; if(poll){clearInterval(poll);poll=null;} };
+  ws.onmessage=e=>render(JSON.parse(e.data));
+  ws.onclose=()=>{ $('#conn').textContent='재연결 중…'; if(!poll) poll=setInterval(refresh,1000); setTimeout(connect,2000); };
+}
+refresh(); connect();
 })();
 </script>
 </body>
