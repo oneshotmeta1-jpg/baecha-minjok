@@ -67,13 +67,41 @@ def trip(seed: int, truck: dict, n: int, t: float, fc: dict, urgent=None) -> dic
             "work_factor": round(rnd.uniform(0.85, 1.45), 3)}
 
 
+def default_assumptions() -> dict:
+    """화면에서 바꿀 수 있는 가정값의 기본값 (settings.json · std_times.json에서)."""
+    st, items = load("settings.json"), load("std_times.json")["items"]
+    return {"std_times": {i["cargo"]: i["minutes"] for i in items},
+            "warn_pct": st["congestion"]["warn_pct"], "crit_pct": st["congestion"]["crit_pct"],
+            "target_wait_min": st["wait"]["target_min"], "call_margin_min": st["call"]["margin_min"],
+            "delay_factor": st["delay"]["factor"],
+            "wait_won_per_hour": st["cost"]["wait_won_per_hour"], "idle_won_per_hour": st["cost"]["sector_idle_won_per_hour"]}
+
+
+def apply_assumptions(settings: dict, std_items: list, a: dict):
+    """가정값을 설정에 덮어쓴다 (data/assumptions.json 또는 화면에서 바꾼 값)."""
+    if not a:
+        return
+    for it in std_items:
+        if it["cargo"] in a.get("std_times", {}):
+            it["minutes"] = a["std_times"][it["cargo"]]
+    m = {"warn_pct": ("congestion", "warn_pct"), "crit_pct": ("congestion", "crit_pct"),
+         "target_wait_min": ("wait", "target_min"), "call_margin_min": ("call", "margin_min"),
+         "delay_factor": ("delay", "factor"), "wait_won_per_hour": ("cost", "wait_won_per_hour"),
+         "idle_won_per_hour": ("cost", "sector_idle_won_per_hour")}
+    for k, (sec, key) in m.items():
+        if k in a:
+            settings[sec][key] = a[k]
+
+
 class Sim:
-    def __init__(self, seed: int = 7, on_event=None):
+    def __init__(self, seed: int = 7, on_event=None, mode: str = "recommend", assumptions: dict | None = None):
         self.seed = seed
         self.on_event = on_event
+        self.mode = mode                     # "recommend" = 추천 배정, "fifo" = 기준선(도착순·고정 호퍼)
         self.cfg = load("sectors.json")
         self.settings = load("settings.json")
         self.std_items = load("std_times.json")["items"]
+        apply_assumptions(self.settings, self.std_items, assumptions)
         self.fc = self.settings["fleet"]
         self.start = datetime.fromisoformat(self.settings["sim"]["start"])
         self.speed = self.settings["sim"]["speed"]
@@ -88,7 +116,12 @@ class Sim:
         self.t = 0.0
         self.running = False
         self.events = []
-        self.alerts = []
+        self.alerts = []            # 최근 80건 (화면용)
+        self.alerts_all = []        # 전체 기록 (알림 이력)
+        self.overrides = {}         # 담당자가 바꾼 호퍼 {차량: 호퍼}
+        self.series = []            # 10분마다 대기 차량 수
+        self.busy_min = 0.0         # 하차구가 실제로 쓰인 시간(하차구·분)
+        self.cap_min = 0.0          # 가동 중인 하차구 시간(하차구·분)
         self.alert_seq = 0
         self.track_seq = 0
         self.urgent_seq = 0
@@ -136,8 +169,10 @@ class Sim:
 
     def alert(self, level, kind, text, action, sector_id=None, vehicle=None):
         self.alert_seq += 1
-        a = {"id": f"AL-{self.alert_seq}", "ts": self.hhmm(self.t), "level": level, "kind": kind,
-             "text": text, "action": action, "sector_id": sector_id, "ack": False}
+        a = {"id": f"AL-{self.alert_seq}", "ts": self.hhmm(self.t), "t": self.t, "level": level, "kind": kind,
+             "text": text, "action": action, "sector_id": sector_id, "vehicle_id": vehicle["id"] if vehicle else None,
+             "ack": False, "ack_at": None, "ack_sec": None}
+        self.alerts_all.append(a)
         self.alerts.insert(0, a)
         del self.alerts[80:]
         self.emit("ALERT", "engine", vehicle=vehicle, sector_id=sector_id,
@@ -224,12 +259,53 @@ class Sim:
         self.pending_arrivals.insert(0, a)
         return plate
 
-    def ack_alert(self, aid):
-        for a in self.alerts:
+    def ack_alert(self, aid, ack_sec=None):
+        for a in reversed(self.alerts_all):
             if a["id"] == aid:
-                a["ack"] = True
-                return True
-        return False
+                if not a["ack"]:
+                    a.update(ack=True, ack_at=self.hhmm(self.t), ack_sec=ack_sec)
+                return a
+        return None
+
+    def override(self, vid, sid):
+        """담당자가 대기장 차량의 호퍼를 바꾼다. 대기장에 있는 차량만."""
+        v = self.vehicles.get(vid)
+        if not v or v["state"] != "yard" or sid not in self.sec_cfg or v["cargo"] not in self.sec_cfg[sid]["cargo"]:
+            return False
+        self.overrides[vid] = sid
+        self.replan()
+        return True
+
+    def sector_inputs(self):
+        """엔진에 넘기는 호퍼 상태 (재계산·영향 계산 공용)."""
+        t = self.t
+        secs = []
+        for sid, sc in self.sec_cfg.items():
+            working = [v for v in self.vehicles.values() if v["state"] == "working" and v["sector"] == sid]
+            pend = []
+            for v in self.vehicles.values():
+                if v["sector"] != sid:
+                    continue
+                if v["state"] == "queue":
+                    pend.append((0.0, v["std"]))
+                elif v["state"] == "moving":
+                    pend.append((max(v["path_t0"] + v["path_dur"] - t, 0.0), v["std"]))
+            secs.append({"id": sid, "name": sc["name"], "up": self.sectors[sid]["up"], "bays": sc["bays"],
+                         "travel_min": sc["travel_min"], "cargo": sc["cargo"],
+                         "working_remain": [engine.remain_min(v["work_elapsed"], v["std"]) for v in working],
+                         "pending_eta": pend})
+        return secs
+
+    def yard_inputs(self):
+        out = []
+        for v in self.vehicles.values():
+            if v["state"] == "yard":
+                v["forced"] = self.overrides.get(v["id"])
+                out.append(v)
+        return out
+
+    def impact(self, vid, sid):
+        return engine.change_impact(self.yard_inputs(), self.sector_inputs(), self.t, self.settings, vid, sid)
 
     # ---------- main loop ----------
     def step(self):
@@ -289,7 +365,9 @@ class Sim:
                     v["xy"] = None
                     self.done_trips.append({"id": v["id"], "trip": v["trip"], "cargo": v["cargo"], "load_t": v["load_t"],
                                             "sector": s_id, "wait_min": v["wait_min"] or 0.0, "done_t": t,
-                                            "late": t > v["due_t"]})
+                                            "wait_total": round(v["work_start"] - v["yard_t"], 2),
+                                            "unload_min": round(v["work_elapsed"], 2), "std": v["std"],
+                                            "delayed": "delay" in v["flags"], "late": v["work_start"] > v["due_t"]})
                     # 공차 복귀 → 원료야드 재상차 → 다음 회차 (근무 시간 안에서만)
                     if not self.truck[v["id"]].get("extra"):
                         nxt = t + random.Random(f"{self.seed}|{v['id']}|cycle|{v['trip']}").uniform(*self.fc["cycle_min"])
@@ -303,6 +381,8 @@ class Sim:
             if not self.sectors[sid]["up"]:
                 continue
             working = [v for v in self.vehicles.values() if v["state"] == "working" and v["sector"] == sid]
+            self.busy_min += len(working) * STEP
+            self.cap_min += sc["bays"] * STEP
             queue = sorted((v for v in self.vehicles.values() if v["state"] == "queue" and v["sector"] == sid),
                            key=lambda v: v["queue_idx"])
             used = {v["bay"] for v in working}
@@ -334,6 +414,11 @@ class Sim:
                 self.call(self.vehicles[p["vehicle_id"]], p)
         self.replan()
 
+        # 10분마다 대기 차량 수 (대기장 + 호출 이동 + 호퍼 대기 = 아직 하차를 시작 못 한 차)
+        if abs(t / 10 - round(t / 10)) < 1e-9:
+            self.series.append({"t": t, "hhmm": self.hhmm(t),
+                                "waiting": sum(v["state"] in ("yard", "moving", "queue") for v in self.vehicles.values())})
+
         # 5) 알림: 대기 초과, 혼잡 지속
         for v in self.vehicles.values():
             if v["state"] == "yard" and t - v["yard_t"] >= st["wait"]["target_min"] + 1 and "wait" not in v["flags"]:
@@ -355,6 +440,7 @@ class Sim:
         sid = p["sector_id"]
         sc = self.sec_cfg[sid]
         self.yard_slots.pop(v["id"], None)
+        self.overrides.pop(v["id"], None)
         q = self.queue_xy(sid, 0)
         if v.get("rerouted"):
             pts = [v["xy"], [v["xy"][0], self.lane_y], [q[0], self.lane_y], q]
@@ -367,24 +453,24 @@ class Sim:
         self.alert("info", "호출", f"{v['id']} {v['cargo']} → {sc['name']}", "기사 앱으로 호출 전송(가상)", sector_id=sid, vehicle=v)
 
     def replan(self):
+        secs, yard = self.sector_inputs(), self.yard_inputs()
+        if self.mode == "fifo":
+            self.plan = engine.plan_fifo(yard, secs, self.t)
+        else:
+            self.plan = engine.plan(yard, secs, self.t, self.settings)
+
+    def metrics(self):
+        """방식 비교용 누적 지표. 대기 = 대기장 진입 → 하차 시작 (아직 못 시작했으면 지금까지)."""
         t = self.t
-        secs = []
-        for sid, sc in self.sec_cfg.items():
-            working = [v for v in self.vehicles.values() if v["state"] == "working" and v["sector"] == sid]
-            pend = []
-            for v in self.vehicles.values():
-                if v["sector"] != sid:
-                    continue
-                if v["state"] == "queue":
-                    pend.append((0.0, v["std"]))
-                elif v["state"] == "moving":
-                    pend.append((max(v["path_t0"] + v["path_dur"] - t, 0.0), v["std"]))
-            secs.append({"id": sid, "name": sc["name"], "up": self.sectors[sid]["up"], "bays": sc["bays"],
-                         "travel_min": sc["travel_min"], "cargo": sc["cargo"],
-                         "working_remain": [engine.remain_min(v["work_elapsed"], v["std"]) for v in working],
-                         "pending_eta": pend})
-        yard = [v for v in self.vehicles.values() if v["state"] == "yard"]
-        self.plan = engine.plan(yard, secs, t, self.settings)
+        waits = [d["wait_total"] for d in self.done_trips]          # 끝난 반입
+        waits += [(v["work_start"] if v["state"] in ("working", "done") else t) - v["yard_t"]
+                  for v in self.vehicles.values() if not v["gone"] and v["yard_t"] is not None]   # 진행 중
+        idle = sum(s["idle_min"] for s in self.sectors.values())
+        return {"vehicles": len(waits), "avg_wait": round(sum(waits) / len(waits), 1) if waits else 0.0,
+                "max_wait": round(max(waits), 1) if waits else 0.0, "wait_total": round(sum(waits), 1),
+                "idle_min": round(idle, 1), "util_pct": round(self.busy_min / self.cap_min * 100) if self.cap_min else 0,
+                "late": sum(d["late"] for d in self.done_trips), "trips_done": len(self.done_trips),
+                "delays": sum(1 for d in self.done_trips if d["delayed"])}
 
     def run_until(self, minutes):
         while self.t < minutes:
@@ -440,6 +526,11 @@ class Sim:
                            for v in sorted(queue, key=lambda v: v["queue_idx"])],
             "moving": [v["id"] for v in moving],
             "idle_min": round(self.sectors[sid]["idle_min"], 1),
+            "assigned": len(nxt),
+            "done": sum(1 for d in self.done_trips if d["sector"] == sid),
+            "avg_unload": round(sum(d["unload_min"] for d in self.done_trips if d["sector"] == sid) /
+                                max(1, sum(1 for d in self.done_trips if d["sector"] == sid)), 1),
+            "warn_pct": self.settings["congestion"]["warn_pct"], "crit_pct": self.settings["congestion"]["crit_pct"],
             "next_call_at": self.hhmm(nxt[0]["call_t"]) if nxt and nxt[0]["call_t"] is not None else None,
         }
 

@@ -69,6 +69,8 @@ def plan(yard: list, sectors: list, now: float, settings: dict) -> list:
     out = []
     for v in sorted(yard, key=lambda v: priority_key(v, now)):
         fits = [s for s in sectors if v["cargo"] in s["cargo"]]
+        if v.get("forced"):                                   # 담당자가 바꾼 호퍼만 본다
+            fits = [s for s in fits if s["id"] == v["forced"]] or fits
         cand = []
         for s in fits:
             if s["id"] not in heaps:
@@ -82,10 +84,19 @@ def plan(yard: list, sectors: list, now: float, settings: dict) -> list:
                         "reason": f"{head} · 배정 보류({down} 정지)"})
             continue
         cand.sort(key=lambda c: (c[0], c[1]))
+        # 원래 받는 호퍼(목록 첫 번째)를 우선한다. 다른 호퍼가 '확실히' 빠를 때만 돌린다 —
+        # 조금 빠르다고 공용 호퍼로 보내면 그 호퍼 전용 원료(연료)가 밀린다.
+        gain = settings["call"].get("switch_gain_min", 0)
+        home = next((c for c in cand if fits and c[1] == fits[0]["id"]), None)
+        if home and not v.get("forced") and home[0] - cand[0][0] < gain:
+            cand.remove(home)
+            cand.insert(0, home)
         start, sid, s = cand[0]
         heapq.heapreplace(heaps[sid], start + v["std"])
         call_t = now + max(0.0, start - s["travel_min"] - margin)
-        if len(fits) == 1:
+        if v.get("forced"):
+            tail = f"담당자 변경 → {s['name']}"
+        elif len(fits) == 1:
             tail = f"{s['name']} 전용 원료"
         else:
             other = [c for c in cand[1:] if c[1] != sid]
@@ -96,3 +107,30 @@ def plan(yard: list, sectors: list, now: float, settings: dict) -> list:
     for i, p in enumerate(out, 1):
         p["rank"] = i
     return out
+
+
+def plan_fifo(yard: list, sectors: list, now: float) -> list:
+    """기준선(기존 방식 가정): 도착순으로, 원료마다 정해진 호퍼(목록의 첫 호퍼) 앞에 바로 가서 줄을 선다.
+    정해진 호퍼가 서 있으면 다음 적합 호퍼로. 미리 부르지 않고 도착하면 바로 보낸다."""
+    out = []
+    for i, v in enumerate(sorted(yard, key=lambda v: (v["arr_t"], v["id"])), 1):
+        fits = [s for s in sectors if v["cargo"] in s["cargo"] and s["up"]]
+        sid = fits[0]["id"] if fits else None
+        out.append({"vehicle_id": v["id"], "sector_id": sid, "call_t": now if sid else None, "start_t": None,
+                    "reason": "도착순 · 정해진 호퍼" if sid else "도착순 · 호퍼 정지로 보류", "rank": i})
+    return out
+
+
+def change_impact(yard: list, sectors: list, now: float, settings: dict, vehicle_id: str, sector_id: str) -> dict:
+    """순번 하나를 다른 호퍼로 바꿨을 때 추천 대비 영향: 대기장 차량 전체의 하차 시작 시각 합의 차이."""
+    base = {p["vehicle_id"]: p for p in plan(yard, sectors, now, settings)}
+    forced = [dict(v, forced=sector_id) if v["id"] == vehicle_id else v for v in yard]
+    alt = {p["vehicle_id"]: p for p in plan(forced, sectors, now, settings)}
+    delta = 0.0
+    for vid, p in base.items():
+        a = alt.get(vid)
+        if p["start_t"] is not None and a and a["start_t"] is not None:
+            delta += a["start_t"] - p["start_t"]
+    rate = settings["cost"]["wait_won_per_hour"]
+    return {"delta_min": round(delta, 1), "cost_won": int(round(delta / 60 * rate, -2)),
+            "start_rec": base.get(vehicle_id, {}).get("start_t"), "start_alt": alt.get(vehicle_id, {}).get("start_t")}

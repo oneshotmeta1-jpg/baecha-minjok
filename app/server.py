@@ -1,15 +1,14 @@
-"""상하역 지연 관제 - FastAPI 서버
+"""하역관제 FastAPI 서버 — 포항제철소 소결공장 원료 반입
 
-- 시뮬레이션 시계: 백그라운드에서 배속에 맞춰 sim.step() 을 돌린다 (시작·일시정지·배속·초기화)
-- 이벤트 로그: 모든 이벤트를 SQLite(data/events.db)에 남긴다
-- 화면: GET /api/state 와 WebSocket /ws 로 같은 상태를 받는다 (docs/events.md)
-- 돌발 이벤트: 섹터 정지·복구, 긴급 출하 넣기
+- 시뮬레이션 시계: 백그라운드에서 배속에 맞춰 추천 배정·FIFO 기준선을 함께 돌린다 (app/runtime.py)
+- 화면: GET /api/state 와 WebSocket /ws (관제 화면), 탭별 GET /api/dock · /api/analysis · /api/alerts
+- 담당자 행동: 순번 승인·변경(사유), 알림 확인, 가정값 변경(재계산), 피드백 제안 적용·무시
+- 모든 핸들러는 async — 시계(이벤트 루프)와 같은 스레드에서 돌아 상태가 엇갈리지 않는다.
 
-실행: python app/server.py  →  http://127.0.0.1:8000/
+실행: python app/server.py [--lan]  →  http://127.0.0.1:8000/
 """
 import asyncio
 import json
-import sqlite3
 import sys
 import time
 from contextlib import asynccontextmanager
@@ -18,41 +17,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect  # noqa: E402
+from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect  # noqa: E402
 from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
-from app.sim import Sim, STEP, load  # noqa: E402
+from app.runtime import REASONS, Runtime  # noqa: E402
+from app.sim import STEP, load  # noqa: E402
 
 DATA = ROOT / "data"
 WEB = ROOT / "web"
-VERSION = "v1"
+VERSION = "v3"
 TICK = 0.1  # 실제 초
 
-
-class EventLog:
-    def __init__(self, path: Path):
-        self.db = sqlite3.connect(path, check_same_thread=False)
-        self.db.execute("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, ts TEXT, type TEXT, source TEXT,"
-                        " vehicle_id TEXT, sector_id TEXT, body TEXT)")
-        self.clear()
-
-    def clear(self):
-        self.db.execute("DELETE FROM events")
-        self.db.commit()
-
-    def add(self, ev):
-        self.db.execute("INSERT INTO events (ts,type,source,vehicle_id,sector_id,body) VALUES (?,?,?,?,?,?)",
-                        (ev["ts"], ev["type"], ev["source"], ev["vehicle_id"], ev["sector_id"],
-                         json.dumps(ev, ensure_ascii=False)))
-
-    def recent(self, limit):
-        rows = self.db.execute("SELECT body FROM events ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
-        return [json.loads(r[0]) for r in rows]
-
-
-log = EventLog(DATA / "events.db")
-sim = Sim(seed=7, on_event=log.add)
+rt = Runtime(seed=7, db_path=DATA / "events.db", assumptions_path=DATA / "assumptions.json")
 clients: set = set()
 
 
@@ -62,20 +39,20 @@ async def ticker():
     while True:
         await asyncio.sleep(TICK)
         now = time.monotonic()
-        real, prev = min(now - prev, 1.0), now        # 실제로 흐른 시간만큼 (멈칫해도 1초 이상 따라잡지 않음)
-        if sim.running:
-            acc += sim.speed * real / 60.0           # speed = 시뮬레이션 초 / 실제 초
+        real, prev = min(now - prev, 1.0), now
+        if rt.running:
+            acc += rt.rec.speed * real / 60.0           # speed = 시뮬레이션 초 / 실제 초
             while acc >= STEP:
                 acc -= STEP
-                sim.step()
-            log.db.commit()
+                rt.step()
+            rt.store.commit()
         await broadcast()
 
 
 async def broadcast():
     if not clients:
         return
-    msg = json.dumps(sim.state(), ensure_ascii=False)
+    msg = json.dumps(rt.state(), ensure_ascii=False)
     for ws in list(clients):
         try:
             await ws.send_text(msg)
@@ -90,88 +67,173 @@ async def lifespan(_app):
     task.cancel()
 
 
-app = FastAPI(title="상하역 지연 관제", version=VERSION, lifespan=lifespan)
+app = FastAPI(title="하역관제", version=VERSION, lifespan=lifespan)
+
+
+def need_sector(sector_id):
+    if sector_id not in rt.rec.sec_cfg:
+        raise HTTPException(404, f"호퍼 {sector_id}가 없습니다")
+
+
+def need_vehicle(vehicle_id):
+    if vehicle_id not in rt.rec.vehicles:
+        raise HTTPException(404, f"차량 {vehicle_id}가 없습니다")
 
 
 @app.get("/api/health")
-def health():
+async def health():
     return {"ok": True, "version": VERSION}
 
 
 @app.get("/api/config")
-def config():
-    return JSONResponse({"version": VERSION, "sectors": load("sectors.json"),
-                         "std_times": load("std_times.json"), "settings": load("settings.json")})
+async def config():
+    return JSONResponse({"version": VERSION, "sectors": load("sectors.json"), "std_times": load("std_times.json"),
+                         "settings": rt.rec.settings, "reasons": REASONS})
 
 
 @app.get("/api/state")
-def state():
-    return sim.state()
+async def state():
+    return rt.state()
 
 
 @app.get("/api/events")
-def events(limit: int = 50):
-    return log.recent(min(limit, 500))
+async def events(limit: int = 50):
+    return rt.store.recent_events(min(limit, 500))
 
 
+# ---------- 시계 ----------
 @app.post("/api/sim/start")
-def sim_start():
-    sim.running = True
+async def sim_start():
+    rt.running = True
     return {"running": True}
 
 
 @app.post("/api/sim/pause")
-def sim_pause():
-    sim.running = False
+async def sim_pause():
+    rt.running = False
     return {"running": False}
 
 
 @app.post("/api/sim/reset")
-def sim_reset():
-    sim.reset()
-    log.clear()
+async def sim_reset():
+    rt.running = False
+    rt.reset()
     return {"ok": True}
 
 
 @app.post("/api/sim/speed")
-def sim_speed(value: int):
+async def sim_speed(value: int):
     if not 1 <= value <= 1200:
         raise HTTPException(400, "배속은 1~1200 사이여야 합니다")
-    sim.speed = value
+    rt.speed = value
+    rt.rec.speed = value
     return {"speed": value}
 
 
-def need_sector(sector_id):
-    if sector_id not in sim.sec_cfg:
-        raise HTTPException(404, f"섹터 {sector_id}가 없습니다")
-
-
+# ---------- 시연 버튼 ----------
 @app.post("/api/events/sector_down")
-def sector_down(sector_id: str):
+async def sector_down(sector_id: str):
     need_sector(sector_id)
-    sim.sector_down(sector_id)
-    sim.replan()
+    rt.sector_down(sector_id)
     return {"ok": True}
 
 
 @app.post("/api/events/sector_up")
-def sector_up(sector_id: str):
+async def sector_up(sector_id: str):
     need_sector(sector_id)
-    sim.sector_up(sector_id)
-    sim.replan()
+    rt.sector_up(sector_id)
     return {"ok": True}
 
 
 @app.post("/api/events/urgent")
-def urgent():
-    return {"vehicle_id": sim.add_urgent()}
+async def urgent():
+    return {"vehicle_id": rt.add_urgent()}
+
+
+# ---------- 통합하역작업: 순번 승인 · 변경 ----------
+@app.get("/api/dock")
+async def dock():
+    return rt.dock()
+
+
+@app.post("/api/order/approve")
+async def order_approve(vehicle_id: str):
+    need_vehicle(vehicle_id)
+    if not rt.approve(vehicle_id):
+        raise HTTPException(409, "순번표에 없는 차량입니다")
+    return {"ok": True}
+
+
+@app.post("/api/order/approve_all")
+async def order_approve_all():
+    return {"approved": rt.approve_all()}
+
+
+@app.get("/api/order/impact")
+async def order_impact(vehicle_id: str, sector_id: str):
+    need_vehicle(vehicle_id)
+    need_sector(sector_id)
+    return rt.impact(vehicle_id, sector_id)
+
+
+@app.post("/api/order/change")
+async def order_change(body: dict = Body(...)):
+    vid, sid = body.get("vehicle_id"), body.get("sector_id")
+    need_vehicle(vid)
+    need_sector(sid)
+    c, err = rt.change(vid, sid, body.get("reason", ""), body.get("memo", ""))
+    if err:
+        raise HTTPException(409, err)
+    return c
+
+
+# ---------- 가정값 ----------
+@app.get("/api/assumptions")
+async def get_assumptions():
+    return {"values": rt.assumptions, "history": rt.history}
+
+
+@app.post("/api/assumptions")
+async def set_assumptions(body: dict = Body(...)):
+    try:
+        changed = rt.set_assumptions(body)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "숫자로 적어 주세요")
+    return {"changed": changed, "history": rt.history[:5]}
+
+
+# ---------- 운영 분석 ----------
+@app.get("/api/analysis")
+async def analysis():
+    return rt.analysis()
+
+
+@app.post("/api/suggestion/apply")
+async def suggestion_apply(key: str):
+    changed = rt.apply_suggestion(key)
+    if changed is None:
+        raise HTTPException(404, "이미 처리된 제안입니다")
+    return {"changed": changed}
+
+
+@app.post("/api/suggestion/ignore")
+async def suggestion_ignore(key: str):
+    rt.ignore_suggestion(key)
+    return {"ok": True}
+
+
+# ---------- 알림 이력 ----------
+@app.get("/api/alerts")
+async def alerts(level: str = "", kind: str = "", sector_id: str = "", unacked: bool = False):
+    return rt.alert_list(level or None, kind or None, sector_id or None, unacked)
 
 
 @app.post("/api/alerts/{alert_id}/ack")
-def ack(alert_id: str):
-    if not sim.ack_alert(alert_id):
+async def ack(alert_id: str):
+    a = rt.ack(alert_id)
+    if not a:
         raise HTTPException(404, "알림이 없습니다")
-    return {"ok": True}
+    return a
 
 
 @app.websocket("/ws")
@@ -179,7 +241,7 @@ async def ws(socket: WebSocket):
     await socket.accept()
     clients.add(socket)
     try:
-        await socket.send_text(json.dumps(sim.state(), ensure_ascii=False))
+        await socket.send_text(json.dumps(rt.state(), ensure_ascii=False))
         while True:
             await socket.receive_text()
     except WebSocketDisconnect:
@@ -187,7 +249,7 @@ async def ws(socket: WebSocket):
 
 
 @app.get("/")
-def index():
+async def index():
     return FileResponse(WEB / "index.html")
 
 
@@ -215,7 +277,7 @@ def lan_ips():
 if __name__ == "__main__":
     import argparse
     import uvicorn
-    ap = argparse.ArgumentParser(description="상하역 지연 관제 서버")
+    ap = argparse.ArgumentParser(description="하역관제 서버")
     ap.add_argument("--lan", action="store_true", help="같은 와이파이의 다른 기기도 접속하게 연다 (0.0.0.0)")
     ap.add_argument("--port", type=int, default=8000)
     args = ap.parse_args()
