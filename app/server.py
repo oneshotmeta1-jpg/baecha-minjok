@@ -1,28 +1,96 @@
-"""상하역 지연 관제 - FastAPI 서버 (v0 뼈대)
+"""상하역 지연 관제 - FastAPI 서버
 
-v0: 관제 화면(web/)과 설정 JSON만 내보낸다.
-다음 라운드에서 붙일 것: 시뮬레이션 시계(sim.py), 배정 엔진(engine.py), 알림(alerts.py),
-/api/state, /ws(WebSocket), /cam/{id}.mjpg, /m/driver, /m/manager.
+- 시뮬레이션 시계: 백그라운드에서 배속에 맞춰 sim.step() 을 돌린다 (시작·일시정지·배속·초기화)
+- 이벤트 로그: 모든 이벤트를 SQLite(data/events.db)에 남긴다
+- 화면: GET /api/state 와 WebSocket /ws 로 같은 상태를 받는다 (docs/events.md)
+- 돌발 이벤트: 섹터 정지·복구, 긴급 출하 넣기
 
 실행: python app/server.py  →  http://127.0.0.1:8000/
 """
+import asyncio
 import json
+import sqlite3
+import sys
+import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect  # noqa: E402
+from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+from app.sim import Sim, STEP, load  # noqa: E402
+
 DATA = ROOT / "data"
 WEB = ROOT / "web"
-VERSION = "v0"
+VERSION = "v1"
+TICK = 0.1  # 실제 초
 
-app = FastAPI(title="상하역 지연 관제", version=VERSION)
+
+class EventLog:
+    def __init__(self, path: Path):
+        self.db = sqlite3.connect(path, check_same_thread=False)
+        self.db.execute("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, ts TEXT, type TEXT, source TEXT,"
+                        " vehicle_id TEXT, sector_id TEXT, body TEXT)")
+        self.clear()
+
+    def clear(self):
+        self.db.execute("DELETE FROM events")
+        self.db.commit()
+
+    def add(self, ev):
+        self.db.execute("INSERT INTO events (ts,type,source,vehicle_id,sector_id,body) VALUES (?,?,?,?,?,?)",
+                        (ev["ts"], ev["type"], ev["source"], ev["vehicle_id"], ev["sector_id"],
+                         json.dumps(ev, ensure_ascii=False)))
+
+    def recent(self, limit):
+        rows = self.db.execute("SELECT body FROM events ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [json.loads(r[0]) for r in rows]
 
 
-def load(name: str):
-    return json.loads((DATA / name).read_text(encoding="utf-8"))
+log = EventLog(DATA / "events.db")
+sim = Sim(seed=7, on_event=log.add)
+clients: set = set()
+
+
+async def ticker():
+    acc = 0.0
+    prev = time.monotonic()
+    while True:
+        await asyncio.sleep(TICK)
+        now = time.monotonic()
+        real, prev = min(now - prev, 1.0), now        # 실제로 흐른 시간만큼 (멈칫해도 1초 이상 따라잡지 않음)
+        if sim.running:
+            acc += sim.speed * real / 60.0           # speed = 시뮬레이션 초 / 실제 초
+            while acc >= STEP:
+                acc -= STEP
+                sim.step()
+            log.db.commit()
+        await broadcast()
+
+
+async def broadcast():
+    if not clients:
+        return
+    msg = json.dumps(sim.state(), ensure_ascii=False)
+    for ws in list(clients):
+        try:
+            await ws.send_text(msg)
+        except Exception:
+            clients.discard(ws)
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    task = asyncio.create_task(ticker())
+    yield
+    task.cancel()
+
+
+app = FastAPI(title="상하역 지연 관제", version=VERSION, lifespan=lifespan)
 
 
 @app.get("/api/health")
@@ -32,13 +100,90 @@ def health():
 
 @app.get("/api/config")
 def config():
-    # 화면은 이 값으로 배치도·섹터 카드·CAM 자리를 그린다
-    return JSONResponse({
-        "version": VERSION,
-        "sectors": load("sectors.json"),
-        "std_times": load("std_times.json"),
-        "settings": load("settings.json"),
-    })
+    return JSONResponse({"version": VERSION, "sectors": load("sectors.json"),
+                         "std_times": load("std_times.json"), "settings": load("settings.json")})
+
+
+@app.get("/api/state")
+def state():
+    return sim.state()
+
+
+@app.get("/api/events")
+def events(limit: int = 50):
+    return log.recent(min(limit, 500))
+
+
+@app.post("/api/sim/start")
+def sim_start():
+    sim.running = True
+    return {"running": True}
+
+
+@app.post("/api/sim/pause")
+def sim_pause():
+    sim.running = False
+    return {"running": False}
+
+
+@app.post("/api/sim/reset")
+def sim_reset():
+    sim.reset()
+    log.clear()
+    return {"ok": True}
+
+
+@app.post("/api/sim/speed")
+def sim_speed(value: int):
+    if not 1 <= value <= 1200:
+        raise HTTPException(400, "배속은 1~1200 사이여야 합니다")
+    sim.speed = value
+    return {"speed": value}
+
+
+def need_sector(sector_id):
+    if sector_id not in sim.sec_cfg:
+        raise HTTPException(404, f"섹터 {sector_id}가 없습니다")
+
+
+@app.post("/api/events/sector_down")
+def sector_down(sector_id: str):
+    need_sector(sector_id)
+    sim.sector_down(sector_id)
+    sim.replan()
+    return {"ok": True}
+
+
+@app.post("/api/events/sector_up")
+def sector_up(sector_id: str):
+    need_sector(sector_id)
+    sim.sector_up(sector_id)
+    sim.replan()
+    return {"ok": True}
+
+
+@app.post("/api/events/urgent")
+def urgent():
+    return {"vehicle_id": sim.add_urgent()}
+
+
+@app.post("/api/alerts/{alert_id}/ack")
+def ack(alert_id: str):
+    if not sim.ack_alert(alert_id):
+        raise HTTPException(404, "알림이 없습니다")
+    return {"ok": True}
+
+
+@app.websocket("/ws")
+async def ws(socket: WebSocket):
+    await socket.accept()
+    clients.add(socket)
+    try:
+        await socket.send_text(json.dumps(sim.state(), ensure_ascii=False))
+        while True:
+            await socket.receive_text()
+    except WebSocketDisconnect:
+        clients.discard(socket)
 
 
 @app.get("/")

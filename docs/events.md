@@ -23,6 +23,24 @@
 - `source`: `cam` | `iot` | `sim` | `engine` | `ui`
 - 없는 값은 `null` (키는 남겨 둔다)
 
+## 샘플과 확인
+
+- 샘플: [sample_events.jsonl](sample_events.jsonl) — 시드 7, 섹터 A 정지(09:51)·긴급 출하(10:15)·A 복구(10:50) 포함 전체 하루 440건
+- 다시 만들기·형식 확인: `py tests/test_r1.py --samples`
+- 영상·설비가 붙기 전에는 시뮬레이터가 대신 내며 `source: "sim"`, `payload.stand_in: "cam" | "crane"`으로 표시한다.
+  비전 파트는 같은 이벤트를 `source: "cam"`으로 내면 된다.
+
+## 서버 API (app/server.py)
+
+| 주소 | 하는 일 |
+|---|---|
+| `GET /api/state`, `WS /ws` | 아래 상태 (WebSocket은 0.1초마다 밀어 줌) |
+| `GET /api/events?limit=50` | 최근 이벤트 로그 (SQLite `data/events.db`) |
+| `POST /api/sim/start` · `pause` · `reset` · `speed?value=60` | 시뮬레이션 시계 (speed = 시뮬레이션 초 / 실제 초) |
+| `POST /api/events/sector_down?sector_id=A` · `sector_up` | 섹터 정지·복구 → 이동·대기 차량 재배정 + Alert |
+| `POST /api/events/urgent` | 긴급 출하 차량 한 대 투입 |
+| `POST /api/alerts/{id}/ack` | 알림 확인 |
+
 ## 종류
 
 | type | 내는 곳 | 의미 |
