@@ -62,7 +62,7 @@ def scenario(seed=7):
 s, down_at = scenario()
 types = doc_types()
 seen = {e["type"] for e in s.events}
-check("이벤트 종류가 events.md 표와 일대일", seen == types, f"문서에만: {sorted(types - seen)}, 코드에만: {sorted(seen - types)}")
+check("시뮬레이션 이벤트가 모두 events.md 표에 있음", seen <= types, f"코드에만: {sorted(seen - types)}")
 check("모든 이벤트가 같은 키 9개를 가짐", all(list(e.keys()) == KEYS for e in s.events), f"{len(s.events)}건")
 check("source 값이 약속된 것만", {e["source"] for e in s.events} <= {"cam", "iot", "sim", "engine", "ui"})
 
@@ -88,9 +88,10 @@ yard = [{"id": "V1", "cargo": "슬러지", "std": 15, "urgent": False, "due_t": 
 sec = [{"id": "B", "name": "호퍼 B", "up": True, "bays": 1, "travel_min": 2, "cargo": ["슬러지"],
         "working_remain": [8.0], "pending_eta": []}]
 p = engine.plan(yard, sec, 0, cfg)[0]
-check("호출 시점: 남은 8분 - (이동2+여유1) → 5분 뒤 호출", abs(p["call_t"] - 5) < 1e-9, f"call_t={p['call_t']}")
-sec[0]["working_remain"] = [3.0]
-check("남은 3분 ≤ 이동2+여유1 → 지금 호출", engine.plan(yard, sec, 0, cfg)[0]["call_t"] == 0)
+mg = cfg["call"]["margin_min"]
+check(f"호출 시점: 남은 8분 - (이동2+여유{mg:g}) → {8 - 2 - mg:g}분 뒤 호출", abs(p["call_t"] - (8 - 2 - mg)) < 1e-9, f"call_t={p['call_t']}")
+sec[0]["working_remain"] = [2.0 + mg]
+check(f"남은 {2 + mg:g}분 ≤ 이동2+여유{mg:g} → 지금 호출", engine.plan(yard, sec, 0, cfg)[0]["call_t"] == 0)
 yard2 = [dict(yard[0], id="V2", cargo="석회석", due_t=300, yard_t=-40),
          dict(yard[0], id="V3", cargo="석회석", due_t=20),
          dict(yard[0], id="V4", cargo="석회석", urgent=True, due_t=400)]
@@ -133,6 +134,75 @@ raised = judge([(0, 974, 1487, 1517, 0.72), (0, 336, 1493, 1515, 0.64)])   # 팀
 lowered = judge([(100, 500, 1500, 1050, 0.8)])
 check("사진 판정: 적재함 든 사진 → 하차 중 (비율 0.79)", raised["state"] == "unloading" and raised["ratio"] == 0.79)
 check("사진 판정: 낮고 긴 박스 → 적재함 내림", lowered["state"] == "bed_down", f"비율 {lowered['ratio']}")
+
+# 6) R2: FIFO 비교 · 순번 승인/변경 · 알림 확인 · 가정값 재계산 · 피드백 제안
+from app.runtime import Runtime  # noqa: E402
+fake_clock = [100.0]
+rt = Runtime(7, clock=lambda: fake_clock[0])
+rt.advance(420)
+c = rt.compare()
+check("FIFO 대비 추천 평균 대기 감소 (시드 7, 하루)", c["reduction_pct"] > 0,
+      f"FIFO {c['fifo']['avg_wait']}분 → 추천 {c['rec']['avg_wait']}분 ({c['reduction_pct']}%) · 반입 {c['fifo']['trips_done']}→{c['rec']['trips_done']}회")
+check("비용 = 줄어든 대기×대기 단가 + 줄어든 유휴×유휴 단가",
+      abs(c["cost"]["total"] - round(c["saved_wait_min"] / 60 * 30000 + c["saved_idle_min"] / 60 * 200000, -2)) <= 100,
+      f"{c['cost']}")
+
+rt = Runtime(7, clock=lambda: fake_clock[0])
+lime = None
+while rt.rec.t < 120 and not lime:
+    rt.step()
+    lime = next((p for p in rt.rec.plan if rt.rec.vehicles[p["vehicle_id"]]["cargo"] == "석회석" and p["sector_id"]), None)
+vid, to = lime["vehicle_id"], ("C" if lime["sector_id"] == "A" else "A")
+imp = rt.impact(vid, to)
+ch, err = rt.change(vid, to, "호퍼·설비 사정", "A 하차구 점검")
+check("순번 변경: 영향 계산·사유 기록·상태 '변경됨'", ch and not err and rt.order_status(vid) == "변경됨"
+      and next(p for p in rt.rec.plan if p["vehicle_id"] == vid)["sector_id"] == to
+      and rt.store.db.execute("SELECT COUNT(*) FROM changes").fetchone()[0] == 1,
+      f"{vid} {lime['sector_id']}→{to} · 대기 {imp['delta_min']:+}분 · ₩{imp['cost_won']:,}")
+check("변경 사유가 목록에 없으면 거절", rt.change(vid, "A", "아무거나")[1] is not None)
+while len(rt.rec.plan) < 3 and rt.rec.t < 200:
+    rt.step()
+n = rt.approve_all()
+others = [p for p in rt.rec.plan if p["vehicle_id"] not in rt.rec.overrides and p["sector_id"]]
+check("전체 승인 → 바꾼 차량 빼고 모두 '승인됨'", n == len(others) > 0 and all(rt.order_status(p["vehicle_id"]) == "승인됨" for p in others)
+      and rt.order_status(vid) in ("변경됨", "이동 중"), f"{n}대 · 바꾼 차량 {rt.order_status(vid)}")
+while not any(a["kind"] != "호출" for a in rt.rec.alerts_all) and rt.rec.t < 300:
+    rt.step()
+before = rt.alert_list()["summary"]["unacked"]
+target = next(a for a in rt.rec.alerts_all if a["kind"] != "호출")
+fake_clock[0] += 12.5
+rt.ack(target["id"])
+s2 = rt.alert_list()["summary"]
+check("알림 확인 → 미확인 감소, 평균 확인 시간 기록", s2["unacked"] == before - 1 and s2["avg_ack_sec"] == 12.5, f"{before}→{s2['unacked']}건 · {s2['avg_ack_sec']}초")
+check("알림 거르기(종류)", all(a["kind"] == target["kind"] for a in rt.alert_list(kind=target["kind"])["rows"]))
+t_before = rt.rec.t
+changed = rt.set_assumptions({"std_times": {"슬러지": 18}, "target_wait_min": 20})
+types_after = {e["type"] for e in rt.rec.events}
+check("가정값 변경 → 같은 시각까지 재계산, 변경·승인·확인 기록 유지",
+      changed and rt.rec.t == t_before and rt.history
+      and any(e["type"] == "CALL" and e["vehicle_id"] == vid and e["sector_id"] == to for e in rt.rec.events)
+      and {"ORDER_CHANGED", "ORDER_APPROVED", "ALERT_ACK", "ASSUMPTIONS_UPDATED"} <= types_after
+      and next(a for a in rt.rec.alerts_all if a["id"] == target["id"])["ack"],
+      " · ".join(changed))
+check("이벤트 종류가 events.md 표와 일대일 (시뮬레이션 + 담당자 행동)", (seen | types_after) == types,
+      f"문서에만: {sorted(types - seen - types_after)}")
+for i in range(3):            # 같은 호퍼·같은 사유 3번 → 제안
+    while True:
+        rt.step()
+        p = next((p for p in rt.rec.plan if rt.rec.vehicles[p["vehicle_id"]]["cargo"] == "석회석" and p["sector_id"] == "A"
+                  and p["vehicle_id"] not in rt.rec.overrides), None)
+        if p or rt.rec.t > 400:
+            break
+    if p:
+        rt.change(p["vehicle_id"], "C", "호퍼·설비 사정")
+fb = rt.feedback()
+sg = fb["suggestions"]
+check("같은 사유 3번 반복 → 가정값 조정 제안", sg and sg[0]["cargo"] == "석회석", sg[0]["text"] if sg else str(fb["counts"]))
+if sg:
+    old = rt.assumptions["std_times"]["석회석"]
+    rt.apply_suggestion(sg[0]["key"])
+    check("제안 [적용] → 표준시간이 바뀌고 이력 남음", rt.assumptions["std_times"]["석회석"] == sg[0]["new"] != old,
+          f"석회석 {old:g} → {rt.assumptions['std_times']['석회석']:g}분")
 
 if "--samples" in sys.argv:
     out = ROOT / "docs" / "sample_events.jsonl"

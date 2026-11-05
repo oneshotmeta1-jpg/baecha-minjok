@@ -38,7 +38,78 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;background:v
 nav{display:flex;gap:4px;background:var(--soft);border-radius:999px;padding:4px}
 nav a,nav span{display:inline-flex;align-items:center;min-height:36px;padding:0 16px;border-radius:999px;font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none}
 nav a[aria-current]{background:var(--ink);color:#fff}
-nav span{color:var(--dim);cursor:not-allowed}
+nav a:not([aria-current]):hover{background:var(--card)}
+nav .cnt{margin-left:6px;min-width:18px;height:18px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+nav .cnt[hidden]{display:none}
+.view{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px}
+.view[hidden]{display:none}
+.simnote{font-size:11.5px;color:var(--muted)}
+
+/* 통합하역작업 탭 */
+.dock-grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.6fr) minmax(360px,1fr);grid-template-rows:auto minmax(0,1fr);gap:12px}
+.dock-grid .hoppers{grid-column:1/-1}
+.hp .ruler{position:relative;height:8px;background:var(--soft-2);border-radius:4px}
+.hp .ruler i{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+.hp .ruler b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink-2)}
+.hp .ruler-l{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+.hold{font-size:12px;font-weight:600;color:var(--red);background:var(--red-bg);border-radius:8px;padding:4px 8px}
+.st{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.st.wait{background:var(--soft);color:var(--ink-2)} .st.ok{background:var(--green-bg);color:var(--green)} .st.chg{background:var(--orange-bg);color:var(--orange)} .st.mv{background:var(--blue-bg);color:var(--blue)}
+.mini{border:1px solid var(--line-2);background:var(--card);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600}
+.mini:hover{border-color:var(--ink)}
+.mini.dark{background:var(--ink);border-color:var(--ink);color:#fff}
+tr.editing td{background:#FAFAF8}
+.edit{display:flex;flex-direction:column;gap:8px;padding:6px 0}
+.edit .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.edit label.rs{display:inline-flex;align-items:center;gap:4px;font-size:12px;border:1px solid var(--line-2);border-radius:999px;padding:3px 10px;cursor:pointer}
+.edit label.rs:has(input:checked){background:var(--ink);color:#fff;border-color:var(--ink)}
+.edit label.rs input{position:absolute;opacity:0;pointer-events:none}
+.edit input[type=text]{flex:1;min-width:160px;border:1px solid var(--line-2);border-radius:10px;padding:6px 10px;font:inherit}
+.edit select{border:1px solid var(--line-2);border-radius:10px;padding:5px 8px;font:inherit}
+.impact{font-size:12.5px;font-weight:600}
+.impact.bad{color:var(--orange)} .impact.zero{color:var(--green)}
+.notice{font-size:12.5px;background:var(--blue-bg);color:var(--blue);border-radius:10px;padding:6px 10px}
+.cmp{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:6px 12px;align-items:baseline;font-size:13px}
+.cmp .h{font-size:11.5px;color:var(--muted);font-weight:600}
+.cmp .f{color:var(--muted)} .cmp .r{font-weight:700} .cmp .d{font-weight:700;text-align:right}
+.good{color:var(--green)} .bad{color:var(--red)}
+.form{display:grid;grid-template-columns:minmax(0,1fr) 110px;gap:6px 10px;align-items:center;font-size:13px}
+.form input{width:100%;border:1px solid var(--line-2);border-radius:10px;padding:5px 8px;font:inherit;text-align:right;font-variant-numeric:tabular-nums}
+.form .sec{grid-column:1/-1;font-size:12px;color:var(--muted);font-weight:600;margin-top:6px}
+
+/* 운영 분석 탭 */
+.ana-grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) minmax(0,1fr);gap:12px}
+.tiles{grid-column:1/-1;display:grid;grid-template-columns:1.3fr 1.3fr repeat(4,minmax(0,1fr));gap:12px}
+.tile{background:var(--card);border-radius:20px;padding:12px 16px;display:flex;flex-direction:column;gap:2px}
+.tile .k{font-size:12px;color:var(--muted);font-weight:600}
+.tile .v{font-size:30px;font-weight:700;line-height:1.15}
+.tile .v small{font-size:14px;color:var(--muted);font-weight:600;margin-left:2px}
+.tile .s{font-size:12px;color:var(--ink-2)}
+.tile .fr{font-size:13px;color:var(--muted)}
+.tile.hero{background:var(--ink);color:#fff}
+.tile.hero .k,.tile.hero .s,.tile.hero .v small{color:#C9CDD1}
+#chart{width:100%;height:100%;min-height:180px;display:block}
+.chart-wrap{position:relative;flex:1;min-height:0}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:#fff;font-size:12px;border-radius:8px;padding:6px 9px;white-space:nowrap;transform:translate(-50%,-110%)}
+.tip[hidden]{display:none}
+.lg{display:flex;gap:12px;font-size:12px;color:var(--ink-2)}
+.lg i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+.bars{display:flex;flex-direction:column;gap:6px}
+.bars .b{display:grid;grid-template-columns:120px minmax(0,1fr) 28px;gap:8px;align-items:center;font-size:12.5px}
+.bars .t{height:10px;background:var(--soft-2);border-radius:5px;overflow:hidden}
+.bars .t i{display:block;height:100%;background:var(--ink-2);border-radius:5px}
+.sugg{border:1px solid var(--line);border-radius:14px;padding:10px 12px;font-size:13px;display:flex;flex-direction:column;gap:8px}
+.formula{font-size:13px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px}
+.formula .eq{font-size:12px;color:var(--muted);grid-column:1/-1;margin-top:-4px}
+.formula .tot{border-top:1px solid var(--line);padding-top:6px;font-weight:700}
+
+/* 알림 이력 탭 */
+.al-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.filters select{border:1px solid var(--line-2);border-radius:999px;padding:6px 10px;font:inherit;font-size:13px;background:var(--card)}
+.lvl{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px}
+.lvl.crit{background:var(--red-bg);color:var(--red)} .lvl.warn{background:var(--orange-bg);color:var(--orange)} .lvl.info{background:var(--blue-bg);color:var(--blue)}
+tr.unacked td:first-child{box-shadow:inset 3px 0 0 var(--red)}
 .sp{flex:1}
 .grp{display:flex;align-items:center;gap:6px;background:var(--soft);border-radius:999px;padding:4px 4px 4px 12px}
 .grp .lbl{font-size:12px;color:var(--muted);font-weight:600}
@@ -148,7 +219,7 @@ dialog::backdrop{background:rgba(20,20,20,.55)}
     <div class="logo" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16h10V9H3z"/><path d="M13 12h4l3 3v1h-7z"/><path d="M5 9l4-5 6 2-2 3"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="16.5" cy="17.5" r="1.8"/></svg></div>
     <div><b>하역관제</b><small id="siteName">포항제철소 소결공장 · 시뮬레이션</small></div>
   </div>
-  <nav aria-label="주 메뉴"><a href="/" aria-current="page">관제 화면</a><span title="다음 라운드">통합하역작업</span><span title="다음 라운드">운영 분석</span><span title="다음 라운드">알림 이력</span></nav>
+  <nav aria-label="주 메뉴"><a href="#monitor" data-view="monitor">관제 화면</a><a href="#dock" data-view="dock">통합하역작업</a><a href="#analysis" data-view="analysis">운영 분석</a><a href="#alerts" data-view="alerts">알림 이력<span class="cnt num" id="navAlert" hidden></span></a></nav>
   <span class="sp"></span>
   <div class="grp" aria-label="시뮬레이션">
     <span class="conn" id="conn" title="연결 중"></span>
@@ -165,6 +236,7 @@ dialog::backdrop{background:rgba(20,20,20,.55)}
   </div>
 </header>
 
+<div class="view" id="view-monitor">
 <section class="kpis" aria-label="요약">
   <div class="kpi"><span class="k">대기장 대기 차량</span><span class="v num" id="kWait">0<small>대</small></span><span class="s" id="kWaitS">—</span></div>
   <div class="kpi"><span class="k">평균 대기시간 (호출까지)</span><span class="v num" id="kAvg">0<small>분</small></span><span class="s" id="kAvgS">—</span></div>
@@ -211,6 +283,68 @@ dialog::backdrop{background:rgba(20,20,20,.55)}
     <div class="bd"><div class="alerts" id="alerts"><div class="empty">아직 알림이 없습니다. 시작을 누르면 덤프트럭이 들어옵니다.</div></div></div>
   </section>
 </main>
+</div>
+
+<!-- 통합하역작업 -->
+<div class="view" id="view-dock" hidden>
+  <div class="dock-grid">
+    <div class="hoppers" id="dockHoppers"></div>
+    <section class="card" aria-label="호출 순번표">
+      <div class="hd"><h2>호출 순번표</h2><span class="sub">투입 기한이 급한 차량부터, 가장 빨리 비는 호퍼로 추천 · 시간이 되면 자동 호출</span><span class="sp"></span>
+        <span class="simnote" id="editNote" hidden>편집 중에는 표가 멈춰 있어요</span><button class="pill-btn dark" id="approveAll">전체 승인</button></div>
+      <div class="bd"><div id="dockMsg"></div><div id="orderTable"></div></div>
+    </section>
+    <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
+      <section class="card" aria-label="KPI 비교">
+        <div class="hd"><h2>KPI 비교</h2><span class="sub">같은 도착 데이터 · 기존 FIFO vs 추천</span></div>
+        <div class="bd" id="dockKpi"></div>
+      </section>
+      <section class="card" aria-label="가정값 설정" style="flex:1">
+        <div class="hd"><h2>가정값 설정</h2><span class="sub">바꾸면 처음부터 다시 계산</span><span class="sp"></span><button class="pill-btn dark" id="recalc">재계산</button></div>
+        <div class="bd"><form class="form" id="assumeForm" onsubmit="return false"></form><p class="cap" id="assumeHist" style="margin:8px 0 0"></p></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- 운영 분석 -->
+<div class="view" id="view-analysis" hidden>
+  <div class="ana-grid">
+    <div class="tiles" id="anaTiles"></div>
+    <section class="card" aria-label="시간대별 대기 차량">
+      <div class="hd"><h2>시간대별 대기 차량</h2><span class="sub" id="chartNote">아직 하차를 시작하지 못한 차량 (대기장 + 호출 이동 + 호퍼 대기), 10분 간격</span><span class="sp"></span>
+        <span class="lg"><span><i style="border-color:#B8420A;border-top-style:dashed"></i>기존 FIFO</span><span><i style="border-color:#1D47B8"></i>추천 방식</span></span></div>
+      <div class="bd" style="display:flex;flex-direction:column"><div class="chart-wrap"><svg id="chart" role="img" aria-label="시간대별 대기 차량 수, 기존 FIFO와 추천 방식 비교"></svg><div class="tip" id="tip" hidden></div></div></div>
+    </section>
+    <section class="card" aria-label="비용 계산 근거">
+      <div class="hd"><h2>비용 계산 근거</h2><span class="assumed">가정 단가 · 근거 확인 필요</span></div>
+      <div class="bd" id="costBox"></div>
+    </section>
+    <section class="card" aria-label="원료별 성과">
+      <div class="hd"><h2>원료별 성과</h2><span class="sub">추천 방식 · 끝난 반입 기준</span></div>
+      <div class="bd" id="cargoTable"></div>
+    </section>
+    <section class="card" aria-label="추천 피드백">
+      <div class="hd"><h2>추천 피드백</h2><span class="sub" id="fbSub">담당자가 순번을 바꾼 이유</span></div>
+      <div class="bd" id="fbBox"></div>
+    </section>
+  </div>
+</div>
+
+<!-- 알림 이력 -->
+<div class="view" id="view-alerts" hidden>
+  <div class="al-tiles" id="alTiles"></div>
+  <section class="card" aria-label="알림 이력" style="flex:1">
+    <div class="hd"><h2>알림 이력</h2><span class="sub" id="alSub"></span><span class="sp"></span>
+      <div class="filters">
+        <select id="fLevel" aria-label="등급"><option value="">등급 전체</option><option value="crit">위험</option><option value="warn">주의</option><option value="info">정보</option></select>
+        <select id="fKind" aria-label="종류"><option value="">종류 전체</option><option>호퍼 이상</option><option>혼잡</option><option>하차 지연</option><option>대기 초과</option><option>호출</option></select>
+        <select id="fSector" aria-label="호퍼"><option value="">호퍼 전체</option></select>
+        <label class="chip"><input type="checkbox" id="fUnacked"> 확인 안 한 것만</label>
+      </div></div>
+    <div class="bd" id="alTable"></div>
+  </section>
+</div>
 
 <dialog id="camDlg" aria-label="CAM 크게 보기">
   <div class="dlg">
@@ -465,6 +599,10 @@ function render(s){
     sh.poly.setAttribute('fill',x.status==='down'?'url(#hatch)':LV_FILL[x.level]);
     sh.pct.textContent=x.status==='down'?'정지':x.congestion_pct+'%';
   });
+  const openN=s.alerts.filter(a=>!a.ack&&a.kind!=='호출').length;
+  $('#navAlert').hidden=!openN; $('#navAlert').textContent=openN;
+  if(view==='dock') renderOrders(s);
+  if(view!=='monitor'){ renderAlerts(); return; }
   drawVehicles(s.vehicles);
   drawCams(s);
 
@@ -518,6 +656,230 @@ $('#downBtn').addEventListener('click',()=>{ const id=$('#downSel').value, x=las
 $('#urgentBtn').addEventListener('click',()=>post('/api/events/urgent').then(refresh));
 $('#alerts').addEventListener('click',e=>{ const b=e.target.closest('[data-ack]'); if(b) post('/api/alerts/'+encodeURIComponent(b.dataset.ack)+'/ack').then(refresh); });
 
+/* ================= 탭 (#monitor · #dock · #analysis · #alerts) ================= */
+const VIEWS=['monitor','dock','analysis','alerts'];
+let view='monitor';
+const won=n=>'₩'+Math.round(n).toLocaleString();
+const sgn=(n,u)=>(n>0?'+':n<0?'−':'')+Math.abs(Math.round(n*10)/10)+u;
+function route(){
+  const h=location.hash.replace('#','');
+  view=VIEWS.includes(h)?h:'monitor';
+  VIEWS.forEach(v=>$('#view-'+v).hidden=(v!==view));
+  document.querySelectorAll('nav a').forEach(a=>{ if(a.dataset.view===view) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
+  if($('#camDlg').open && view!=='monitor') $('#camDlg').close();
+  pollView(true);
+}
+window.addEventListener('hashchange',route);
+async function getJ(u){ const r=await fetch(u); if(!r.ok) throw new Error(r.status); return r.json(); }
+async function postJ(u,body){ const r=await fetch(u,{method:'POST',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined}); const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.detail||r.status); return j; }
+let polling=false;
+async function pollView(force){
+  if(polling&&!force) return; polling=true;
+  try{
+    if(view==='dock') renderDock(await getJ('/api/dock'));
+    else if(view==='analysis') renderAnalysis(await getJ('/api/analysis'));
+    else if(view==='alerts') renderAlertHistory(await getJ('/api/alerts?'+alertQuery()));
+  }catch(e){} finally{ polling=false; }
+}
+setInterval(()=>pollView(false),1000);
+const sname=id=>(S.sectors.find(s=>s.id===id)||{}).name||id||'보류';
+
+/* ---------- 통합하역작업 ---------- */
+let editing=null;          // {vehicle_id, sector_id, reason, memo}
+let dockMsg='';
+function hopperCard(x){
+  const lv=x.status==='down'?'down':x.level;
+  const lvColor={ok:'var(--green)',warn:'var(--orange)',crit:'var(--red)',down:'var(--red)'}[lv];
+  const delayed=x.working.filter(w=>w.delayed);
+  const work=x.working.length?x.working.map(w=>{
+    const late=w.elapsed_min>w.std;
+    return '<span class="plate num">'+esc(w.vehicle_id)+'</span><div class="pbar'+(w.delayed?' late':'')+'"><i style="width:'+w.progress_pct+'%"></i></div>'+
+      '<span class="num'+(late?' late-t':'')+'">'+(late?'표준 +'+Math.round(w.elapsed_min-w.std)+'분':w.progress_pct+'% · 남은 약 '+Math.ceil(w.remain_min)+'분')+'</span>'+
+      '<span></span><span style="grid-column:2/-1;color:var(--muted)">'+esc(w.cargo)+' '+w.load_t+'t · 하차구 '+(w.bay+1)+'</span>';
+  }).join(''):'<span class="empty" style="grid-column:1/-1">하차 중인 차량 없음</span>';
+  const pos=p=>Math.min(p,120)/120*100;
+  return '<div class="hp'+(x.status==='down'?' down':'')+'"><div class="top"><div><b>'+esc(x.name)+'</b><div class="role">'+esc(x.role)+' · '+esc(x.cargo.join('·'))+'</div></div><span class="chip '+lv+'">'+LV_TEXT[lv]+'</span><span class="pct num">'+x.congestion_pct+'%</span></div>'+
+    '<div class="ruler" title="혼잡도 '+x.congestion_pct+'%"><i style="width:'+pos(x.congestion_pct)+'%;background:'+lvColor+'"></i><b style="left:'+pos(x.warn_pct)+'%"></b><b style="left:'+pos(x.crit_pct)+'%"></b></div>'+
+    '<div class="ruler-l"><span>0</span><span>주의 '+x.warn_pct+' · 혼잡 '+x.crit_pct+'</span><span>120%</span></div>'+
+    '<div class="meta"><span>배정 대기 <b class="num">'+x.assigned+'대</b></span><span>오늘 처리 <b class="num">'+x.done+'대</b></span><span>평균 하차 <b class="num">'+(x.done?x.avg_unload+'분':'—')+'</b></span><span>하차구 <b class="num">'+x.working.length+'/'+x.bays+'</b></span></div>'+
+    (delayed.length?'<div class="hold">하차 지연 (표준 ×'+cfg.settings.delay.factor+' 초과) · 다음 호출 보류 · '+esc(delayed.map(w=>w.vehicle_id).join(', '))+'</div>':'')+
+    (x.status==='down'?'<div class="hold">호퍼 정지 · 배정 차량은 다른 호퍼로</div>':'')+
+    '<div class="work">'+work+'</div></div>';
+}
+const STATUS_CLS={'승인 대기':'wait','승인됨':'ok','변경됨':'chg','이동 중':'mv'};
+function renderOrders(s){
+  if(editing){ $('#editNote').hidden=false; return; }
+  $('#editNote').hidden=true;
+  if(!s.queue.length){ $('#orderTable').innerHTML='<div class="empty">대기장에서 순번을 기다리는 덤프트럭이 없습니다. 관제 화면에서 시작을 누르면 들어옵니다.</div>'; return; }
+  $('#orderTable').innerHTML='<table><thead><tr><th>순번</th><th>차량</th><th>원료 · 투입 기한</th><th class="r">대기</th><th>보낼 호퍼</th><th class="r">예상 호출</th><th>추천 이유</th><th>상태</th><th></th></tr></thead><tbody>'+
+    s.queue.map(q=>'<tr><td><span class="rank">'+q.rank+'</span></td><td><span class="plate">'+esc(q.vehicle_id)+'</span>'+(q.urgent?'<span class="badge">긴급</span>':'')+'</td>'+
+      '<td>'+esc(q.cargo)+' '+q.load_t+'t<div class="cap">기한 '+esc(q.due)+'</div></td><td class="r num">'+Math.floor(q.wait_min)+'분</td><td><b>'+esc(sname(q.sector_id))+'</b></td>'+
+      '<td class="r num">'+esc(q.call_at||'—')+'</td><td>'+esc(q.reason)+'</td><td><span class="st '+(STATUS_CLS[q.status]||'wait')+'">'+esc(q.status)+'</span></td>'+
+      '<td style="white-space:nowrap">'+(q.status==='승인 대기'&&q.sector_id?'<button class="mini dark" data-approve="'+esc(q.vehicle_id)+'">승인</button> ':'')+
+      (fitSectors(q.cargo).length>1?'<button class="mini" data-edit="'+esc(q.vehicle_id)+'">변경</button>':'<span class="cap" title="받을 수 있는 호퍼가 하나뿐">전용</span>')+'</td></tr>').join('')+'</tbody></table>';
+}
+const fitSectors=cargo=>S.sectors.filter(s=>s.cargo.includes(cargo));
+function openEdit(vid){
+  const q=last.queue.find(x=>x.vehicle_id===vid); if(!q) return;
+  const opts=fitSectors(q.cargo).filter(s=>s.id!==q.sector_id);
+  editing={vehicle_id:vid,sector_id:opts[0]?opts[0].id:null,reason:'',memo:'',from:q.sector_id};
+  $('#editNote').hidden=false;
+  const tr=[...document.querySelectorAll('#orderTable tbody tr')].find(r=>r.querySelector('[data-edit="'+CSS.escape(vid)+'"]'));
+  if(!tr) return;
+  tr.classList.add('editing');
+  const ed=document.createElement('tr'); ed.className='editing'; ed.id='editRow';
+  ed.innerHTML='<td></td><td colspan="8"><div class="edit">'+
+    '<div class="row"><b>'+esc(vid)+'</b> · '+esc(q.cargo)+' · '+esc(sname(q.sector_id))+' → <select id="edSector" aria-label="보낼 호퍼">'+opts.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('')+'</select><span class="impact" id="edImpact">영향 계산 중…</span></div>'+
+    '<div class="row" role="radiogroup" aria-label="변경 사유">'+cfg.reasons.map((r,i)=>'<label class="rs"><input type="radio" name="edReason" value="'+esc(r)+'">'+esc(r)+'</label>').join('')+'</div>'+
+    '<div class="row"><input type="text" id="edMemo" placeholder="메모 (선택) 예: 기사 휴게 중, 5분 뒤 출발 가능" maxlength="200"><button class="mini dark" id="edSave">저장</button><button class="mini" id="edCancel">취소</button><span class="cap" id="edErr"></span></div></div></td>';
+  tr.after(ed);
+  $('#edSector').addEventListener('change',e=>{ editing.sector_id=e.target.value; loadImpact(); });
+  ed.querySelectorAll('input[name=edReason]').forEach(r=>r.addEventListener('change',e=>{ editing.reason=e.target.value; }));
+  $('#edMemo').addEventListener('input',e=>{ editing.memo=e.target.value; });
+  $('#edCancel').addEventListener('click',closeEdit);
+  $('#edSave').addEventListener('click',saveEdit);
+  loadImpact();
+}
+async function loadImpact(){
+  if(!editing||!editing.sector_id) return;
+  try{ const im=await getJ('/api/order/impact?vehicle_id='+encodeURIComponent(editing.vehicle_id)+'&sector_id='+encodeURIComponent(editing.sector_id));
+    const el=$('#edImpact'); if(!el) return;
+    el.className='impact '+(im.delta_min>0.05?'bad':'zero');
+    el.textContent=im.delta_min>0.05?'추천 대비 대기 '+sgn(im.delta_min,'분')+' · 비용 +'+won(im.cost_won)+' (가정 단가)':'추천과 대기 차이 없음';
+  }catch(e){ const el=$('#edImpact'); if(el) el.textContent='영향을 계산하지 못했습니다'; }
+}
+function closeEdit(){ editing=null; const r=$('#editRow'); if(r) r.remove(); if(last) renderOrders(last); }
+async function saveEdit(){
+  if(!editing.reason){ $('#edErr').textContent='변경 사유를 골라 주세요'; return; }
+  try{
+    const c=await postJ('/api/order/change',{vehicle_id:editing.vehicle_id,sector_id:editing.sector_id,reason:editing.reason,memo:editing.memo});
+    dockMsg='다시 계산함 · '+c.vehicle_id+' → '+sname(c.to)+' · 추천 대비 대기 '+sgn(c.delta_min,'분')+', 비용 +'+won(c.cost_won)+' · 사유 '+c.reason+' · 같은 사유가 반복되면 가정값 조정을 제안해요';
+    editing=null; const r=$('#editRow'); if(r) r.remove(); await refresh(); pollView(true);
+  }catch(e){ $('#edErr').textContent=e.message; }
+}
+$('#orderTable').addEventListener('click',async e=>{
+  const a=e.target.closest('[data-approve]'), ed=e.target.closest('[data-edit]');
+  if(a){ try{ await postJ('/api/order/approve?vehicle_id='+encodeURIComponent(a.dataset.approve)); await refresh(); }catch(err){} }
+  else if(ed&&!editing) openEdit(ed.dataset.edit);
+});
+$('#approveAll').addEventListener('click',async()=>{ try{ const r=await postJ('/api/order/approve_all'); dockMsg=r.approved+'대 승인했습니다.'; await refresh(); pollView(true);}catch(e){} });
+const AFIELDS=[['sec','혼잡·대기'],['warn_pct','혼잡 주의 기준 (%)'],['crit_pct','혼잡 기준 (%)'],['target_wait_min','목표 대기시간 (분)'],['call_margin_min','호출 여유시간 (분)'],['delay_factor','하차 지연 기준 (표준 ×)'],
+  ['sec','단가 (가정)'],['wait_won_per_hour','차량 대기 단가 (원/시간)'],['idle_won_per_hour','호퍼 유휴 단가 (원/시간)'],['sec','원료별 하차 표준시간 (분)']];
+let formBuilt=false;
+function buildForm(a){
+  $('#assumeForm').innerHTML=AFIELDS.map(([k,l])=>k==='sec'?'<div class="sec">'+esc(l)+'</div>':'<label for="as-'+k+'">'+esc(l)+'</label><input id="as-'+k+'" data-k="'+k+'" inputmode="decimal" value="'+a[k]+'">').join('')+
+    Object.keys(a.std_times).map(c=>'<label for="as-std-'+esc(c)+'">'+esc(c)+'</label><input id="as-std-'+esc(c)+'" data-std="'+esc(c)+'" inputmode="decimal" value="'+a.std_times[c]+'">').join('');
+  formBuilt=true;
+}
+$('#recalc').addEventListener('click',async()=>{
+  const body={std_times:{}}; let bad=false;
+  document.querySelectorAll('#assumeForm input').forEach(i=>{ const v=Number(i.value); if(!isFinite(v)||v<0){bad=true;i.style.borderColor='var(--red)';} else i.style.borderColor=''; if(i.dataset.std) body.std_times[i.dataset.std]=v; else body[i.dataset.k]=v; });
+  if(bad){ dockMsg='숫자가 아닌 칸이 있습니다. 빨간 칸을 고쳐 주세요.'; return; }
+  try{ const r=await postJ('/api/assumptions',body); dockMsg=r.changed.length?'재계산했습니다 · '+r.changed.join(' · '):'바뀐 값이 없습니다.'; formBuilt=false;
+    try{ cfg.settings=(await getJ('/api/config')).settings; }catch(e){} await refresh(); pollView(true); }catch(e){ dockMsg='재계산하지 못했습니다: '+e.message; }
+});
+function renderDock(d){
+  $('#dockHoppers').innerHTML=d.sectors.map(hopperCard).join('');
+  $('#dockMsg').innerHTML=dockMsg?'<div class="notice" style="margin-bottom:8px">'+esc(dockMsg)+'</div>':'';
+  if(last) renderOrders(last);
+  const c=d.compare, f=c.fifo, r=c.rec;
+  const row=(k,a,b,u,better)=>{ const dv=b-a; const good=better==='low'?dv<0:dv>0; return '<span>'+k+'</span><span class="f num">'+a+u+'</span><span class="r num">'+b+u+'</span><span class="d num '+(Math.abs(dv)<0.05?'':good?'good':'bad')+'">'+(a?sgn(dv,u):'—')+'</span>'; };
+  $('#dockKpi').innerHTML='<div class="cmp"><span class="h">지표</span><span class="h">기존 FIFO</span><span class="h">추천</span><span class="h" style="text-align:right">차이</span>'+
+    row('평균 대기',f.avg_wait,r.avg_wait,'분','low')+row('최대 대기',f.max_wait,r.max_wait,'분','low')+row('호퍼 유휴',Math.round(f.idle_min),Math.round(r.idle_min),'분','low')+row('반입 완료',f.trips_done,r.trips_done,'회','high')+row('투입 기한 초과',f.late,r.late,'건','low')+'</div>'+
+    '<p style="margin:10px 0 0;font-size:13px">평균 대기 <b class="'+(c.reduction_pct>0?'good':'bad')+'">'+(c.reduction_pct>0?'−':'+')+Math.abs(c.reduction_pct)+'%</b> · 추정 비용 절감 <b>'+won(c.cost.total)+'</b> <span class="simnote">(시뮬레이션 값 · 가정 단가)</span></p>'+
+    '<p class="simnote" style="margin:4px 0 0">추천 일치율 '+(c.match_pct==null?'— (아직 결정 없음)':c.match_pct+'% · 승인 '+c.decisions.approved+' / 변경 '+c.decisions.changed)+'</p>';
+  if(!formBuilt) buildForm(d.assumptions);
+  $('#assumeHist').textContent=d.history.length?'최근 변경 · '+d.history[0].text+' ('+d.history[0].at+')':'아직 바꾼 가정값이 없습니다. 모든 값은 가정값입니다.';
+}
+
+/* ---------- 운영 분석 ---------- */
+function renderAnalysis(a){
+  const c=a.compare, f=c.fifo, r=c.rec;
+  const t=(k,v,u,s,hero)=>'<div class="tile'+(hero?' hero':'')+'"><span class="k">'+k+'</span><span class="v num">'+v+'<small>'+u+'</small></span><span class="s">'+s+'</span></div>';
+  const redTxt=(c.reduction_pct>0?'−':c.reduction_pct<0?'+':'')+Math.abs(c.reduction_pct);
+  $('#anaTiles').innerHTML=
+    t('평균 대기시간 감소율',redTxt,'%','평균 '+f.avg_wait+'분 → '+r.avg_wait+'분 · 차량 '+r.vehicles+'대 기준',true)+
+    t('추정 비용 절감 · 오늘',won(c.cost.total),'','가정 단가 기준 · 아래 계산 근거')+
+    t('하차구 가동률',r.util_pct,'%','기존 '+f.util_pct+'% → '+sgn(r.util_pct-f.util_pct,'%p'))+
+    t('하차 지연 건수',r.delays,'건','기존 '+f.delays+'건 · 표준 ×'+cfg.settings.delay.factor+' 초과')+
+    t('반입 완료',r.trips_done,'회','기존 '+f.trips_done+'회 · '+sgn(r.trips_done-f.trips_done,'회'))+
+    t('추천 일치율',c.match_pct==null?'—':c.match_pct,c.match_pct==null?'':'%',c.decisions.approved+c.decisions.changed?'승인 '+c.decisions.approved+' · 변경 '+c.decisions.changed:'아직 결정 없음');
+  drawChart(a.series);
+  const cc=c.cost;
+  $('#costBox').innerHTML='<div class="formula"><span>차량 대기 비용</span><b class="num">'+won(cc.wait)+'</b><span class="eq">줄어든 대기 '+c.saved_wait_min+'분 = '+(c.saved_wait_min/60).toFixed(2)+'시간 × '+won(cc.wait_rate)+'/시간</span>'+
+    '<span>호퍼 유휴 비용</span><b class="num">'+won(cc.idle)+'</b><span class="eq">줄어든 유휴 '+c.saved_idle_min+'분 = '+(c.saved_idle_min/60).toFixed(2)+'시간 × '+won(cc.idle_rate)+'/시간 (설비·인력)</span>'+
+    '<span class="tot">합계 · 오늘</span><b class="tot num">'+won(cc.total)+'</b></div><p class="cap" style="margin:8px 0 0">줄어든 시간 = 같은 도착 데이터로 돌린 기존 FIFO − 추천. 단가는 통합하역작업 탭의 가정값에서 바꿉니다. 모든 값은 시뮬레이션 값입니다.</p>';
+  $('#cargoTable').innerHTML=a.cargo.length?'<table><thead><tr><th>원료</th><th class="r">처리</th><th class="r">반입량</th><th class="r">평균 하차</th><th class="r">평균 대기</th><th class="r">지연</th><th>메모</th></tr></thead><tbody>'+
+    a.cargo.map(x=>'<tr><td><b>'+esc(x.cargo)+'</b></td><td class="r num">'+x.trips+'대</td><td class="r num">'+x.tons.toLocaleString()+'t</td><td class="r num">'+x.avg_unload+'분</td><td class="r num">'+x.avg_wait+'분</td><td class="r num">'+x.delays+'건</td><td class="cap">'+esc(x.note)+'</td></tr>').join('')+'</tbody></table>'
+    :'<div class="empty">끝난 반입이 아직 없습니다.</div>';
+  const fb=a.feedback, mx=Math.max(1,...Object.values(fb.counts));
+  $('#fbSub').textContent='담당자가 순번을 바꾼 이유 · '+fb.total+'건';
+  $('#fbBox').innerHTML='<div class="bars">'+Object.entries(fb.counts).map(([k,v])=>'<div class="b"><span>'+esc(k)+'</span><span class="t"><i style="width:'+(v/mx*100)+'%"></i></span><span class="num r">'+v+'</span></div>').join('')+'</div>'+
+    (fb.suggestions.length?fb.suggestions.map(s=>'<div class="sugg" style="margin-top:10px"><b>가정값 조정 제안</b><span>'+esc(s.text)+'</span><div class="row" style="display:flex;gap:6px"><button class="mini dark" data-apply="'+esc(s.key)+'">적용</button><button class="mini" data-ignore="'+esc(s.key)+'">무시</button></div></div>').join('')
+      :'<p class="cap" style="margin:10px 0 0">같은 호퍼에서 같은 사유가 3번 쌓이면 표준시간 조정을 제안합니다.</p>');
+}
+$('#fbBox').addEventListener('click',async e=>{
+  const ap=e.target.closest('[data-apply]'), ig=e.target.closest('[data-ignore]');
+  try{ if(ap){ await postJ('/api/suggestion/apply?key='+encodeURIComponent(ap.dataset.apply)); formBuilt=false; }
+       else if(ig) await postJ('/api/suggestion/ignore?key='+encodeURIComponent(ig.dataset.ignore));
+       pollView(true); }catch(err){}
+});
+let chartData=null;
+function drawChart(series){
+  chartData=series;
+  const svgc=$('#chart'), W=svgc.clientWidth||600, H=svgc.clientHeight||220;
+  svgc.setAttribute('viewBox','0 0 '+W+' '+H);
+  const pad={l:34,r:12,t:10,b:24}, rec=series.rec, fifo=series.fifo;
+  const n=Math.max(rec.length,fifo.length);
+  if(n<2){ svgc.innerHTML='<text x="'+W/2+'" y="'+H/2+'" text-anchor="middle" fill="#5F6368" font-size="13">시뮬레이션을 20분 이상 돌리면 그래프가 그려집니다</text>'; return; }
+  const ymax=Math.max(4,...rec.map(p=>p.waiting),...fifo.map(p=>p.waiting));
+  const step=ymax<=6?1:ymax<=12?2:5, top=Math.ceil(ymax/step)*step;
+  const x=i=>pad.l+(W-pad.l-pad.r)*i/(n-1), y=v=>pad.t+(H-pad.t-pad.b)*(1-v/top);
+  let g='';
+  for(let v=0;v<=top;v+=step) g+='<line x1="'+pad.l+'" x2="'+(W-pad.r)+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="#E4E4E1"/><text x="'+(pad.l-6)+'" y="'+(y(v)+4)+'" text-anchor="end" font-size="11" fill="#5F6368">'+v+'</text>';
+  const lbl=rec.length>=fifo.length?rec:fifo, every=Math.ceil(n/8);
+  lbl.forEach((p,i)=>{ if(i%every===0) g+='<text x="'+x(i)+'" y="'+(H-6)+'" text-anchor="middle" font-size="11" fill="#5F6368">'+p.hhmm+'</text>'; });
+  const path=arr=>arr.map((p,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(p.waiting).toFixed(1)).join(' ');
+  g+='<path d="'+path(fifo)+'" fill="none" stroke="#B8420A" stroke-width="2" stroke-dasharray="6 4" stroke-linejoin="round"/>';
+  g+='<path d="'+path(rec)+'" fill="none" stroke="#1D47B8" stroke-width="2" stroke-linejoin="round"/>';
+  const lastI=n-1;
+  if(rec[lastI]) g+='<circle cx="'+x(lastI)+'" cy="'+y(rec[lastI].waiting)+'" r="4" fill="#1D47B8" stroke="#fff" stroke-width="2"/>';
+  if(fifo[lastI]) g+='<circle cx="'+x(lastI)+'" cy="'+y(fifo[lastI].waiting)+'" r="4" fill="#B8420A" stroke="#fff" stroke-width="2"/>';
+  g+='<line id="xh" y1="'+pad.t+'" y2="'+(H-pad.b)+'" stroke="#141414" stroke-width="1" opacity="0"/><rect id="hit" x="'+pad.l+'" y="0" width="'+(W-pad.l-pad.r)+'" height="'+H+'" fill="transparent"/>';
+  svgc.innerHTML=g;
+  const fmax=Math.max(...fifo.map(p=>p.waiting)), rmax=Math.max(...rec.map(p=>p.waiting));
+  $('#chartNote').textContent='하차를 시작하지 못한 차량(대기장+호출 이동+호퍼 대기) · 최대: 기존 FIFO '+fmax+'대, 추천 '+rmax+'대';
+  const hit=$('#hit'), xh=$('#xh'), tip=$('#tip');
+  hit.addEventListener('mousemove',ev=>{
+    const b=svgc.getBoundingClientRect(), px=(ev.clientX-b.left)*W/b.width, i=Math.max(0,Math.min(n-1,Math.round((px-pad.l)/(W-pad.l-pad.r)*(n-1))));
+    xh.setAttribute('x1',x(i)); xh.setAttribute('x2',x(i)); xh.setAttribute('opacity','.35');
+    const p=lbl[i]||{}, fv=fifo[i]?fifo[i].waiting:'—', rv=rec[i]?rec[i].waiting:'—';
+    tip.hidden=false; tip.style.left=(x(i)*b.width/W)+'px'; tip.style.top=(y(Math.max(fifo[i]?fifo[i].waiting:0,rec[i]?rec[i].waiting:0))*b.height/H)+'px';
+    tip.textContent=(p.hhmm||'')+' · 기존 FIFO '+fv+'대 · 추천 '+rv+'대';
+  });
+  hit.addEventListener('mouseleave',()=>{ xh.setAttribute('opacity','0'); tip.hidden=true; });
+}
+window.addEventListener('resize',()=>{ if(view==='analysis'&&chartData) drawChart(chartData); });
+
+/* ---------- 알림 이력 ---------- */
+$('#fSector').innerHTML+=S.sectors.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('');
+const alertQuery=()=>new URLSearchParams({level:$('#fLevel').value,kind:$('#fKind').value,sector_id:$('#fSector').value,unacked:$('#fUnacked').checked}).toString();
+['#fLevel','#fKind','#fSector','#fUnacked'].forEach(id=>$(id).addEventListener('change',()=>pollView(true)));
+const LVL={crit:'위험',warn:'주의',info:'정보'};
+function renderAlertHistory(d){
+  const s=d.summary;
+  const t=(k,v,u,sub)=>'<div class="tile"><span class="k">'+k+'</span><span class="v num">'+v+'<small>'+u+'</small></span><span class="s">'+sub+'</span></div>';
+  $('#alTiles').innerHTML=t('오늘 알림',s.total,'건',Object.entries(s.by_kind).map(([k,v])=>k+' '+v).join(' · ')||'—')+t('확인 안 한 알림',s.unacked,'건','호출 알림 제외')+
+    t('평균 확인 시간',s.avg_ack_sec==null?'—':s.avg_ack_sec,s.avg_ack_sec==null?'':'초','알림이 뜬 뒤 확인을 누르기까지 (실제 시간)')+t('위험 등급',s.crit,'건','호퍼 정지·혼잡 지속');
+  $('#alSub').textContent=d.rows.length+'건 표시';
+  $('#alTable').innerHTML=d.rows.length?'<table><thead><tr><th>시각</th><th>등급</th><th>종류</th><th>내용</th><th>권장 조치</th><th>호퍼 · 차량</th><th>확인</th></tr></thead><tbody>'+
+    d.rows.slice(0,300).map(a=>'<tr class="'+(a.ack||a.kind==='호출'?'':'unacked')+'"><td class="num">'+esc(a.ts)+'</td><td><span class="lvl '+a.level+'">'+LVL[a.level]+'</span></td><td>'+esc(a.kind)+'</td><td>'+esc(a.text)+'</td><td class="cap">'+esc(a.action)+'</td>'+
+      '<td>'+esc(a.sector_id?sname(a.sector_id):'—')+(a.vehicle_id?'<div class="cap plate">'+esc(a.vehicle_id)+'</div>':'')+'</td>'+
+      '<td>'+(a.ack?'<span class="cap">'+esc(a.ack_at)+(a.ack_sec!=null?' · '+a.ack_sec+'초':'')+'</span>':'<button class="mini" data-ack="'+esc(a.id)+'">확인</button>')+'</td></tr>').join('')+'</tbody></table>'
+    :'<div class="empty">조건에 맞는 알림이 없습니다.</div>';
+}
+$('#alTable').addEventListener('click',async e=>{ const b=e.target.closest('[data-ack]'); if(b){ try{ await postJ('/api/alerts/'+encodeURIComponent(b.dataset.ack)+'/ack'); }catch(err){} pollView(true); refresh(); } });
+
 /* ---------- 실시간 연결 ---------- */
 let poll=null;
 function connect(){
@@ -526,7 +888,7 @@ function connect(){
   ws.onmessage=e=>render(JSON.parse(e.data));
   ws.onclose=()=>{ $('#conn').classList.remove('on'); $('#conn').title='재연결 중'; if(!poll) poll=setInterval(refresh,1000); setTimeout(connect,2000); };
 }
-refresh(); connect();
+route(); refresh(); connect();
 })();
 </script>
 </body>

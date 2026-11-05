@@ -6,3 +6,4 @@ vision/runs/
 *.pt
 *.mp4
 *.db
+data/assumptions.json

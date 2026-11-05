@@ -55,6 +55,38 @@
 | `CRANE_START` / `CRANE_DONE` | 설비 신호(가정) 또는 담당자 화면 버튼 | 크레인 상하역 시작·완료 (DONE이면 진척도 100% 확정) |
 | `SECTOR_DOWN` / `SECTOR_UP` | 돌발 이벤트 버튼 | 섹터 정지·복구 → 재배정 |
 | `ALERT` | 배정 엔진 | 알림 발생 (payload: level, kind, text, action) |
+| `ORDER_APPROVED` | 통합하역작업 탭 | 담당자가 추천 순번 승인 (payload: rank, reason) |
+| `ORDER_CHANGED` | 통합하역작업 탭 | 담당자가 보낼 호퍼 변경 (payload: from, to, reason, memo, delta_min, cost_won) |
+| `ALERT_ACK` | 관제 화면 · 알림 이력 탭 | 알림 확인 (payload: alert_id, ack_sec = 뜬 뒤 확인까지 실제 초) |
+| `ASSUMPTIONS_UPDATED` | 통합하역작업 탭 가정값 | 가정값 변경 → 처음부터 다시 계산 (payload: changes[]) |
+
+R2에서 팀이 제안한 `order_approved` 등 소문자 이름은 기존 형식에 맞춰 대문자로 썼다. 변경 사유 코드는
+`기사·차량 사정 / 현장 우선순위 / 영상 판정 오류 / 호퍼·설비 사정 / 긴급 반입 끼어듦 / 기타` 여섯 가지(app/runtime.py 의 REASONS 목록).
+
+```json
+{"ts": "2026-11-09T08:30:00", "type": "ORDER_CHANGED", "source": "ui", "cam_id": null, "sector_id": "C", "zone": null,
+ "track_id": 9, "vehicle_id": "81바 6572",
+ "payload": {"from": "A", "to": "C", "reason": "호퍼·설비 사정", "memo": "A 하차구 1번 점검", "delta_min": 7.8, "cost_won": 3900}}
+{"ts": "2026-11-09T08:31:00", "type": "ORDER_APPROVED", "source": "ui", "cam_id": null, "sector_id": "B", "zone": null,
+ "track_id": 12, "vehicle_id": "88자 2126", "payload": {"rank": 1, "reason": "투입 기한 임박(26분 남음) · 호퍼 B 전용 원료"}}
+{"ts": "2026-11-09T08:32:00", "type": "ALERT_ACK", "source": "ui", "cam_id": null, "sector_id": "A", "zone": null,
+ "track_id": null, "vehicle_id": null, "payload": {"alert_id": "AL-14", "ack_sec": 12.4}}
+{"ts": "2026-11-09T08:35:00", "type": "ASSUMPTIONS_UPDATED", "source": "ui", "cam_id": null, "sector_id": null, "zone": null,
+ "track_id": null, "vehicle_id": null, "payload": {"changes": ["슬러지 하차 표준 15 → 18분"]}}
+```
+
+### 탭별 API (R2)
+
+| 주소 | 하는 일 |
+|---|---|
+| `GET /api/dock` | 호퍼 카드(배정 대기·처리·평균 하차), FIFO vs 추천 비교, 가정값·변경 이력, 최근 변경 기록 |
+| `POST /api/order/approve?vehicle_id=` · `POST /api/order/approve_all` | 순번 승인 |
+| `GET /api/order/impact?vehicle_id=&sector_id=` | 바꾸면 추천 대비 대기 +N분 · 비용 +₩N (저장 전 미리 보기) |
+| `POST /api/order/change` `{vehicle_id, sector_id, reason, memo}` | 호퍼 변경 + 사유 기록(SQLite `changes`) |
+| `GET/POST /api/assumptions` | 가정값 보기·바꾸기(→ `data/assumptions.json`, 처음부터 재계산) |
+| `GET /api/analysis` | 배정 방식 성과, 시간대별 대기 차량(두 방식), 원료별 성과, 추천 피드백·제안 |
+| `POST /api/suggestion/apply?key=` · `ignore?key=` | 가정값 조정 제안 적용·무시 |
+| `GET /api/alerts?level=&kind=&sector_id=&unacked=` | 알림 이력 + 요약(오늘 건수·미확인·평균 확인 시간), SQLite `alerts`에도 저장 |
 
 ## 차량 상태
 
