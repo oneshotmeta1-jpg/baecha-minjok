@@ -1,7 +1,7 @@
 # 하역 관제 개발 오피스 ↔ 코드 작업 규칙
 
-- 오피스: (게시 후 주소 기록) — 소스: `office/dock_dev_office.html`
-- 진행 상태: 오피스 DB 문서 `data/users/<uid>/office` (ArtifactData로 읽고 씀)
+- 오피스: https://claude.ai/artifact/SABeFbaZ3JLeVWXTnNrUck — 소스: `office/dock_dev_office.html` (고친 뒤 같은 경로로 다시 게시)
+- 진행 상태: 오피스 DB 문서 `data/users/me/office` (ArtifactData collection `data/users/me`, doc `office`)
 - 코드: `D:/내문서 및 바탕화면/Desktop/해커톤` (로컬 git, `main` = 확정본)
 - 로컬 실행: `.claude/launch.json`의 `dock` → http://127.0.0.1:8000/
 - GitHub 원격은 아직 없음. 팀 저장소가 생기면 `site.repo`에 주소를 넣고 push 단계를 추가한다.
