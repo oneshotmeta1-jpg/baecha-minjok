@@ -194,6 +194,38 @@ def index():
 app.mount("/web", StaticFiles(directory=WEB), name="web")
 
 
+def lan_ips():
+    """이 PC의 내부망 IPv4 주소들 (같은 와이파이의 팀원이 들어올 주소)."""
+    import socket
+    ips = set()
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("10.255.255.255", 1))          # 실제로 보내지 않음, 기본 경로의 내 주소만 얻음
+        ips.add(s.getsockname()[0])
+        s.close()
+    except OSError:
+        pass
+    try:
+        ips.update(i[4][0] for i in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET))
+    except OSError:
+        pass
+    return sorted(ip for ip in ips if not ip.startswith("127."))
+
+
 if __name__ == "__main__":
+    import argparse
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    ap = argparse.ArgumentParser(description="상하역 지연 관제 서버")
+    ap.add_argument("--lan", action="store_true", help="같은 와이파이의 다른 기기도 접속하게 연다 (0.0.0.0)")
+    ap.add_argument("--port", type=int, default=8000)
+    args = ap.parse_args()
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")   # 실행 창·로그에서 한글이 깨지지 않게
+    except (AttributeError, ValueError):
+        pass
+    host = "0.0.0.0" if args.lan else "127.0.0.1"
+    print(f"이 PC: http://127.0.0.1:{args.port}/")
+    if args.lan:
+        for ip in lan_ips():
+            print(f"팀원 공유 주소: http://{ip}:{args.port}/")
+    uvicorn.run(app, host=host, port=args.port)
