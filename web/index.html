@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>상하역 지연 관제</title>
+<style>
+:root{
+  --bg:#0f141a; --panel:#17202a; --panel-2:#1f2a36; --line:#2c3a49;
+  --fg:#e8eef5; --muted:#8fa1b3;
+  --ok:#3fbf7f; --warn:#f2b136; --crit:#ef5350; --accent:#4aa3ff;
+  --sans:"Noto Sans KR","Malgun Gothic",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:16px}
+.chip{font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:10px;color:var(--muted)}
+.sp{flex:1}
+button{font:inherit;color:inherit;background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:5px 10px;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+main{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr);grid-template-rows:auto auto;gap:12px;padding:12px 16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;min-width:0}
+.card h2{margin:0;padding:8px 12px;font-size:13px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+.card h2 small{color:var(--muted);font-weight:400}
+.in{padding:10px 12px}
+#map svg{width:100%;height:auto;display:block}
+.cams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.cam{aspect-ratio:16/9;background:#000;border:1px solid var(--line);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;position:relative}
+.cam b{position:absolute;left:6px;top:4px;color:var(--fg);font-size:12px}
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tabs button[aria-selected="true"]{border-color:var(--accent);color:var(--accent)}
+.sector-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sc{background:var(--panel-2);border-radius:4px;padding:8px}
+.sc .pct{font-size:20px;font-weight:700}
+.empty{color:var(--muted);font-size:13px}
+@media (max-width:900px){main{grid-template-columns:minmax(0,1fr)}.sector-cards{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>상하역 지연 관제</h1>
+  <span class="chip" id="ver">v0</span>
+  <span class="chip" id="clock">시뮬레이션 시계 —</span>
+  <span class="sp"></span>
+  <button disabled title="다음 라운드에서 연결">섹터 정지</button>
+  <button disabled title="다음 라운드에서 연결">긴급 출하 넣기</button>
+</header>
+<main>
+  <section class="card" id="map"><h2>① 시나리오 좌표 맵 <small>섹터 색 = 혼잡도 단계</small></h2><div class="in" id="mapBox"><div class="empty">배치도 불러오는 중…</div></div></section>
+  <section class="card"><h2>③ CAM 4채널 <small>섹터 A·B·C + 대기장</small></h2><div class="in"><div class="cams" id="cams"></div></div></section>
+  <section class="card"><h2>② 통합하역작업 <small>순번 승인 · 효과 비교</small></h2>
+    <div class="in">
+      <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="true">섹터 현황</button>
+        <button role="tab" aria-selected="false" disabled>호출 순번</button>
+        <button role="tab" aria-selected="false" disabled>KPI 비교</button>
+        <button role="tab" aria-selected="false" disabled>가정값</button>
+      </div>
+      <div class="sector-cards" id="sectorCards"></div>
+    </div>
+  </section>
+  <section class="card"><h2>④ Alert <small>후순위</small></h2><div class="in"><div class="empty">알림 모듈 연결 전입니다.</div></div></section>
+</main>
+<script>
+(async function(){
+  const NS='http://www.w3.org/2000/svg';
+  const el=(tag,attrs,text)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text)e.textContent=text;return e;};
+  const pts=p=>p.map(x=>x.join(',')).join(' ');
+  const center=p=>[p.reduce((s,x)=>s+x[0],0)/p.length,p.reduce((s,x)=>s+x[1],0)/p.length];
+  let cfg;
+  try{ cfg=await (await fetch('/api/config')).json(); }
+  catch(e){ document.getElementById('mapBox').innerHTML='<div class="empty">설정을 불러오지 못했습니다.</div>'; return; }
+  document.getElementById('ver').textContent=cfg.version;
+  const S=cfg.sectors, svg=el('svg',{viewBox:'0 0 '+S.map.width+' '+S.map.height,role:'img','aria-label':'하역장 배치도'});
+  svg.appendChild(el('rect',{x:0,y:0,width:S.map.width,height:S.map.height,fill:'#121a22'}));
+  S.roads.forEach(r=>svg.appendChild(el('polyline',{points:pts(r.points),fill:'none',stroke:'#3a4a5a','stroke-width':22,'stroke-linejoin':'round'})));
+  const draw=(z,fill)=>{const c=center(z.poly);svg.appendChild(el('polygon',{points:pts(z.poly),fill,stroke:'#5a6b7c','stroke-width':3}));svg.appendChild(el('text',{x:c[0],y:c[1],fill:'#e8eef5','font-size':34,'text-anchor':'middle','dominant-baseline':'middle'},z.name));};
+  S.zones.forEach(z=>draw(z,'#1f2a36'));
+  S.sectors.forEach(z=>draw(z,'rgba(63,191,127,.25)'));
+  const box=document.getElementById('mapBox'); box.innerHTML=''; box.appendChild(svg);
+  document.getElementById('cams').innerHTML=S.cams.map(c=>'<div class="cam"><b>'+c.id+' · '+c.name+'</b>영상 연결 전</div>').join('');
+  document.getElementById('sectorCards').innerHTML=S.sectors.map(s=>'<div class="sc"><b>'+s.name+'</b><div class="pct">— %</div><div class="empty">베이 '+s.bays+' · 대기 슬롯 '+s.queue_slots+'<br>'+s.cargo.join(', ')+'</div></div>').join('');
+})();
+</script>
+</body>
+</html>

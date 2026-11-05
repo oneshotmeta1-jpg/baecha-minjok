@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dock",
+      "runtimeExecutable": "C:\\Users\\mypc\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+      "runtimeArgs": ["D:\\내문서 및 바탕화면\\Desktop\\해커톤\\app\\server.py"],
+      "port": 8000
+    }
+  ]
+}

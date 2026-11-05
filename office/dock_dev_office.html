@@ -1,0 +1,788 @@
+<title>하역 관제 개발 오피스</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: the office scene is the hero on the left; goal, the current step and round history on the right; the meeting log runs underneath. Single dark look by choice: a night shift in a pixel studio. */
+:root{
+  color-scheme:dark;
+  --bg:#15121d; --panel:#1f1b2b; --panel-2:#2a2539; --line:#3b3452;
+  --fg:#f3eefc; --muted:#a69ebf; --dim:#776f93;
+  --accent:#ffcc4d; --accent-ink:#2a1f05; --accent-bg:rgba(255,204,77,.12);
+  --ok:#6be38f; --ok-bg:rgba(107,227,143,.12); --warn:#ff9f5a; --crit:#ff6b7a;
+  --pixel:"Press Start 2P","Courier New",monospace;
+  --sans:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+}
+html,body{background:var(--bg);color:var(--fg)}
+body{margin:0;font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:14px}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+button,textarea,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{max-width:1500px;margin-inline:auto;display:flex;flex-direction:column;gap:14px}
+
+header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+h1{margin:0;font-family:var(--pixel);font-size:15px;letter-spacing:.04em;color:var(--accent);text-shadow:2px 2px 0 #5a3c00}
+.chip{font-size:12px;font-weight:700;padding:3px 10px;border-radius:2px;border:2px solid var(--line);color:var(--muted)}
+.chip.working{border-color:var(--accent);color:var(--accent)}
+.chip.review{border-color:var(--warn);color:var(--warn)}
+.chip.approved{border-color:var(--ok);color:var(--ok)}
+.goal-line{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.goal-line b{color:var(--fg);font-weight:500}
+
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:14px;align-items:start}
+.card{background:var(--panel);border:2px solid var(--line);border-radius:4px;min-width:0}
+.card>h2{margin:0;padding:10px 14px;border-bottom:2px solid var(--line);font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.card>h2 small{font-weight:400;color:var(--muted);font-size:12px}
+.card .in{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.side{display:flex;flex-direction:column;gap:14px;min-width:0}
+
+/* stage */
+.stage{position:relative;width:100%;aspect-ratio:320/200;max-width:100%;border:4px solid #0b0910;border-radius:4px;background:#0b0910;overflow:hidden;box-shadow:0 0 0 2px var(--line)}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
+.overlay{position:absolute;inset:0;pointer-events:none}
+.tag{position:absolute;transform:translate(-50%,0);text-align:center;line-height:1.1;white-space:nowrap}
+.tag .code{display:inline-block;font-family:var(--pixel);font-size:clamp(5px,.75vw,9px);color:#fff;background:rgba(20,16,30,.78);padding:2px 3px;border-radius:2px}
+.tag .ko{display:inline-block;font-size:clamp(7px,.8vw,11px);color:#2b2033;font-weight:700;margin-top:1px;background:rgba(255,248,232,.72);padding:0 3px;border-radius:2px}
+.tag .code+.ko{margin-left:0}
+.tag{display:flex;flex-direction:column;align-items:center}
+.tag.to .code{background:var(--accent);color:var(--accent-ink)}
+.tag.speaking .code{background:#fff;color:#15121d;box-shadow:0 0 0 2px var(--accent)}
+.bubble{position:absolute;max-width:40%;min-width:120px;background:#fffdf5;color:#1d1726;border:3px solid #1d1726;border-radius:3px;padding:6px 9px;font-size:clamp(10px,1.1vw,14px);line-height:1.45;box-shadow:3px 3px 0 rgba(0,0,0,.35)}
+.bubble::after{content:"";position:absolute;bottom:-9px;left:var(--tail,50%);width:12px;height:12px;background:#fffdf5;border-right:3px solid #1d1726;border-bottom:3px solid #1d1726;transform:translateX(-50%) rotate(45deg)}
+.bubble .who{display:block;font-family:var(--pixel);font-size:clamp(6px,.65vw,8px);color:#7a5c00;margin-bottom:3px}
+.bubble .who em{font-style:normal;color:#b04a2a}
+.board{position:absolute;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;color:#1d1726;text-align:center}
+.board .v{font-family:var(--pixel);font-size:clamp(8px,1.3vw,16px)}
+.board .s{font-size:clamp(7px,.8vw,11px);font-weight:700}
+.board .bar{width:80%;height:clamp(4px,.6vw,7px);background:#d9d2c0;border:2px solid #1d1726}
+.board .bar i{display:block;height:100%;background:#3fbf6f}
+.stage-foot{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-top:10px;color:var(--muted);font-size:12.5px}
+.stage-foot .sp{flex:1}
+
+/* controls */
+textarea{width:100%;min-height:84px;resize:vertical;background:var(--panel-2);border:2px solid var(--line);border-radius:3px;padding:8px 10px;line-height:1.5}
+.btn{border:2px solid var(--line);background:var(--panel-2);border-radius:3px;padding:7px 12px;font-weight:700;box-shadow:0 3px 0 #0b0910}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #0b0910}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#06210f}
+.btn.danger{border-color:var(--crit);color:var(--crit)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn.sm{padding:4px 9px;font-size:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.note{font-size:12.5px;color:var(--muted)}
+.note.err{color:var(--crit)}
+.progress{height:10px;border:2px solid var(--line);background:var(--panel-2);border-radius:2px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent);transition:width .4s steps(8)}
+@media (prefers-reduced-motion:reduce){.progress i{transition:none}}
+
+.ver-head{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.ver-head .v{font-family:var(--pixel);font-size:12px;color:var(--accent)}
+.ver-head b{font-size:15px}
+.summary{margin:0}
+.sec{font-size:12px;color:var(--muted);font-weight:700;margin:4px 0 -4px}
+ul.plain{margin:0;padding-left:18px}
+ul.plain li{margin:2px 0}
+.deliv{border:2px solid var(--line);border-radius:3px;padding:8px 10px;background:var(--panel-2)}
+.deliv .h{display:flex;gap:8px;align-items:center;font-weight:700;font-size:13px}
+.deliv pre{margin:6px 0 0;white-space:pre-wrap;word-break:break-word;font-family:var(--sans);font-size:12.5px;color:#ddd6ee}
+.rc{display:inline-block;min-width:34px;text-align:center;font-family:var(--pixel);font-size:8px;padding:3px 4px;border-radius:2px;color:#15121d}
+.qa{display:flex;gap:12px;font-size:12.5px}
+.qa .p{color:var(--ok)} .qa .f{color:var(--crit)}
+.feedback{border-left:4px solid var(--warn);padding:4px 10px;background:rgba(255,159,90,.08);font-size:13px}
+
+.versions{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow:auto}
+.vitem{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;align-items:center;text-align:left;width:100%;background:var(--panel-2);border:2px solid transparent;border-radius:3px;padding:7px 10px}
+.vitem:hover{border-color:var(--line)}
+.vitem.sel{border-color:var(--accent)}
+.vitem .v{font-family:var(--pixel);font-size:10px;color:var(--accent)}
+.vitem .t{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vitem .st{font-size:12px;color:var(--muted)}
+.vitem .st.ok{color:var(--ok)}
+.vitem .fb{grid-column:2/-1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.log{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow:auto;padding:12px 14px}
+.msg{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px;align-items:start}
+.msg .meta{font-size:12px;color:var(--muted)}
+.msg .meta b{color:var(--fg)}
+.msg .txt{grid-column:2;font-size:13.5px}
+.empty{color:var(--muted);font-size:13px;padding:6px 0}
+
+@media (max-width:1100px){.layout{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:520px){h1{font-size:12px}.bubble{max-width:70%;min-width:96px}}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:2px;border:1px solid var(--line);color:var(--muted)}
+.pill.hi{border-color:var(--crit);color:var(--crit)} .pill.lo{color:var(--dim)}
+.item{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:start;padding:8px 10px;border:2px solid var(--line);border-radius:3px;background:var(--panel-2);cursor:pointer}
+.item.on{border-color:var(--accent);background:var(--accent-bg)}
+.item.ro{cursor:default}
+.item input{margin-top:3px;width:16px;height:16px;accent-color:var(--accent)}
+.item .mark{width:16px;text-align:center;color:var(--accent);font-weight:700}
+.item .body{display:flex;flex-direction:column;gap:4px;min-width:0}
+.item .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.item .pills{display:flex;gap:6px;flex-wrap:wrap}
+.item .d{font-size:13px;color:#ddd6ee}
+.item .c{font-size:12px;color:var(--muted)}
+.callout{border:2px dashed var(--accent);border-radius:3px;padding:10px 12px;background:var(--accent-bg);font-size:13px;line-height:1.6}
+.callout.big{font-size:14px}
+.callout a.btn{text-decoration:none;display:inline-block;margin-top:6px}
+.result{border-left:4px solid var(--dim);padding:8px 12px;background:var(--panel-2);font-weight:700}
+.result.ok{border-left-color:var(--ok);color:var(--ok)} .result.no{border-left-color:var(--warn)}
+.okm{color:var(--ok);font-weight:700} .ngm{color:var(--crit);font-weight:700}
+ul.plain.ok li::marker{color:var(--ok)} ul.plain.warn li::marker{color:var(--warn)}
+.sepline{text-align:center;font-size:12px;color:var(--accent);padding:6px 0}
+</style>
+
+<div class="app">
+  <header>
+    <h1>DOCK DEV OFFICE</h1>
+    <span class="chip" id="statusChip">목표 대기</span>
+    <span class="chip" id="liveChip">대시보드 v0</span>
+    <span class="goal-line" id="goalLine"></span>
+  </header>
+
+  <main class="layout">
+    <section>
+      <div class="stage" id="stage" role="img" aria-label="하역 관제 개발팀이 일하는 픽셀 사무실">
+        <canvas id="cv" width="320" height="200"></canvas>
+        <div class="overlay" id="overlay" aria-hidden="true"></div>
+      </div>
+      <div class="stage-foot">
+        <span id="phaseText">팀이 목표를 기다리고 있습니다.</span>
+        <span class="sp"></span>
+        <label class="row" for="fast"><input type="checkbox" id="fast"> 빠르게 보기</label>
+        <button class="btn sm" id="skipBtn" hidden>대화 건너뛰기</button>
+        <button class="btn sm danger" id="stopBtn" hidden>회의 중지</button>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="card">
+        <h2>목표 <small>배차의 민족 · 상하역 지연 관제</small></h2>
+        <div class="in">
+          <div id="goalEdit">
+            <label for="goalInput" class="note">대시보드에 무엇을 만들거나 고칠까요? 바라는 장면과 결과를 적어 주세요. 팀은 개선안을 제안만 하고, 승인한 것만 Claude Code가 실제로 고칩니다.</label>
+            <textarea id="goalInput" placeholder="예: 섹터 B가 정지되면 대기 차량이 C로 재배정되는 장면을 시연할 수 있게 해 주세요.">v1 뼈대: 가짜 데이터로 처음부터 끝까지 한 번 도는 관제 화면을 만들어 주세요.
+1) 관제 화면 4영역 배치: ①시나리오 좌표 맵(게이트·대기장·섹터 A·B·C·출구, 섹터 색=혼잡도 단계, 차량 점=상태) ②통합하역작업 탭(섹터 카드: 혼잡도%·진척도 막대·남은 시간·대기 대수, 호출 순번표: 차량·섹터·예상 호출 시각·추천 이유 한 줄) ③CAM 4채널 자리(섹터 A·B·C+대기장, 영상 전에는 자리표시) ④Alert 목록 자리.
+2) 시뮬레이션 시계 + 가상 도착 데이터로 차량이 대기장→섹터→출구로 움직이고, 혼잡도·진척도·호출 시점이 PLAN.md 공식대로 계산되게.
+3) 상단 돌발 이벤트 버튼(섹터 정지, 긴급 출하 넣기) 자리.
+영상 인식(YOLO)은 이번 라운드에서 빼고, 이벤트 형식은 docs/events.md를 그대로 따라 주세요.</textarea>
+            <div class="row" style="margin-top:8px"><button class="btn primary" id="startBtn">제안 회의 열기</button><span class="note" id="startNote"></span></div>
+            <div class="note" id="diag" style="margin-top:6px">연결 확인 중…</div>
+          </div>
+          <div id="goalShow" hidden><div id="goalText" style="white-space:pre-wrap"></div></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2><span id="stepTitle">진행</span></h2>
+        <div class="in" id="stepBody"></div>
+      </section>
+
+      <section class="card">
+        <h2>진행 기록 <small id="roundCount"></small></h2>
+        <div class="in"><div class="versions" id="rounds"></div></div>
+      </section>
+    </aside>
+  </main>
+
+  <details class="card" id="dbgBox">
+    <summary style="padding:10px 14px;cursor:pointer;font-weight:700;font-size:13px">진단 기록 <small style="color:var(--muted);font-weight:400">버튼이 동작하지 않으면 이 내용을 알려 주세요</small></summary>
+    <div class="log" id="dbg" style="font-family:var(--sans);font-size:12px;color:var(--muted)"></div>
+  </details>
+
+  <section class="card">
+    <h2>회의 대화 <small id="logSub"></small></h2>
+    <div class="log" id="log" aria-live="polite"><div class="empty">팀의 대화가 여기에 기록됩니다.</div></div>
+  </section>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = v => String(v==null?'':v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- the team ---------- */
+// desk x is the seat centre, y is the desk top edge (canvas pixels, 320x200)
+const ROLES = [
+  {k:'PO',       code:'PO',  ko:'제품 오너',       duty:'심사 기준(주제 적합성·현업 적용성)과 비용 절감 논리, 4영역 밖으로 기능을 늘리지 않게 범위 관리', x:52,  y:84,  hair:'#3a2418', skin:'#f1c9a5', shirt:'#e35d5b'},
+  {k:'PM',       code:'PM',  ko:'PM (승현)',        duty:'일정(사전 준비 11/5~8, 당일 10:00~02:00), 역할 조율, 리스크, 발표 흐름', x:116, y:84,  hair:'#151018', skin:'#e8b892', shirt:'#2f6fd1'},
+  {k:'PL',       code:'PL',  ko:'PL (현우)',        duty:'전체 구조, 이벤트 형식·좌표 JSON 계약, 모듈 통합 총괄', x:180, y:84,  hair:'#5b3a1e', skin:'#d9a27a', shirt:'#1f9e8a'},
+  {k:'FIELD',    code:'현장', ko:'현장 전문가',      duty:'제철소 출하장·갠트리 크레인 현장 관점에서 가정값·동선·용어 검증 (심사위원 명장 관점)', x:244, y:84,  hair:'#7a7a86', skin:'#e2b08a', shirt:'#c98b2b'},
+  {k:'PLANNER',  code:'기획', ko:'기획 (아령)',      duty:'시나리오, 통합하역작업 탭 항목 설계, 기획서·결과보고서', x:36,  y:128, hair:'#2b1b2e', skin:'#f3cfae', shirt:'#f2a541'},
+  {k:'DESIGNER', code:'UX',  ko:'UI/UX',           duty:'관제 화면 4영역 배치, 혼잡도 단계 색과 차량 상태 표현, 모바일 화면 흐름', x:96,  y:128, hair:'#c2552d', skin:'#f1c9a5', shirt:'#d65db1'},
+  {k:'FE',       code:'FE',  ko:'프론트 (가은)',     duty:'관제 대시보드 화면, 좌표 맵 렌더링(SVG), 크레인 작업반경 경고 표시', x:156, y:128, hair:'#3d2a1c', skin:'#f1c9a5', shirt:'#3fb4e8'},
+  {k:'MOBILE',   code:'APP', ko:'모바일 웹',        duty:'기사(/m/driver)·섹터 담당자(/m/manager) 반응형 웹, 호출 받기·출발·완료 버튼', x:216, y:128, hair:'#0f0f14', skin:'#d9a27a', shirt:'#53c26b'},
+  {k:'VISION',   code:'CV',  ko:'비전 (영훈)',      duty:'YOLO 파인튜닝(차량·크레인·컨테이너), ByteTrack 추적, ROI 구역 판정, 미리 돌린 결과 저장', x:276, y:128, hair:'#262230', skin:'#e8b892', shirt:'#8a63d2'},
+  {k:'BE',       code:'BE',  ko:'백엔드',           duty:'FastAPI REST·WebSocket, 시뮬레이션 시계, SQLite 이벤트 로그, MJPEG CAM 스트림', x:52,  y:172, hair:'#2a1a12', skin:'#e8b892', shirt:'#4b56d8'},
+  {k:'OPT',      code:'OPT', ko:'배정 엔진',        duty:'혼잡도·진척도 계산, 우선순위 순번·호출 시점(배치 기준), FIFO 기준선 대비 KPI', x:116, y:172, hair:'#8c5a2b', skin:'#f1c9a5', shirt:'#e07b39'},
+  {k:'DATA',     code:'DATA', ko:'시나리오 데이터',  duty:'배치도·sectors.json, 도착 데이터, IoT 가상 이벤트 시뮬레이터, CAM 영상 소스 확보', x:180, y:172, hair:'#4a2c2a', skin:'#e2b08a', shirt:'#6c7a89'},
+  {k:'QA',       code:'QA',  ko:'QA·시연',          duty:'끝까지 도는지 확인, 돌발 시나리오(섹터 정지·긴급 출하) 리허설, 버그 발견', x:244, y:172, hair:'#4a2c2a', skin:'#f1c9a5', shirt:'#c43c4c'}
+];
+const ROLE = Object.fromEntries(ROLES.map(r=>[r.k,r]));
+const WHO = k => k==='ALL' ? '모두' : k==='USER' ? '고객님' : ROLE[k] ? ROLE[k].ko : k;
+const roleChip = k => { const r=ROLE[k]; return r ? '<span class="rc" style="background:'+r.shirt+'">'+esc(r.code)+'</span>' : ''; };
+
+/* ---------- state ----------
+   One private document per viewer: data/users/<id>/office.
+   This page writes the goal, the meeting, the chosen proposals and the decision.
+   Claude Code writes `site`, each round's `candidate`, and closes rounds after applying or reverting. */
+const SCHEMA = 2;
+const SITE_DEFAULT = {name:'상하역 지연 관제 대시보드', url:'http://127.0.0.1:8000/', repo:'', live:'v0', brief:'상하역 지연 관제 대시보드 (팀 배차의 민족, K-뉴딜 아카데미 내부 해커톤, 교육과정 비전 AI 안전관제). 목표: 상하역 섹터를 비추는 CCTV로 차량 상태를 자동 판정하고, 섹터별 혼잡도(%)·작업 진척도(%)로 대기장 차량의 하역 순번(순서·섹터·호출 시점)을 정해 섹터는 놀지 않고 차량은 기다리지 않게 한다. 지표: 혼잡도=(작업 중+섹터 대기 차량)/(베이 수+허용 대기 슬롯)×100, 60% 미만 원활·60~85 주의·85 이상 혼잡. 진척도=min(작업 경과/표준 작업시간,1)×100, 크레인 완료 신호로 100% 확정. 호출: 표준시간×(1-진척도)≤이동시간+여유. 우선순위: 긴급→마감 임박→오래 기다린 순, 가장 빨리 비는 적합 섹터에 배정. 결과 KPI는 FIFO 기준선 대비 평균·최대 대기, 가동률, 지연 건수, 대기시간 감소율(단가는 가정값). 객체 인식: 형태(YOLO 차량 검출)+위치(ROI 다각형, 박스 아래 중심점)+시간(체류·정지)으로 상태 판정, 차량 신원은 기사 앱 비콘 신호(가정), 번호판 인식 제외. IoT는 시뮬레이터가 GATE_IN·BEACON_NEAR·CALL_ACK 등 같은 형식 이벤트로 대신함. 화면 4영역: ①시나리오 좌표 맵 ②통합하역작업 탭 ③CAM 4채널(섹터 A·B·C+대기장, 각각 다른 화각) ④Alert(후순위, 화면 안 WebSocket 알림). 모바일은 /m/driver, /m/manager 반응형 웹. 기능은 이 4영역에서 더 늘리지 않는다. 스택: FastAPI(REST+WebSocket)+HTML/JS 단일 페이지(빌드 없음, 지도 SVG, 차트 Chart.js)+SQLite, Ultralytics YOLO+ByteTrack+OpenCV, 추론은 미리 돌려 재생(1채널만 실시간). 소스: D:/내문서 및 바탕화면/Desktop/해커톤 (로컬 git, main=확정본, 후보는 office/r번호 브랜치). 서버 app/server.py, 화면 web/index.html, 설정 data/sectors.json·std_times.json·settings.json, 이벤트 계약 docs/events.md, 기획 PLAN.md. 로컬 주소 http://127.0.0.1:8000/. 현재 v0: 4영역 자리표시와 배치도(설정 JSON으로 그림)만 있고 시뮬레이터·엔진·영상·모바일은 아직 없음. 할 일 우선순위: 1 CAM 소스(하역·갠트리 크레인 영상) 2 객체 학습(현우·영훈) 3 실시간 좌표 맵(현우·영훈) 4 통합하역작업 탭(가은·아령) 5 통합. 팀원: 여현우(팀장·메인 개발·좌표 맵·통합), 김아령(대시보드 설계·문서), 이가은(대시보드 구현·안전 경보), 송영훈(객체 탐지 모델), 이승현(PM·도메인·발표).'};
+let state = {schema:SCHEMA, site:SITE_DEFAULT, status:'idle', rounds:[], legacy:null};
+let viewing = 0;                  // round number shown in the panels (0 = latest)
+let sample = null, store = null, lastSaved = '', ready = false;
+function dbg(text){ const el=document.getElementById('dbg'); if(!el) return; const t=new Date().toTimeString().slice(0,8); const row=document.createElement('div'); row.textContent=t+'  '+text; el.appendChild(row); el.scrollTop=el.scrollHeight; }
+const NO_CLAUDE = '이 창에서는 Claude를 부를 수 없어 팀이 회의할 수 없습니다. 웹 브라우저(크롬 등)에서 claude.ai에 로그인한 뒤 이 오피스 링크를 열어 주세요.';
+function diag(){
+  const el=$('#diag'); if(!el) return;
+  el.innerHTML = !ready ? '연결 확인 중…' : 'Claude 회의: '+(sample?'<span class="okm">사용 가능</span>':'<span class="ngm">사용 불가</span>')+' · 진행 저장: '+(store?'<span class="okm">사용 가능</span>':'<span class="ngm">사용 불가</span>')+(sample?'':'<br>'+NO_CLAUDE);
+}
+const run = {ctl:null, queue:[], current:null, live:[], items:[], summary:null, done:false, thinking:false, fail:'', round:0, replay:0};
+const anim = {t:0, cheer:0};
+const latestRound = () => state.rounds[state.rounds.length-1] || null;
+const shownRound = () => viewing ? state.rounds.find(r=>r.n===viewing) || latestRound() : latestRound();
+
+function normalize(d){
+  // the store hands back frozen objects; work on a copy so the page can change it
+  d = d ? JSON.parse(JSON.stringify(d)) : d;
+  if(!d || d.schema!==SCHEMA){
+    // first open after the switch: keep whatever the old page saved, start the new flow empty
+    return {schema:SCHEMA, site:SITE_DEFAULT, status:'idle', rounds:[], legacy:d && Object.keys(d).length ? d : null};
+  }
+  return {schema:SCHEMA, site:Object.assign({}, SITE_DEFAULT, d.site||{}), status:d.status||'idle',
+          rounds:Array.isArray(d.rounds)?d.rounds:[], legacy:d.legacy||null};
+}
+
+/* ---------- persistence ---------- */
+async function connect(){
+  dbg('페이지 시작 (화면 버전 5)');
+  try { sample = await claude.use('sample'); } catch(e){ sample = null; dbg('Claude 연결 오류: '+(e&&e.message||e)); }
+  dbg('Claude 회의 기능: '+(sample?'있음':'없음'));
+  let db=null, user=null;
+  try { [db, user] = await Promise.all([claude.use('db'), claude.use('user')]); } catch(e){}
+  if(db && user){
+    const uid = await user.id();
+    dbg('저장소: 있음, 사용자 '+(uid?'확인됨':'확인 안 됨'));
+    if(uid){
+      store = db.doc('data/users/'+uid+'/office');
+      try{
+        const snap = await store.get();
+        adopt(snap.exists ? snap.data() : null, true);
+        dbg('저장된 진행 상황 불러옴: 단계 '+state.status+', 라운드 '+state.rounds.length+'개');
+      }catch(e){ note('저장된 진행 상황을 불러오지 못했습니다.'); }
+      // Claude Code writes candidates into the same document; pick them up while the page is open
+      try{
+        store.onSnapshot(snap=>{
+          if(!snap.exists || snap.metadata.hasPendingWrites) return;
+          const d=snap.data(); if(JSON.stringify(d)===lastSaved) return;
+          if(state.status==='meeting') return;      // a meeting in this view owns the state until it ends
+          adopt(d, false);
+        }, ()=>{});
+      }catch(e){}
+    }
+  }
+  if(!(db && user)) dbg('저장소: 없음');
+  ready=true; diag();
+  render(); greet();
+}
+function adopt(d, first){
+  const before = latestRound();
+  state = normalize(d);
+  if(state.status==='meeting'){ state.status = latestRound() && latestRound().items && latestRound().items.length ? 'plan' : 'idle'; }
+  if(first && state.legacy && !state.rounds.length && state.legacy.goal) $('#goalInput').value = state.legacy.goal;
+  const r = latestRound();
+  if(r && r.candidate && !r.candidate.watched && run.replay!==r.n && !run.queue.length) replay(r);
+  if(!first && r && before && r.applied && !before.applied) say('PM','USER', r.applied===r.candidate?.version ? r.applied+' 확정본으로 반영됐습니다!' : '이전 버전 '+r.applied+'로 되돌렸습니다.', true);
+  render();
+}
+let saving = Promise.resolve();
+function save(){
+  if(!store) return;
+  const copy = JSON.parse(JSON.stringify(state));
+  let size = JSON.stringify(copy).length;
+  for(let i=0; size>200000 && i<copy.rounds.length-1; i++){ copy.rounds[i].log=[]; if(copy.rounds[i].candidate) copy.rounds[i].candidate.report=[]; size=JSON.stringify(copy).length; }
+  lastSaved = JSON.stringify(copy);
+  saving = saving.then(()=>store.set(copy)).catch(()=>note('저장하지 못했습니다. 새로고침하면 마지막 저장 상태로 돌아갑니다.'));
+}
+function note(text){ $('#phaseText').textContent = text; }
+function greet(){
+  const r=latestRound(), s=state.status;
+  if(s==='plan') say('PM','USER','R'+r.n+' 개선안이 준비돼 있어요. 고르시고 OK를 눌러 주세요.', true);
+  else if(s==='requested') say('PM','USER','승인하신 개선안을 Claude Code가 작업할 차례예요.', true);
+  else if(s==='candidate' && !run.queue.length) say('PM','USER',(r.candidate.version||'후보')+'가 올라와 있어요. 대시보드에서 확인하고 결정해 주세요.', true);
+  else if(s==='decided') say('PM','USER','결정을 받았어요. Claude Code가 반영하면 끝납니다.', true);
+  else if(!r) say('PM','USER','안녕하세요! 대시보드에 만들거나 고치고 싶은 것을 목표로 주세요.', true);
+}
+
+/* ---------- the proposal meeting (one Claude call per meeting) ---------- */
+function history(){
+  return state.rounds.filter(r=>r.n!==run.round).map(r=>{
+    const chosen=(r.items||[]).filter(i=>(r.selected||[]).includes(i.id)).map(i=>i.title);
+    const result = r.applied ? (r.candidate && r.applied===r.candidate.version ? r.applied+' 적용' : '반려되어 '+r.applied+' 유지') : r.decision ? '결정 대기' : '진행 중';
+    return 'R'+r.n+' 목표: '+r.goal+'\n  고객이 승인한 개선안: '+(chosen.join(' / ')||'(없음)')+'\n  결과: '+result+(r.decision_note?' / 고객 의견: '+r.decision_note:'');
+  }).join('\n');
+}
+function meetingPrompt(round, extra){
+  const team = ROLES.map(r=>'- '+r.k+' ('+r.ko+'): '+r.duty).join('\n');
+  const hist = history();
+  return [
+    '너는 아래 13개 역할로 이뤄진 해커톤 개발팀이다. 실제 팀원은 5명이고 역할 이름의 괄호가 담당자다. 고객(팀)이 준 목표에 맞게 "상하역 지연 관제 대시보드"를 하루 해커톤 안에 만들어 간다.',
+    '이번 회의는 "제안 회의"다. 아직 아무것도 구현하지 않았고 이 회의에서도 구현하지 않는다. 각자 자기 역할의 관점에서 문제를 짚고 개선안을 낸다. 구현과 테스트는 고객이 개선안을 승인한 뒤 따로 진행된다.',
+    '금지: "수정했습니다", "구현 완료", "테스트 통과"처럼 끝난 일로 말하기, 재 보지 않은 수치를 사실처럼 말하기. 모르는 것은 "확인 필요"라고 말한다.',
+    '', '팀:', team, '',
+    '프로젝트: '+state.site.name+' (확정 버전 '+state.site.live+')',
+    state.site.brief ? '프로젝트 정보:\n'+state.site.brief : '프로젝트 정보: (아직 없음)', '',
+    hist ? '지난 라운드:\n'+hist+'\n' : '',
+    '고객 목표: '+round.goal,
+    (round.feedbacks||[]).length ? '고객이 이번 라운드에 덧붙인 의견: '+round.feedbacks.join(' / ') : '',
+    extra ? '고객이 방금 남긴 의견(반드시 반영): '+extra : '', '',
+    '회의 규칙:',
+    '- 모든 역할이 최소 한 번 말한다. 14~22개 메시지. 한국어 존댓말, 한 메시지 90자 이내, 구체적으로(화면 이름, 파일 이름, 동작).',
+    '- 흐름: PO가 목표 해석과 우선순위 → PM이 일정과 리스크 → 현장 전문가가 현장 관점 점검 → 각 역할이 자기 관점의 문제와 개선안 → QA가 확인·시연 방법 → PL이 이벤트 형식 영향 정리 → PM이 고객에게 제안 요약.',
+    '- 범위: 기능은 ①시나리오 좌표 맵 ②통합하역작업 탭 ③CAM 4채널 ④Alert 네 영역과 모바일 웹 안에서만 낸다. 후순위(Alert push, 화각 구성 변경)는 목표가 요구할 때만. 하루 해커톤 작업량으로, 시연에서 보이는 것부터.',
+    '- 모듈 사이는 docs/events.md 이벤트 형식으로만 잇는다. 형식을 바꾸자는 안은 PL이 영향 받는 파트를 함께 말한다. 수치 가정값은 가정값이라고 밝힌다.',
+    '- 서로 이름을 부르며 대화한다. to는 말하는 상대(역할 키, ALL, 고객에게는 USER).',
+    '',
+    '출력 형식: 한 줄에 JSON 객체 하나씩. 다른 글, 마크다운, 코드 펜스는 쓰지 않는다. 메시지와 개선안은 회의 흐름대로 섞어도 된다.',
+    '대화: {"type":"msg","from":"PO","to":"PM","text":"..."}',
+    '개선안: {"type":"item","owner":"제안한 역할 키","title":"40자 이내","detail":"무엇을 왜 바꾸는지 200자 이내","priority":"높음|보통|낮음","effort":"작음|보통|큼","check":"고친 뒤 고객이 확인할 방법 100자 이내"}',
+    '마지막 한 줄: {"type":"summary","text":"제안 요약 2~3문장","question":"고객에게 확인할 것 한 가지, 없으면 빈 문자열"}',
+    '역할 키: '+ROLES.map(r=>r.k).join(', ')+' (to에는 ALL, USER도 가능)',
+    '개선안은 6~12개, 목표와 직접 관련된 것부터, 서로 겹치지 않게.'
+  ].filter(x=>x!=='').join('\n');
+}
+const parseLine = line => { const a=line.indexOf('{'), b=line.lastIndexOf('}'); if(a<0||b<=a) return null; try{ return JSON.parse(line.slice(a,b+1)); }catch(e){ return null; } };
+const clip = (s,n) => { s=String(s==null?'':s).trim(); return s.length>n ? s.slice(0,n-1)+'…' : s; };
+const PRI = ['높음','보통','낮음'], EFF = ['작음','보통','큼'];
+function takeLine(line){
+  const o=parseLine(line); if(!o) return;
+  if(o.type==='msg' && ROLE[o.from] && o.text){
+    run.queue.push({from:o.from, to:(ROLE[o.to]||o.to==='ALL'||o.to==='USER')?o.to:'ALL', text:clip(o.text,180)});
+    run.thinking=false;
+  } else if(o.type==='item' && o.title && run.items.length<14){
+    run.items.push({id:'I'+(run.items.length+1), owner:ROLE[o.owner]?o.owner:'PL', title:clip(o.title,60), detail:clip(o.detail,320),
+      priority:PRI.includes(o.priority)?o.priority:'보통', effort:EFF.includes(o.effort)?o.effort:'보통', check:clip(o.check,160)});
+    run.thinking=false;
+  } else if(o.type==='summary'){
+    run.summary={text:clip(o.text,600), question:clip(o.question,200)};
+  }
+}
+const ERR = {
+  not_granted:'Claude 사용이 허용되지 않았습니다.', sampling_disabled:'이 계정에서는 Claude를 쓸 수 없습니다.',
+  rate_limited:'요청이 많아 잠시 쉬어야 합니다. 조금 뒤에 다시 시도해 주세요.', session_expired:'다시 로그인해야 합니다.',
+  refused:'이 요청은 처리할 수 없다고 합니다. 목표 문장을 바꿔 주세요.', prompt_too_large:'기록이 너무 길어졌습니다.',
+  empty_completion:'팀이 아무 말도 하지 않았습니다. 다시 시도해 주세요.', upstream_error:'연결이 잠시 끊겼습니다. 다시 시도해 주세요.'
+};
+async function meeting(round, extra){
+  if(!sample || state.status==='meeting'){ dbg('회의를 열지 않음: '+(!sample?'Claude 없음':'이미 회의 중')); return; }
+  Object.assign(run, {ctl:new AbortController(), queue:[], current:null, live:[], items:[], summary:null, done:false, thinking:true, fail:'', round:round.n, replay:0});
+  state.status='meeting'; viewing=0; render();
+  const hint=setTimeout(()=>{ if(state.status==='meeting' && run.thinking) note('아직 응답이 없습니다. Claude 사용을 허용하는 창이 떠 있다면 허용을 눌러 주세요. 계속 멈춰 있으면 회의 중지 후 다시 시도해 주세요.'); }, 45000);
+  let rest='', first=true;
+  try{
+    dbg('Claude에 회의 요청을 보냄 (허용 창이 뜨면 허용해 주세요)');
+    await sample(meetingPrompt(round, extra||''), {signal:run.ctl.signal, cache:false, onText:({delta})=>{
+      if(first){ first=false; dbg('Claude 응답이 오기 시작함'); }
+      const lines=(rest+delta).split('\n'); rest=lines.pop(); lines.forEach(takeLine);
+    }});
+    if(rest.trim()) takeLine(rest);
+    dbg('Claude 응답 끝: 발언 '+(run.live.length+run.queue.length)+'개, 개선안 '+run.items.length+'개');
+    if(!run.items.length) run.fail='팀이 개선안을 정리하지 못했습니다. 다시 시도해 주세요.';
+  }catch(e){
+    dbg('Claude 요청 실패: '+(e&&e.code)+' '+(e&&e.message||''));
+    if(rest.trim()) takeLine(rest);
+    run.fail = e && e.code==='cancelled' ? '회의를 중지했습니다.' : (ERR[e&&e.code] || '문제가 생겼습니다 ('+(e&&e.code||'알 수 없음')+').');
+    if(e && e.code==='cancelled') run.queue=[];
+  }
+  clearTimeout(hint);
+  if(extra) round.feedbacks=(round.feedbacks||[]).concat(extra);
+  run.done=true; run.thinking=false; render();
+}
+function finishMeeting(){
+  const round = state.rounds.find(r=>r.n===run.round);
+  if(round && run.items.length && !run.fail){
+    Object.assign(round, {log:run.live.slice(), items:run.items.slice(), summary:run.summary?run.summary.text:'', question:run.summary?run.summary.question:'',
+      met_at:new Date().toISOString(), selected:run.items.filter(i=>i.priority==='높음').map(i=>i.id)});
+    state.status='plan';
+    say('PM','USER','개선안 '+round.items.length+'개를 정리했습니다. 진행할 것을 고르고 OK를 눌러 주세요.', true);
+  } else {
+    if(round && !(round.items||[]).length){ state.rounds=state.rounds.filter(r=>r!==round); }
+    state.status = round && (round.items||[]).length ? 'plan' : 'idle';
+    say('PM','ALL', run.fail || '이번 회의는 여기까지입니다.', true);
+  }
+  run.done=false; run.ctl=null; run.round=0;
+  save(); render();
+}
+function replay(round){
+  run.queue = (round.candidate.report||[]).slice(); run.live=[]; run.replay=round.n; run.current=null;
+  if(!run.queue.length){ round.candidate.watched=true; save(); }
+}
+function finishReplay(){
+  const r=state.rounds.find(x=>x.n===run.replay); run.replay=0;
+  if(r && r.candidate){ r.candidate.watched=true; save(); }
+  say('PM','USER',(r&&r.candidate&&r.candidate.version||'후보')+' 올라왔습니다. 대시보드에서 직접 확인하고 승인 또는 반려해 주세요.', true);
+  render();
+}
+
+/* ---------- speech playback ---------- */
+let bubbleEl=null;
+function say(from, to, text, keep){ run.current = {from, to, text, shown:0, until:0, keep:!!keep, t0:performance.now()}; }
+function speed(){ return $('#fast').checked ? 3 : 1; }
+function stepSpeech(now){
+  const c=run.current;
+  if(c){
+    const total=c.text.length, rate=34*speed();
+    c.shown=Math.min(total, Math.floor((now-c.t0)/1000*rate));
+    if(c.shown>=total && !c.until) c.until = now + Math.max(900, 1300 + total*18)/speed();
+    if(c.until && now>c.until && !c.keep) run.current=null;
+  }
+  if((!run.current || run.current.keep) && run.queue.length){
+    const m=run.queue.shift(); run.live.push(m); say(m.from, m.to, m.text); renderLog();
+  }
+  if(!run.current && !run.queue.length){
+    if(run.done) finishMeeting();
+    else if(run.replay) finishReplay();
+  }
+}
+function skipTalk(){ while(run.queue.length) run.live.push(run.queue.shift()); run.current=null; renderLog(); }
+
+/* ---------- pixel office ---------- */
+const cv=$('#cv'), g=cv.getContext('2d');
+g.imageSmoothingEnabled=false;
+const R = (x,y,w,h,c) => { g.fillStyle=c; g.fillRect(x|0,y|0,w|0,h|0); };
+function drawRoom(t){
+  R(0,0,320,200,'#c9a27a');                                         // floor
+  for(let y=56;y<200;y+=12){ R(0,y,320,1,'#b88f66'); for(let x=((y/12)%2)*20;x<320;x+=40) R(x,y-11,1,11,'#b88f66'); }
+  R(0,0,320,52,'#e9dcc0'); R(0,48,320,4,'#8d6b4c'); R(0,52,320,2,'#6e5038');   // wall + baseboard
+  for(let x=0;x<320;x+=16) R(x,0,1,48,'#e1d2b3');
+  // whiteboard
+  R(10,7,104,36,'#5d6476'); R(12,9,100,32,'#fbfaf5'); R(14,41,96,2,'#9aa1b0'); R(98,40,6,2,'#d64545'); R(90,40,6,2,'#3a7bd5');
+  // clock
+  R(126,10,14,14,'#3b3346'); R(127,11,12,12,'#fffdf2');
+  const a=t/6000; R(133,17,1,1,'#3b3346');
+  for(let i=1;i<5;i++) R(133+Math.round(Math.cos(a)*i),17+Math.round(Math.sin(a)*i),1,1,'#c0392b');
+  for(let i=1;i<4;i++) R(133+Math.round(Math.cos(a/12-1.6)*i),17+Math.round(Math.sin(a/12-1.6)*i),1,1,'#3b3346');
+  // window with drifting clouds
+  R(226,6,86,38,'#5d6476'); R(228,8,82,34,'#8ed1f5');
+  const cx=228+((t/180)%110)-20; R(cx,16,14,4,'#ffffff'); R(cx+3,13,8,3,'#ffffff');
+  const cx2=228+((t/260+60)%110)-20; R(cx2,28,10,3,'#f4fbff');
+  R(228,24,82,1,'#5d6476'); R(268,8,1,34,'#5d6476');
+  R(226,6,86,38,'rgba(0,0,0,0)');
+  // poster and coffee corner
+  R(150,10,26,20,'#2f6fd1'); R(152,12,22,16,'#ffcc4d'); R(158,16,10,8,'#2f6fd1');
+  R(190,18,18,30,'#40495e'); R(192,22,14,8,'#1d2230'); R(196,32,6,2,'#c0392b'); R(195,40,8,6,'#f6f1e3');
+  if(Math.floor(t/400)%2) R(198,36,1,3,'rgba(255,255,255,.7)'); else R(200,35,1,3,'rgba(255,255,255,.7)');
+  // plants
+  plant(4,40,t); plant(308,40,t+900);
+  // rug under the middle row
+  R(18,104,284,46,'#a8445a'); R(20,106,280,42,'#b85068');
+  for(let x=24;x<298;x+=10) R(x,106,4,42,'rgba(255,255,255,.04)');
+}
+function plant(x,y,t){
+  R(x,y+6,10,10,'#8d4f2c'); R(x+1,y+16,8,2,'#6e3c21');
+  const s=Math.round(Math.sin(t/700));
+  R(x+2+s,y-4,2,10,'#3f9e4d'); R(x+5,y-8,2,14,'#4fb35e'); R(x+7-s,y-3,2,9,'#3f9e4d'); R(x,y,2,6,'#4fb35e');
+}
+function drawDesk(r){
+  const x=r.x, y=r.y;
+  R(x-18,y-2,36,3,'#6e4a2f');           // back edge shadow
+  R(x-18,y,36,10,'#9a6a43'); R(x-18,y,36,2,'#b17d52'); R(x-18,y+10,36,2,'#6e4a2f');
+  R(x-16,y+12,3,6,'#5c3d26'); R(x+13,y+12,3,6,'#5c3d26');
+}
+function drawLaptop(r, glow){
+  const x=r.x, y=r.y;
+  R(x-7,y-7,14,9,'#c7ccd8'); R(x-7,y-7,14,1,'#e3e7ef'); R(x-1,y-4,2,2,'#9aa2b3');    // lid back
+  R(x-9,y+1,18,2,'#aeb4c2');                                                         // base
+  if(glow) R(x-8,y-8,16,1,'rgba(127,211,255,.85)');
+  R(x+10,y+1,4,4,'#f6f1e3'); R(x+11,y+2,2,1,'#7a4b2a');                               // mug
+}
+function drawPerson(r, t, mode){
+  // mode: idle | type | talk | think | cheer | listen
+  const i=ROLES.indexOf(r), f=Math.floor(t/220+i*1.7);
+  let x=r.x, top=r.y-22, armL=0, armR=0;
+  if(mode==='talk') top -= (f%2)?2:0;
+  if(mode==='cheer'){ top -= Math.abs(Math.round(Math.sin(t/160+i)*5)); }
+  if(mode==='type'){ armL=(f%2)?1:0; armR=(f%2)?0:1; }
+  // chair back
+  R(x-7,top+9,14,12,'#3b3346'); R(x-6,top+10,12,10,'#4a4158');
+  // body
+  R(x-6,top+10,12,10,r.shirt); R(x-6,top+10,12,1,'rgba(255,255,255,.18)'); R(x-1,top+10,2,3,'rgba(0,0,0,.18)');
+  // arms
+  if(mode==='cheer'){ R(x-9,top+2,3,9,r.shirt); R(x+6,top+2,3,9,r.shirt); R(x-9,top,3,3,r.skin); R(x+6,top,3,3,r.skin); }
+  else { R(x-8,top+12+armL,3,8,r.shirt); R(x+5,top+12+armR,3,8,r.shirt); R(x-8,top+19+armL,3,2,r.skin); R(x+5,top+19+armR,3,2,r.skin); }
+  // head
+  R(x-4,top,8,9,r.skin); R(x-5,top+3,1,4,r.skin); R(x+4,top+3,1,4,r.skin);
+  R(x-5,top-1,10,3,r.hair); R(x-5,top+2,2,3,r.hair); R(x+3,top+2,2,3,r.hair);
+  const blink = (f+i*3)%23===0;
+  if(!blink){ R(x-3,top+4,1,2,'#1d1726'); R(x+2,top+4,1,2,'#1d1726'); }
+  else { R(x-3,top+5,2,1,'#1d1726'); R(x+1,top+5,2,1,'#1d1726'); }
+  if(mode==='talk' && (f%2)) R(x-1,top+7,2,1,'#7a2a2a'); else if(mode==='cheer') R(x-2,top+7,4,1,'#7a2a2a'); else R(x-1,top+7,2,1,'#b06a5a');
+  if(mode==='think'){ const d=Math.floor(t/350)%4; for(let k=0;k<3;k++) R(x+6+k*3,top-5,2,2, k<d?'#1d1726':'rgba(29,23,38,.25)'); }
+  if(mode==='listen') R(x-6,top-4,1,1,'#ffcc4d');
+}
+function drawConfetti(t){
+  if(!anim.cheer) return;
+  const life=(t-anim.cheer)/1000; if(life>7){ anim.cheer=0; return; }
+  const cols=['#ffcc4d','#e35d5b','#3fb4e8','#53c26b','#d65db1','#ffffff'];
+  for(let k=0;k<70;k++){
+    const x=(k*37+Math.sin(k*12.9)*80+320)%320, y=((life*40*(0.6+(k%5)/5)+k*13)%220)-20;
+    R(x+Math.sin(life*3+k)*3,y,2,2,cols[k%cols.length]);
+  }
+}
+const DEVS = ['FE','BE','VISION','OPT','DATA','MOBILE','DESIGNER'];
+function modeOf(r, t){
+  const c=run.current, i=ROLES.indexOf(r), s=state.status;
+  if(anim.cheer) return 'cheer';
+  if(c && c.from===r.k && (!c.keep || c.shown<c.text.length)) return 'talk';
+  if(c && !c.keep && (c.to===r.k || c.to==='ALL')) return 'listen';
+  if(s==='meeting'){
+    if(run.thinking) return ((Math.floor(t/1800)+i)%3===0) ? 'think' : 'type';
+    return (Math.floor(t/900)+i)%3===0 ? 'type' : 'idle';
+  }
+  if(s==='requested') return DEVS.includes(r.k) ? 'type' : r.k==='QA' || r.k==='PL' ? 'think' : 'idle';
+  if(s==='candidate' || s==='decided') return r.k==='QA' ? 'type' : 'idle';
+  return 'idle';
+}
+function drawScene(t){
+  drawRoom(t);
+  const glow = ['meeting','requested'].includes(state.status);
+  ROLES.forEach(r=>{ drawPerson(r, t, modeOf(r,t)); drawDesk(r); drawLaptop(r, glow); });
+  drawConfetti(t);
+}
+
+/* ---------- HTML overlay: name tags, speech bubble, whiteboard ---------- */
+const P = (x,y) => 'left:'+(x/320*100)+'%;top:'+(y/200*100)+'%';
+function buildOverlay(){
+  $('#overlay').innerHTML =
+    ROLES.map(r=>'<div class="tag" id="tag-'+r.k+'" style="'+P(r.x, r.y+13)+'"><span class="code">'+esc(r.code)+'</span><span class="ko">'+esc(r.ko)+'</span></div>').join('')+
+    '<div class="board" id="board" style="'+P(12,9)+';width:'+(100/320*100)+'%;height:'+(32/200*100)+'%"></div>'+
+    '<div class="bubble" id="bubble" hidden><span class="who" id="bubbleWho"></span><span id="bubbleText"></span></div>';
+  bubbleEl=$('#bubble');
+}
+const STEP = {idle:'목표 대기', meeting:'제안 회의 중', plan:'개선안 선택', requested:'수정 작업 대기', candidate:'후보 검토', decided:'반영 대기'};
+let lastBoard='';
+function updateOverlay(){
+  const c=run.current;
+  ROLES.forEach(r=>{ const el=$('#tag-'+r.k); el.classList.toggle('speaking', !!c && c.from===r.k); el.classList.toggle('to', !!c && c.to===r.k); });
+  if(c){
+    const r=ROLE[c.from], left=r.x/320*100, edge = r.x<80 ? 14 : r.x>240 ? 86 : 50;
+    bubbleEl.hidden=false;
+    bubbleEl.style.left=left+'%'; bubbleEl.style.top=((r.y-28)/200*100)+'%';
+    bubbleEl.style.transform='translate(-'+edge+'%,-100%)'; bubbleEl.style.setProperty('--tail', edge+'%');
+    $('#bubbleWho').innerHTML=esc(r.code)+' → <em>'+esc(WHO(c.to))+'</em>';
+    $('#bubbleText').textContent=c.text.slice(0, c.shown||0) || '…';
+  } else bubbleEl.hidden=true;
+  const r=latestRound();
+  const extra = state.status==='plan' && r ? '개선안 '+(r.items||[]).length+'개' : state.status==='candidate' && r && r.candidate ? r.candidate.version+' 후보' : '';
+  const html='<span class="v">'+esc(state.site.live)+'</span><span class="s">'+esc(STEP[state.status]||'')+'</span>'+(extra?'<span class="s">'+esc(extra)+'</span>':'');
+  if(html!==lastBoard){ lastBoard=html; $('#board').innerHTML=html; }
+}
+function loop(now){ anim.t=now; drawScene(now); updateOverlay(); requestAnimationFrame(loop); }
+// speech and meeting progress run on a timer, not the frame loop: a hidden tab pauses frames,
+// and a meeting that finishes while the viewer looks elsewhere must still be saved
+setInterval(()=>stepSpeech(performance.now()), 120);
+
+/* ---------- side panels ---------- */
+function render(){
+  const s=state.status, r=latestRound();
+  const chip=$('#statusChip');
+  chip.className='chip '+({meeting:'working',plan:'review',requested:'working',candidate:'review',decided:'working'}[s]||'');
+  chip.textContent = (r && s!=='idle' ? 'R'+r.n+' ' : '')+(STEP[s]||'');
+  $('#liveChip').textContent = '대시보드 '+state.site.live;
+  const busy = s!=='idle';
+  $('#goalLine').innerHTML = r && busy ? '이번 목표 <b>'+esc(r.goal.replace(/\s+/g,' '))+'</b>' : '만들 기능이나 고칠 점을 목표로 주면, 팀이 개선안을 내고 승인한 것만 실제로 만듭니다.';
+  $('#goalEdit').hidden = busy; $('#goalShow').hidden = !busy;
+  $('#goalText').textContent = r && busy ? r.goal : '';
+  $('#stopBtn').hidden = s!=='meeting' || run.done;
+  $('#skipBtn').hidden = !(run.queue.length || (run.current && !run.current.keep));
+  $('#phaseText').textContent = {
+    idle: sample ? '팀이 목표를 기다리고 있습니다.' : '이 페이지는 claude.ai에서 열어야 팀이 회의합니다.',
+    meeting: run.thinking ? '팀이 회의를 준비하고 있습니다. 첫 발언까지 30초~1분쯤 걸립니다.' : '제안 회의 중입니다.',
+    plan: '진행할 개선안을 고르고 OK를 눌러 주세요.',
+    requested: 'Claude Code가 실제로 코드를 고칠 차례입니다.',
+    candidate: '후보 대시보드를 확인하고 승인 또는 반려해 주세요.',
+    decided: 'Claude Code가 결정을 반영하면 끝납니다.'
+  }[s] || '';
+  renderStep(); renderRounds(); renderLog();
+}
+const pill = (t, cls) => '<span class="pill '+(cls||'')+'">'+esc(t)+'</span>';
+const PRI_CLS = {'높음':'hi','보통':'','낮음':'lo'};
+function itemsHtml(round, editable){
+  const sel = new Set(round.selected||[]);
+  return (round.items||[]).map(i=>{
+    const on = sel.has(i.id);
+    return '<label class="item'+(on?' on':'')+(editable?'':' ro')+'" for="it-'+round.n+'-'+i.id+'">'+
+      (editable ? '<input type="checkbox" id="it-'+round.n+'-'+i.id+'" data-item="'+i.id+'"'+(on?' checked':'')+'>' : '<span class="mark">'+(on?'✔':'·')+'</span>')+
+      '<span class="body"><span class="h">'+roleChip(i.owner)+'<b>'+esc(i.title)+'</b></span>'+
+      '<span class="pills">'+pill('우선순위 '+i.priority, PRI_CLS[i.priority])+pill('작업량 '+i.effort)+'</span>'+
+      '<span class="d">'+esc(i.detail)+'</span>'+(i.check?'<span class="c">확인 방법: '+esc(i.check)+'</span>':'')+'</span></label>';
+  }).join('');
+}
+const list = (title, arr, cls) => arr && arr.length ? '<div class="sec">'+title+'</div><ul class="plain '+(cls||'')+'">'+arr.map(x=>'<li>'+x+'</li>').join('')+'</ul>' : '';
+function candidateHtml(round){
+  const c=round.candidate, title=x=>{ const it=(round.items||[]).find(i=>i.id===x.id); return esc(it?it.title:x.id); };
+  return '<div class="ver-head"><span class="v">'+esc(c.version)+'</span><b>후보 버전</b><span class="note">'+esc(c.base||state.site.live)+' 기준, '+esc((c.built_at||'').slice(0,16).replace('T',' '))+'</span></div>'+
+    '<p class="summary">'+esc(c.summary||'')+'</p>'+
+    list('고친 개선안', (c.done||[]).map(x=>'<b>'+title(x)+'</b> — '+esc(x.result||'')), 'ok')+
+    list('하지 못한 것', (c.skipped||[]).map(x=>'<b>'+title(x)+'</b> — '+esc(x.reason||'')), 'warn')+
+    (c.branch||c.commit ? '<div class="sec">'+(state.site.repo?'GitHub':'Git (로컬)')+'</div><div class="note">'+
+      (c.branch?'브랜치 '+(state.site.repo?'<a href="'+esc(state.site.repo+'/tree/'+c.branch)+'" target="_blank" rel="noopener">'+esc(c.branch)+'</a>':'<b>'+esc(c.branch)+'</b>'):'')+
+      (c.commit?' · 커밋 '+(state.site.repo?'<a href="'+esc(state.site.repo+'/commit/'+c.commit)+'" target="_blank" rel="noopener">'+esc(String(c.commit).slice(0,7))+'</a>':esc(String(c.commit).slice(0,7))):'')+
+      (c.compare?' · <a href="'+esc(c.compare)+'" target="_blank" rel="noopener">바뀐 내용 비교</a>':'')+'</div>' : '')+
+    list('바뀐 파일', (c.files||[]).map(esc))+
+    list('Claude Code가 직접 확인한 것', (c.tests||[]).map(x=>(x.ok?'<span class="okm">통과</span> ':'<span class="ngm">실패</span> ')+esc(x.name)+(x.note?' — '+esc(x.note):'')))+
+    list('직접 확인해 주세요', (c.checks||[]).map(esc))+
+    (c.limits&&c.limits.length?list('알아 둘 점', c.limits.map(esc)):'');
+}
+let lastStepKey='';
+function renderStep(){
+  const s=state.status, latest=latestRound(), r=shownRound();
+  const key=[s, r&&r.n, viewing, r&&r.items&&r.items.length, r&&r.candidate&&r.candidate.built_at, r&&r.decision, r&&r.applied, run.items.length, run.fail, !!sample].join('|');
+  if(s==='meeting'){
+    $('#stepTitle').textContent='R'+run.round+' 제안 회의';
+    $('#stepBody').innerHTML='<div class="progress"><i style="width:'+Math.min(95,6+run.live.length*4)+'%"></i></div><div class="note">개선안 '+run.items.length+'개가 나왔습니다. 회의가 끝나면 고를 수 있습니다.</div>';
+    lastStepKey=''; return;
+  }
+  if(key===lastStepKey) return;   // keep checkboxes and typed text as they are
+  lastStepKey=key;
+  const past = r && latest && r!==latest;
+  let title='진행', html='';
+  if(!r){ html='<div class="empty">목표를 주시면 팀이 제안 회의를 엽니다.</div>'+(state.legacy?'<div class="note">이전 방식으로 만든 기록은 보관해 두었습니다. 그때 보고된 수정과 테스트는 실제로 실행되지 않은 내용이었습니다.</div>':''); }
+  else if(past || s==='idle'){
+    title='R'+r.n+' 결과';
+    html='<div class="sec">목표</div><div>'+esc(r.goal)+'</div>'+
+      (r.summary?'<div class="sec">팀 제안 요약</div><p class="summary">'+esc(r.summary)+'</p>':'')+
+      '<div class="sec">개선안 (✔ 승인한 것)</div>'+itemsHtml(r,false)+
+      (r.candidate?candidateHtml(r):'')+
+      '<div class="result '+(r.applied && r.candidate && r.applied===r.candidate.version?'ok':'no')+'">'+
+        (r.applied ? (r.candidate && r.applied===r.candidate.version ? r.applied+'로 업데이트했습니다.' : '반려되어 '+r.applied+'를 그대로 씁니다.') : r.decision ? '결정 반영 대기' : r.plan_at ? '수정 작업 대기' : '개선안 선택 전')+
+        (r.decision_note?'<br><span class="note">남긴 의견: '+esc(r.decision_note)+'</span>':'')+'</div>';
+  }
+  else if(s==='plan'){
+    title='R'+r.n+' 개선안 고르기';
+    html=(r.summary?'<p class="summary">'+esc(r.summary)+'</p>':'')+(r.question?'<div class="callout">팀의 질문: '+esc(r.question)+'</div>':'')+
+      '<div class="note">진행할 개선안을 고르세요. 우선순위 "높음"은 미리 골라 두었습니다.</div>'+itemsHtml(r,true)+
+      '<div class="row"><button class="btn ok" id="planOk">OK, 선택한 개선안으로 진행</button><span class="note" id="planNote"></span></div>'+
+      '<label class="note" for="replanInput">다른 방향을 원하면 의견을 적고 다시 회의하세요.</label><textarea id="replanInput" placeholder="예: 맵과 순번 엔진에만 집중하고 모바일 화면은 다음 라운드로 미뤄 주세요."></textarea>'+
+      '<div class="row"><button class="btn" id="replanBtn">의견 반영해서 다시 회의</button><button class="btn sm danger" id="dropBtn">이번 목표 취소</button></div>';
+  }
+  else if(s==='requested'){
+    title='R'+r.n+' 수정 작업 대기';
+    html='<div class="callout big">이 화면은 코드를 직접 고칠 수 없습니다.<br><b>Claude Code 채팅에 "오피스 개선안 작업해줘"라고 보내 주세요.</b><br>승인하신 개선안대로 후보 브랜치(office/r번호)에서 코드를 만들고, 서버를 후보 버전으로 켠 뒤 결과를 여기에 올립니다. 확정본(main)은 승인 전까지 바뀌지 않습니다.</div>'+
+      '<div class="sec">승인한 개선안 '+(r.selected||[]).length+'개</div>'+itemsHtml(Object.assign({}, r, {items:(r.items||[]).filter(i=>(r.selected||[]).includes(i.id))}), false)+
+      '<div class="row"><button class="btn sm" id="backToPlan">개선안 다시 고르기</button></div>';
+  }
+  else if(s==='candidate'){
+    title='R'+r.n+' '+r.candidate.version+' 후보 검토';
+    const pv=r.candidate.preview_url||state.site.url;
+    html='<div class="callout">후보 버전이 브랜치 <b>'+esc(r.candidate.branch||'')+'</b>로 이 PC에서 켜져 있습니다. 확정본(main)은 아직 그대로입니다. 직접 들어가 확인해 주세요.<br><a class="btn primary sm" href="'+esc(pv)+'" target="_blank" rel="noopener">후보 대시보드 열기</a> <span class="note">'+esc(pv)+' (이 PC에서만 열립니다)</span></div>'+
+      candidateHtml(r)+
+      '<div class="row"><button class="btn ok" id="acceptBtn">승인: '+esc(r.candidate.version)+'를 확정본(main)에 합치기</button></div>'+
+      '<label class="note" for="rejectNote">마음에 들지 않으면 이유를 적고 반려하세요. 후보 브랜치를 지우고 확정본('+esc(r.candidate.base||state.site.live)+')은 그대로 둡니다.</label>'+
+      '<textarea id="rejectNote" placeholder="예: 순번표에 추천 이유가 안 보이고 차량 이동이 너무 빨라요."></textarea>'+
+      '<div class="row"><button class="btn danger" id="rejectBtn">반려: 이전 버전 유지</button></div>';
+  }
+  else if(s==='decided'){
+    title='R'+r.n+' 반영 대기';
+    html='<div class="callout big"><b>'+(r.decision==='approved'?'승인':'반려')+'</b>하셨습니다.<br><b>Claude Code 채팅에 "오피스 결정 반영해줘"라고 보내 주세요.</b><br>'+
+      (r.decision==='approved' ? esc(r.candidate.branch||'후보 브랜치')+'를 main에 합쳐 확정본으로 만들고 서버를 다시 켭니다.' : '후보 브랜치를 지우고 main은 '+esc(r.candidate.base||state.site.live)+' 그대로 둡니다.')+'</div>'+
+      (r.decision_note?'<div class="note">남긴 의견: '+esc(r.decision_note)+'</div>':'')+candidateHtml(r);
+  }
+  $('#stepTitle').textContent=title; $('#stepBody').innerHTML=html;
+}
+function renderRounds(){
+  const rs=state.rounds;
+  $('#roundCount').textContent = rs.length ? rs.length+'개' : '';
+  const cur = viewing || (rs.length?rs[rs.length-1].n:0);
+  $('#rounds').innerHTML = rs.length ? rs.slice().reverse().map(r=>{
+    const res = r.applied ? (r.candidate && r.applied===r.candidate.version ? r.applied+' 적용' : '반려') : r.decision ? '반영 대기' : r.candidate ? '후보 검토' : r.plan_at ? '작업 대기' : '선택 중';
+    const ok = r.applied && r.candidate && r.applied===r.candidate.version;
+    return '<button class="vitem'+(r.n===cur?' sel':'')+'" data-r="'+r.n+'"><span class="v">R'+r.n+'</span><span class="t">'+esc(r.goal)+'</span>'+
+      '<span class="st'+(ok?' ok':'')+'">'+esc(res)+'</span><span class="fb">개선안 '+(r.items||[]).length+'개 중 '+(r.selected||[]).length+'개 승인</span></button>';
+  }).join('') : '<div class="empty">목표마다 한 줄씩 쌓입니다.</div>';
+}
+let lastLog='';
+function renderLog(){
+  let msgs, label;
+  const r=shownRound();
+  if((state.status==='meeting' || run.replay) && !viewing){ msgs=run.live; label=state.status==='meeting'?'R'+run.round+' 제안 회의':'R'+run.replay+' 작업 보고'; }
+  else if(r){ msgs=(r.log||[]).concat(r.candidate&&r.candidate.report?[{from:'PL',to:'ALL',text:'── 작업 보고 ('+r.candidate.version+') ──',sep:true}].concat(r.candidate.report):[]); label='R'+r.n; }
+  else { msgs=[]; label=''; }
+  const html = msgs.length ? msgs.map(m=>m.sep?'<div class="sepline">'+esc(m.text)+'</div>':'<div class="msg">'+roleChip(m.from)+'<span class="meta"><b>'+esc(ROLE[m.from]?ROLE[m.from].ko:m.from)+'</b> → '+esc(WHO(m.to))+'</span><span class="txt">'+esc(m.text)+'</span></div>').join('')
+    : '<div class="empty">'+(state.status==='meeting'?'팀이 회의를 준비하고 있습니다.':'팀의 대화가 여기에 기록됩니다.')+'</div>';
+  $('#logSub').textContent = label ? label+' · '+msgs.filter(m=>!m.sep).length+'개 발언' : '';
+  if(html!==lastLog){ const box=$('#log'), atEnd=box.scrollTop+box.clientHeight>=box.scrollHeight-30; lastLog=html; box.innerHTML=html; if(atEnd) box.scrollTop=box.scrollHeight; }
+}
+
+/* ---------- controls ---------- */
+$('#startBtn').addEventListener('click',()=>{
+  dbg('회의 열기 버튼 눌림: 준비 '+ready+', Claude '+(!!sample)+', 단계 '+state.status+', 목표 '+$('#goalInput').value.trim().length+'자');
+  try{ startClicked(); }catch(e){ dbg('버튼 처리 중 오류: '+(e&&e.stack||e)); note('화면 오류: '+(e&&e.message||e)); }
+});
+function startClicked(){
+  if(!ready){ $('#startNote').textContent='아직 연결을 확인하는 중입니다. 몇 초 뒤에 다시 눌러 주세요.'; return; }
+  if(!sample){ $('#startNote').textContent=NO_CLAUDE; say('PM','USER','지금 창에서는 회의를 열 수 없어요. 브라우저에서 열어 주세요.', true); return; }
+  if(state.status!=='idle'){ $('#startNote').textContent='진행 중인 단계가 있습니다: '+(STEP[state.status]||state.status); return; }
+  const goal=$('#goalInput').value.trim();
+  if(!goal){ $('#startNote').textContent='목표를 먼저 적어 주세요.'; $('#goalInput').focus(); return; }
+  $('#startNote').textContent='';
+  const round={n:(state.rounds.length?latestRound().n:0)+1, goal, log:[], items:[], selected:[], feedbacks:[], created_at:new Date().toISOString()};
+  state.rounds.push(round);
+  dbg('라운드 R'+round.n+' 만들고 회의 시작');
+  meeting(round,'').catch(e=>{ dbg('회의 처리 중 오류: '+(e&&e.stack||e)); note('화면 오류: '+(e&&e.message||e)); });
+}
+$('#stopBtn').addEventListener('click',()=>{ if(run.ctl) run.ctl.abort(); });
+$('#skipBtn').addEventListener('click',skipTalk);
+$('#stepBody').addEventListener('change',e=>{
+  const box=e.target.closest('[data-item]'); if(!box) return;
+  const r=latestRound(); if(state.status!=='plan' || !r) return;
+  const set=new Set(r.selected||[]); if(box.checked) set.add(box.dataset.item); else set.delete(box.dataset.item);
+  r.selected=(r.items||[]).map(i=>i.id).filter(id=>set.has(id));
+  box.closest('.item').classList.toggle('on', box.checked);
+  save();
+});
+$('#stepBody').addEventListener('click',e=>{
+  const id=e.target.id, r=latestRound(); if(!r) return;
+  if(id==='planOk' && state.status==='plan'){
+    if(!(r.selected||[]).length){ $('#planNote').textContent='개선안을 하나 이상 골라 주세요.'; return; }
+    r.plan_at=new Date().toISOString(); state.status='requested';
+    say('PM','USER','선택하신 '+r.selected.length+'개 개선안을 Claude Code 개발팀에 넘깁니다.', true);
+    save(); render();
+  }
+  if(id==='replanBtn' && state.status==='plan'){
+    const extra=$('#replanInput').value.trim();
+    if(!extra){ $('#replanInput').focus(); return; }
+    meeting(r, extra);
+  }
+  if(id==='dropBtn' && state.status==='plan'){
+    r.dropped=true; r.applied=state.site.live; state.status='idle'; viewing=0;
+    save(); render();
+  }
+  if(id==='backToPlan' && state.status==='requested'){ state.status='plan'; delete r.plan_at; save(); render(); }
+  if(id==='acceptBtn' && state.status==='candidate'){
+    r.decision='approved'; r.decided_at=new Date().toISOString(); state.status='decided'; anim.cheer=performance.now();
+    say('PM','USER','승인 감사합니다! '+r.candidate.version+'로 업데이트하겠습니다.', true);
+    save(); render();
+  }
+  if(id==='rejectBtn' && state.status==='candidate'){
+    r.decision='rejected'; r.decision_note=$('#rejectNote').value.trim(); r.decided_at=new Date().toISOString(); state.status='decided';
+    say('PM','USER','알겠습니다. 이전 버전 '+(r.candidate.base||state.site.live)+'를 그대로 쓰겠습니다.', true);
+    save(); render();
+  }
+});
+$('#rounds').addEventListener('click',e=>{
+  const b=e.target.closest('[data-r]'); if(!b) return;
+  const n=Number(b.dataset.r), last=latestRound();
+  viewing = last && n===last.n ? 0 : n; lastStepKey=''; render();
+});
+
+window.addEventListener('error', e=>{ note('화면 오류: '+(e.message||'알 수 없음')+' (새로고침해 주세요)'); dbg('화면 오류: '+e.message+' @'+e.lineno); });
+window.addEventListener('unhandledrejection', e=>note('화면 오류: '+((e.reason&&(e.reason.message||e.reason.code))||'알 수 없음')));
+buildOverlay();
+render();
+requestAnimationFrame(loop);
+connect();
+
+})();
+</script>

@@ -1,0 +1,66 @@
+# 이벤트 형식 (모듈 간 유일한 약속)
+
+영상 모듈·IoT 시뮬레이터는 이벤트를 **내고**, 배정 엔진은 이벤트를 **받아 상태를 바꾸고**, 화면은 **상태를 그린다**.
+이 형식만 지키면 각 파트가 따로 만들어도 당일 바로 연결된다. 바꿀 때는 PL(현우)과 먼저 합의한다.
+
+## 한 건의 모양
+
+```json
+{
+  "ts": "2026-11-09T15:04:12",
+  "type": "ZONE_ENTER",
+  "source": "cam",
+  "cam_id": "CAM-B",
+  "sector_id": "B",
+  "zone": "bay",
+  "track_id": 17,
+  "vehicle_id": "TR-0412",
+  "payload": { "bbox": [412, 230, 688, 401], "conf": 0.86 }
+}
+```
+
+- `ts`: 시뮬레이션 시계 기준 ISO 시각
+- `source`: `cam` | `iot` | `sim` | `engine` | `ui`
+- 없는 값은 `null` (키는 남겨 둔다)
+
+## 종류
+
+| type | 내는 곳 | 의미 |
+|---|---|---|
+| `GATE_IN` | 기사 앱(가정) → 시뮬레이터 | 도착, 차량 등록 (payload: vehicle, cargo, due, urgent) |
+| `BEACON_NEAR` | 기사 앱(가정) → 시뮬레이터 | 차량이 어느 구역 근처인지. 영상 이벤트에 vehicle_id를 붙이는 데 씀 |
+| `ZONE_ENTER` / `ZONE_EXIT` | 영상 | 구역(`yard`·`queue`·`bay`) 진입·이탈, 3초 이상 유지 시에만 |
+| `VEHICLE_STOPPED` | 영상 | 구역 안에서 멈춤 → 대기 또는 작업 시작 |
+| `CALL` | 배정 엔진 | 차량 호출 (payload: sector_id, rank, reason) → 기사 화면 알림 |
+| `CALL_ACK` | 기사 모바일 화면 | 기사가 ‘출발’을 누름 |
+| `CRANE_START` / `CRANE_DONE` | 설비 신호(가정) 또는 담당자 화면 버튼 | 크레인 상하역 시작·완료 (DONE이면 진척도 100% 확정) |
+| `SECTOR_DOWN` / `SECTOR_UP` | 돌발 이벤트 버튼 | 섹터 정지·복구 → 재배정 |
+| `ALERT` | 배정 엔진 | 알림 발생 (payload: level, kind, text, action) |
+
+## 차량 상태
+
+`arrived`(도착) → `yard`(대기장 대기) → `moving`(호출 후 이동) → `queue`(섹터 대기) → `working`(작업 중) → `done`(완료·출차)
+
+## 화면이 받는 상태 (`GET /api/state`, WebSocket `/ws`로 같은 모양을 밀어 줌)
+
+```json
+{
+  "clock": "2026-11-09T15:04:12",
+  "mode": "recommend",
+  "sectors": [
+    { "id": "B", "status": "up", "congestion_pct": 75, "level": "warn",
+      "working": [ { "vehicle_id": "TR-0412", "progress_pct": 62, "remain_min": 13 } ],
+      "queue": ["TR-0420"], "next_call_at": "2026-11-09T15:15:00" }
+  ],
+  "vehicles": [
+    { "id": "TR-0412", "type": "트레일러", "cargo": "후판", "state": "working",
+      "sector_id": "B", "rank": null, "wait_min": 12, "urgent": false, "due": "2026-11-09T17:00:00",
+      "xy": [1100, 450] }
+  ],
+  "queue": [ { "rank": 1, "vehicle_id": "TR-0420", "sector_id": "C", "call_at": "15:09", "reason": "긴급 출하 · C가 가장 먼저 빔" } ],
+  "kpi": { "baseline": { "avg_wait": 0, "max_wait": 0, "util_pct": 0, "late": 0 },
+           "recommend": { "avg_wait": 0, "max_wait": 0, "util_pct": 0, "late": 0 },
+           "reduction_pct": 0 },
+  "alerts": [ { "id": "AL-3", "ts": "15:02", "level": "crit", "kind": "혼잡", "text": "섹터 B 혼잡 85%↑ 5분", "action": "B 호출 보류, 대기 2대 → C", "ack": false } ]
+}
+```

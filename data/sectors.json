@@ -1,0 +1,35 @@
+{
+  "_note": "지도 좌표는 배치도 픽셀(1600x900, 왼쪽 위 0,0). 실제 제철소 도면이 아닌 가상 배치도. cam_zones는 CAM 화면 픽셀 좌표로, 영상이 정해지면 비전 파트가 채운다.",
+  "map": { "width": 1600, "height": 900 },
+  "zones": [
+    { "id": "GATE", "name": "게이트", "poly": [[60,380],[200,380],[200,520],[60,520]] },
+    { "id": "YARD", "name": "대기장", "poly": [[280,260],[640,260],[640,640],[280,640]], "cam_id": "CAM-Y", "slots": 12 },
+    { "id": "EXIT", "name": "출구", "poly": [[1420,380],[1540,380],[1540,520],[1420,520]] }
+  ],
+  "sectors": [
+    { "id": "A", "name": "섹터 A", "poly": [[900,90],[1300,90],[1300,300],[900,300]],
+      "cam_id": "CAM-A", "bays": 2, "queue_slots": 2, "cargo": ["열연코일", "냉연코일"], "travel_min": 4,
+      "cam_zones": { "bay": [], "queue": [] } },
+    { "id": "B", "name": "섹터 B", "poly": [[900,345],[1300,345],[1300,555],[900,555]],
+      "cam_id": "CAM-B", "bays": 2, "queue_slots": 2, "cargo": ["후판"], "travel_min": 3,
+      "cam_zones": { "bay": [], "queue": [] } },
+    { "id": "C", "name": "섹터 C", "poly": [[900,600],[1300,600],[1300,810],[900,810]],
+      "cam_id": "CAM-C", "bays": 1, "queue_slots": 2, "cargo": ["선재", "열연코일"], "travel_min": 5,
+      "cam_zones": { "bay": [], "queue": [] } }
+  ],
+  "roads": [
+    { "from": "GATE", "to": "YARD", "points": [[200,450],[280,450]] },
+    { "from": "YARD", "to": "A", "points": [[640,400],[760,400],[760,195],[900,195]] },
+    { "from": "YARD", "to": "B", "points": [[640,450],[900,450]] },
+    { "from": "YARD", "to": "C", "points": [[640,500],[760,500],[760,705],[900,705]] },
+    { "from": "A", "to": "EXIT", "points": [[1300,195],[1360,195],[1360,430],[1420,430]] },
+    { "from": "B", "to": "EXIT", "points": [[1300,450],[1420,450]] },
+    { "from": "C", "to": "EXIT", "points": [[1300,705],[1360,705],[1360,470],[1420,470]] }
+  ],
+  "cams": [
+    { "id": "CAM-A", "name": "섹터 A", "source": null },
+    { "id": "CAM-B", "name": "섹터 B", "source": null },
+    { "id": "CAM-C", "name": "섹터 C", "source": null },
+    { "id": "CAM-Y", "name": "대기장", "source": null }
+  ]
+}

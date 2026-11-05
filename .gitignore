@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+vision/out/
+vision/runs/
+*.pt
+*.mp4
+*.db
