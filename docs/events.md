@@ -25,8 +25,9 @@
 
 ## 샘플과 확인
 
-- 샘플: [sample_events.jsonl](sample_events.jsonl) — 시드 7, 섹터 A 정지(09:51)·긴급 출하(10:15)·A 복구(10:50) 포함 전체 하루 440건
-- 다시 만들기·형식 확인: `py tests/test_r1.py --samples`
+- 샘플: [sample_events.jsonl](sample_events.jsonl) — 소결공장 시나리오, 시드 7, 덤프트럭 20대 4시간 순환 운행, 호퍼 A 정지(08:02)·긴급 반입·A 복구 포함 1,244건
+- 다시 만들기·형식 확인: `py tests/test_sim.py --samples`
+- 소결 호퍼에서는 `CRANE_START`/`CRANE_DONE`을 **덤프 하차 시작·완료**로 쓴다(`payload.stand_in: "dump"`, DONE에는 `load_t`). `GATE_IN.payload`에 `load_t`(적재 t)·`trip`(회차)이 있다.
 - 영상·설비가 붙기 전에는 시뮬레이터가 대신 내며 `source: "sim"`, `payload.stand_in: "cam" | "crane"`으로 표시한다.
   비전 파트는 같은 이벤트를 `source: "cam"`으로 내면 된다.
 

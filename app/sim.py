@@ -1,10 +1,13 @@
-"""시뮬레이션 — 가상 도착 데이터, 시뮬레이션 시계, 가상 IoT·영상 이벤트.
+"""시뮬레이션 — 포항제철소 소결공장 원료 반입 (덤프트럭 순환 운행)
 
+덤프트럭 한 대가 하루에 여러 번 왔다 갔다 한다:
+  원료야드 상차 → 계근대(입) → 차량 대기장 → (호출) → 하차 호퍼 → 적재함 상승·하차 → 계근대(출) → 공차 복귀 → 재상차 …
 영상(YOLO)과 기사 앱이 붙기 전까지, 둘이 낼 이벤트를 docs/events.md 형식 그대로 대신 낸다.
-- source "iot": 기사 앱이 낼 신호(GATE_IN, BEACON_NEAR, CALL_ACK)
-- source "sim": 영상·설비가 낼 신호(ZONE_ENTER/EXIT, VEHICLE_STOPPED, CRANE_START/DONE) — payload.stand_in 에 원래 출처
+- source "iot": 기사 앱 신호(GATE_IN, BEACON_NEAR, CALL_ACK)
+- source "sim": 영상·설비 신호 대체(ZONE_ENTER/EXIT, VEHICLE_STOPPED, CRANE_START/DONE) — payload.stand_in 에 원래 출처
+  (소결 호퍼에서는 CRANE_START/DONE = 덤프 하차 시작/완료로 쓴다)
 - source "engine": 배정 엔진(CALL, ALERT) / "ui": 화면 버튼(SECTOR_DOWN/UP)
-시간 단위는 분. 한 걸음(STEP)씩 고정 간격으로 진행해 같은 시드면 항상 같은 결과가 나온다.
+시간 단위는 분. 고정 간격(STEP)으로 진행해 같은 시드면 항상 같은 결과가 나온다.
 """
 import json
 import random
@@ -14,9 +17,11 @@ from pathlib import Path
 from . import engine
 
 STEP = 0.25            # 시뮬레이션 한 걸음(분)
-GATE_HOLD = 1.0        # 게이트 등록에 걸리는 시간(분)
-EXIT_MIN = 2.0         # 섹터 → 출구 이동(분)
-CARGO_MIX = [("열연코일", 0.35), ("냉연코일", 0.15), ("후판", 0.25), ("선재", 0.25)]
+GATE_HOLD = 1.0        # 계근·등록에 걸리는 시간(분)
+EXIT_MIN = 2.0         # 호퍼 → 계근대(출) 이동(분)
+VEHICLE = "덤프 25.5t"
+PLATE_HEAD = ["80", "81", "82", "83", "85", "86", "87", "88"]
+PLATE_MID = "사아바자"
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -35,31 +40,31 @@ def bbox(poly):
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def make_arrivals(seed: int, n: int = 30, span_min: int = 150, std_items=None) -> list:
-    """시드 고정 도착 데이터. 앞쪽 90분에 몰리게 만들어 대기가 생기도록 한다 (모두 가정값)."""
+def make_fleet(seed: int, fleet_cfg: dict) -> list:
+    """시드 고정 덤프트럭 목록. 차마다 맡은 원료가 정해져 있다(가정)."""
     rnd = random.Random(seed)
-    out, t = [], 0.0
-    for i in range(n):
-        t += rnd.expovariate(1 / (4.0 if t < 90 else 8.0))
-        if t > span_min:
-            break
-        r, acc, cargo = rnd.random(), 0.0, CARGO_MIX[-1][0]
-        for c, p in CARGO_MIX:
-            acc += p
-            if r <= acc:
-                cargo = c
+    cargos = [c for c, n in fleet_cfg["cargo_mix"].items() for _ in range(n)]
+    rnd.shuffle(cargos)
+    plates, out = set(), []
+    for i in range(fleet_cfg["trucks"]):
+        while True:
+            p = f"{rnd.choice(PLATE_HEAD)}{rnd.choice(PLATE_MID)} {rnd.randint(1000, 9999)}"
+            if p not in plates:
+                plates.add(p)
                 break
-        vtype = "카고" if cargo == "선재" or (cargo == "열연코일" and rnd.random() < 0.5) else "트레일러"
-        out.append({
-            "id": f"TR-{401 + i:04d}",
-            "type": vtype,
-            "cargo": cargo,
-            "arr_t": round(t, 2),
-            "due_t": round(t + rnd.uniform(70, 200), 1),
-            "urgent": rnd.random() < 0.08,
-            "work_factor": round(rnd.uniform(0.85, 1.4), 3),   # 실제 작업시간 = 표준 x 이 값 (지연 발생용)
-        })
+        out.append({"plate": p, "cargo": cargos[i % len(cargos)],
+                    "first_t": round(rnd.uniform(0, fleet_cfg["first_wave_min"]), 2)})
     return out
+
+
+def trip(seed: int, truck: dict, n: int, t: float, fc: dict, urgent=None) -> dict:
+    """트럭 한 대의 n번째 반입. 같은 시드·차·회차면 항상 같은 값."""
+    rnd = random.Random(f"{seed}|{truck['plate']}|{n}")
+    return {"id": truck["plate"], "trip": n, "type": VEHICLE, "cargo": truck["cargo"], "arr_t": round(t, 2),
+            "due_t": round(t + rnd.uniform(*fc["due_min"]), 1),
+            "urgent": rnd.random() < fc["urgent_rate"] if urgent is None else urgent,
+            "load_t": round(rnd.uniform(*fc["load_t"]), 1),
+            "work_factor": round(rnd.uniform(0.85, 1.45), 3)}
 
 
 class Sim:
@@ -69,11 +74,13 @@ class Sim:
         self.cfg = load("sectors.json")
         self.settings = load("settings.json")
         self.std_items = load("std_times.json")["items"]
+        self.fc = self.settings["fleet"]
         self.start = datetime.fromisoformat(self.settings["sim"]["start"])
         self.speed = self.settings["sim"]["speed"]
         self.zone = {z["id"]: z for z in self.cfg["zones"]}
         self.sec_cfg = {s["id"]: s for s in self.cfg["sectors"]}
         self.roads = {(r["from"], r["to"]): r["points"] for r in self.cfg["roads"]}
+        self.lane_y = self.cfg["map"].get("lane_y", 525)
         self.reset()
 
     # ---------- setup ----------
@@ -86,11 +93,14 @@ class Sim:
         self.track_seq = 0
         self.urgent_seq = 0
         self.plan = []
-        self.arrivals = make_arrivals(self.seed)
-        self.pending_arrivals = list(self.arrivals)
+        self.fleet = make_fleet(self.seed, self.fc)
+        self.truck = {f["plate"]: f for f in self.fleet}
+        self.pending_arrivals = sorted((trip(self.seed, f, 1, f["first_t"], self.fc) for f in self.fleet),
+                                       key=lambda a: (a["arr_t"], a["id"]))
         self.vehicles = {}
         self.yard_slots = {}
-        self.sectors = {sid: {"id": sid, "up": True, "crit_since": None, "alerted": False}
+        self.done_trips = []          # 끝난 반입 기록 (KPI용)
+        self.sectors = {sid: {"id": sid, "up": True, "crit_since": None, "alerted": False, "idle_min": 0.0}
                         for sid in self.sec_cfg}
 
     def std_of(self, vtype, cargo):
@@ -98,7 +108,7 @@ class Sim:
             if it["vehicle"] == vtype and it["cargo"] == cargo:
                 return it["minutes"]
         same = [it["minutes"] for it in self.std_items if it["cargo"] == cargo]
-        return same[0] if same else 25
+        return same[0] if same else 10
 
     def clock(self, t=None):
         return self.start + timedelta(minutes=self.t if t is None else t)
@@ -136,19 +146,20 @@ class Sim:
     # ---------- geometry ----------
     def yard_xy(self, v):
         used = set(self.yard_slots.values())
-        slot = next(i for i in range(200) if i not in used)
+        slot = next(i for i in range(500) if i not in used)
         self.yard_slots[v["id"]] = slot
         x0, y0, x1, y1 = bbox(self.zone["YARD"]["poly"])
-        cols = 6
-        return [x0 + 30 + (slot % cols) * 60, y0 + 30 + (slot // cols) % 5 * 70]
+        cols, rows = 6, 4
+        return [x0 + (x1 - x0) * ((slot % cols) + 0.5) / cols, y0 + (y1 - y0) * (((slot // cols) % rows) + 0.5) / rows]
 
     def queue_xy(self, sid, idx):
         x0, y0, x1, y1 = bbox(self.sec_cfg[sid]["poly"])
-        return [x0 + 40, y0 + 45 + (idx % 3) * 60]
+        return [x0 + (x1 - x0) * (0.14 + 0.16 * (idx % 2)), y0 + (y1 - y0) * (0.72 - 0.0 * idx)]
 
     def bay_xy(self, sid, idx):
         x0, y0, x1, y1 = bbox(self.sec_cfg[sid]["poly"])
-        return [x0 + 180 + idx * 110, (y0 + y1) / 2]
+        n = self.sec_cfg[sid]["bays"]
+        return [x0 + (x1 - x0) * (0.5 + 0.45 * (idx + 0.5) / n), y0 + (y1 - y0) * 0.4]
 
     def start_path(self, v, pts, minutes):
         v["path"] = [list(p) for p in pts]
@@ -183,11 +194,11 @@ class Sim:
         moved = 0
         for v in self.vehicles.values():
             if v["sector"] == sid and v["state"] in ("moving", "queue"):
-                # 이동 중·대기 중인 차량은 다시 배정 대상으로 돌린다 (그 자리에서 다른 섹터로 출발)
-                self.leave_sector_slot(v)
+                # 이동 중·대기 중인 차량은 다시 배정 대상으로 (그 자리에서 다른 호퍼로 출발)
+                v.pop("queue_idx", None)
                 v.update(state="yard", sector=None, rerouted=True, path=None)
                 moved += 1
-        self.alert("crit", "섹터 이상", f"{name} 정지", f"영향 차량 {moved}대 재배정, 작업 중 차량은 일시 중지",
+        self.alert("crit", "호퍼 이상", f"{name} 정지", f"영향 차량 {moved}대 재배정, 하차 중 차량은 일시 중지",
                    sector_id=sid)
 
     def sector_up(self, sid):
@@ -196,16 +207,22 @@ class Sim:
             return
         s["up"] = True
         self.emit("SECTOR_UP", "ui", sector_id=sid)
-        self.alert("info", "섹터 이상", f"{self.sec_cfg[sid]['name']} 복구", "순번 재계산", sector_id=sid)
+        self.alert("info", "호퍼 이상", f"{self.sec_cfg[sid]['name']} 복구", "순번 재계산", sector_id=sid)
 
     def add_urgent(self):
+        """긴급 반입: 소결 배합에 바로 필요한 원료(예: 분코크스 부족)를 실은 트럭 한 대."""
         self.urgent_seq += 1
-        rnd = random.Random(self.seed * 1000 + self.urgent_seq)
-        cargo = rnd.choice(["열연코일", "선재", "냉연코일"])
-        a = {"id": f"UR-{self.urgent_seq:03d}", "type": "카고" if cargo == "선재" else "트레일러", "cargo": cargo,
-             "arr_t": self.t, "due_t": self.t + 60, "urgent": True, "work_factor": 1.0}
+        rnd = random.Random(f"{self.seed}|urgent|{self.urgent_seq}")
+        plate = f"{rnd.choice(PLATE_HEAD)}{rnd.choice(PLATE_MID)} {rnd.randint(1000, 9999)}"
+        while plate in self.truck:
+            plate = plate[:-1] + str((int(plate[-1]) + 1) % 10)
+        cargo = rnd.choice(["분코크스", "석회석", "밀스케일"])
+        t = {"plate": plate, "cargo": cargo, "first_t": self.t, "extra": True}
+        self.truck[plate] = t
+        a = trip(self.seed, t, 1, self.t, self.fc, urgent=True)
+        a["due_t"] = self.t + 30
         self.pending_arrivals.insert(0, a)
-        return a["id"]
+        return plate
 
     def ack_alert(self, aid):
         for a in self.alerts:
@@ -215,24 +232,21 @@ class Sim:
         return False
 
     # ---------- main loop ----------
-    def leave_sector_slot(self, v):
-        v.pop("queue_idx", None)
-
     def step(self):
         self.t = round(self.t + STEP, 4)
         t = self.t
         st = self.settings
 
-        # 1) 게이트 도착 (기사 앱 지오펜스 가정)
+        # 1) 계근대(입) 도착
         while self.pending_arrivals and self.pending_arrivals[0]["arr_t"] <= t:
             a = self.pending_arrivals.pop(0)
             v = dict(a, state="arrived", sector=None, std=self.std_of(a["type"], a["cargo"]),
                      xy=center(self.zone["GATE"]["poly"]), yard_t=None, track_id=None, path=None,
-                     work_elapsed=0.0, flags=set(), rerouted=False, gone=False, call_t=None)
+                     work_elapsed=0.0, flags=set(), rerouted=False, gone=False, call_t=None, wait_min=None)
             self.vehicles[v["id"]] = v
             self.emit("GATE_IN", "iot", vehicle=v, payload={
-                "vehicle_type": v["type"], "cargo": v["cargo"], "urgent": v["urgent"],
-                "due": self.clock(v["due_t"]).isoformat(timespec="seconds")})
+                "vehicle_type": v["type"], "cargo": v["cargo"], "load_t": v["load_t"], "trip": v["trip"],
+                "urgent": v["urgent"], "due": self.clock(v["due_t"]).isoformat(timespec="seconds")})
 
         for v in self.vehicles.values():
             s_id = v["sector"]
@@ -241,7 +255,7 @@ class Sim:
                 self.track_seq += 1
                 v.update(state="yard", yard_t=t, track_id=self.track_seq, xy=self.yard_xy(v))
                 self.emit("BEACON_NEAR", "iot", vehicle=v, zone="yard")
-                self.emit("ZONE_ENTER", "sim", vehicle=v, zone="yard", cam_id="CAM-Y",
+                self.emit("ZONE_ENTER", "sim", vehicle=v, zone="yard", cam_id=self.zone["YARD"]["cam_id"],
                           payload={"stand_in": "cam"})
             elif v["state"] == "moving":
                 if self.walk(v):
@@ -254,14 +268,16 @@ class Sim:
             elif v["state"] == "working":
                 if self.sectors[s_id]["up"]:
                     v["work_elapsed"] += STEP
-                if (v["work_elapsed"] > v["std"] * st["delay"]["factor"] and "delay" not in v["flags"]):
+                if v["work_elapsed"] > v["std"] * st["delay"]["factor"] and "delay" not in v["flags"]:
                     v["flags"].add("delay")
-                    self.alert("warn", "작업 지연",
-                               f"{v['id']} 작업 {int(v['work_elapsed'])}분 (표준 {v['std']}분의 {st['delay']['factor']}배 초과)",
-                               f"{self.sec_cfg[s_id]['name']} 현장 확인", sector_id=s_id, vehicle=v)
+                    self.alert("warn", "하차 지연",
+                               f"{v['id']} {v['cargo']} 하차 {int(v['work_elapsed'])}분 (표준 {v['std']}분의 {st['delay']['factor']}배 초과)",
+                               f"{self.sec_cfg[s_id]['name']} 다음 호출 보류, 적재함 들러붙음·호퍼 막힘 확인",
+                               sector_id=s_id, vehicle=v)
                 if v["work_elapsed"] >= v["std"] * v["work_factor"]:
                     cam = self.sec_cfg[s_id]["cam_id"]
-                    self.emit("CRANE_DONE", "sim", vehicle=v, sector_id=s_id, payload={"stand_in": "crane"})
+                    self.emit("CRANE_DONE", "sim", vehicle=v, sector_id=s_id,
+                              payload={"stand_in": "dump", "load_t": v["load_t"]})
                     self.emit("ZONE_EXIT", "sim", vehicle=v, sector_id=s_id, zone="bay", cam_id=cam,
                               payload={"stand_in": "cam"})
                     road = self.roads.get((s_id, "EXIT"), [])
@@ -271,8 +287,18 @@ class Sim:
                 if self.walk(v):
                     v["gone"] = True
                     v["xy"] = None
+                    self.done_trips.append({"id": v["id"], "trip": v["trip"], "cargo": v["cargo"], "load_t": v["load_t"],
+                                            "sector": s_id, "wait_min": v["wait_min"] or 0.0, "done_t": t,
+                                            "late": t > v["due_t"]})
+                    # 공차 복귀 → 원료야드 재상차 → 다음 회차 (근무 시간 안에서만)
+                    if not self.truck[v["id"]].get("extra"):
+                        nxt = t + random.Random(f"{self.seed}|{v['id']}|cycle|{v['trip']}").uniform(*self.fc["cycle_min"])
+                        if nxt < self.fc["shift_min"]:
+                            a = trip(self.seed, self.truck[v["id"]], v["trip"] + 1, nxt, self.fc)
+                            self.pending_arrivals.append(a)
+                            self.pending_arrivals.sort(key=lambda x: (x["arr_t"], x["id"]))
 
-        # 3) 섹터 대기 → 작업 시작 (빈 베이가 있으면)
+        # 3) 호퍼 대기 → 하차 시작 (빈 하차구가 있으면)
         for sid, sc in self.sec_cfg.items():
             if not self.sectors[sid]["up"]:
                 continue
@@ -280,19 +306,21 @@ class Sim:
             queue = sorted((v for v in self.vehicles.values() if v["state"] == "queue" and v["sector"] == sid),
                            key=lambda v: v["queue_idx"])
             used = {v["bay"] for v in working}
+            if not working and not queue:
+                self.sectors[sid]["idle_min"] += STEP
             for v in queue:
                 free = [b for b in range(sc["bays"]) if b not in used]
                 if not free:
                     break
                 b = free[0]
                 used.add(b)
-                self.leave_sector_slot(v)
+                v.pop("queue_idx", None)
                 v.update(state="working", bay=b, work_start=t, xy=self.bay_xy(sid, b))
                 self.emit("ZONE_ENTER", "sim", vehicle=v, sector_id=sid, zone="bay", cam_id=sc["cam_id"],
                           payload={"stand_in": "cam"})
                 self.emit("VEHICLE_STOPPED", "sim", vehicle=v, sector_id=sid, zone="bay", cam_id=sc["cam_id"],
                           payload={"stand_in": "cam"})
-                self.emit("CRANE_START", "sim", vehicle=v, sector_id=sid, payload={"stand_in": "crane"})
+                self.emit("CRANE_START", "sim", vehicle=v, sector_id=sid, payload={"stand_in": "dump"})
             rest = sorted((v for v in self.vehicles.values() if v["state"] == "queue" and v["sector"] == sid),
                           key=lambda v: v["queue_idx"])
             for i, v in enumerate(rest):
@@ -310,8 +338,8 @@ class Sim:
         for v in self.vehicles.values():
             if v["state"] == "yard" and t - v["yard_t"] >= st["wait"]["target_min"] + 1 and "wait" not in v["flags"]:
                 v["flags"].add("wait")
-                self.alert("warn", "대기 초과", f"{v['id']} 대기 {int(t - v['yard_t'])}분 (목표 {st['wait']['target_min']}분 초과)",
-                           "우선 배정 또는 섹터 변경 검토", vehicle=v)
+                self.alert("warn", "대기 초과", f"{v['id']} {v['cargo']} 대기 {int(t - v['yard_t'])}분 (목표 {st['wait']['target_min']}분 초과)",
+                           "우선 배정 또는 공용 호퍼 C로 변경 검토", vehicle=v)
         for sid, s in self.sectors.items():
             pct = self.sector_view(sid)["congestion_pct"]
             if pct >= st["congestion"]["crit_pct"]:
@@ -319,7 +347,7 @@ class Sim:
                 if t - s["crit_since"] >= st["congestion"]["crit_hold_min"] and not s["alerted"]:
                     s["alerted"] = True
                     self.alert("crit", "혼잡", f"{self.sec_cfg[sid]['name']} 혼잡 {pct}% {st['congestion']['crit_hold_min']}분 지속",
-                               f"{self.sec_cfg[sid]['name']} 호출 보류, 다른 섹터로 분산", sector_id=sid)
+                               f"{self.sec_cfg[sid]['name']} 호출 보류, 공용 호퍼로 분산", sector_id=sid)
             else:
                 s["crit_since"], s["alerted"] = None, False
 
@@ -327,16 +355,16 @@ class Sim:
         sid = p["sector_id"]
         sc = self.sec_cfg[sid]
         self.yard_slots.pop(v["id"], None)
+        q = self.queue_xy(sid, 0)
         if v.get("rerouted"):
-            q = self.queue_xy(sid, 0)
-            pts = [v["xy"], [840, v["xy"][1]], [840, q[1]], q]
+            pts = [v["xy"], [v["xy"][0], self.lane_y], [q[0], self.lane_y], q]
         else:
-            pts = [v["xy"]] + self.roads.get(("YARD", sid), []) + [self.queue_xy(sid, 0)]
+            pts = [v["xy"]] + self.roads.get(("YARD", sid), []) + [q]
         v.update(state="moving", sector=sid, call_t=self.t, wait_min=round(self.t - v["yard_t"], 1), rerouted=False)
         self.emit("CALL", "engine", vehicle=v, sector_id=sid, payload={"rank": p["rank"], "reason": p["reason"]})
         self.emit("CALL_ACK", "iot", vehicle=v, sector_id=sid)     # 기사 '출발' (모바일 화면 전까지는 자동 응답)
         self.start_path(v, pts, sc["travel_min"])
-        self.alert("info", "호출", f"{v['id']} → {sc['name']}로 이동", "기사 앱으로 호출 전송(가상)", sector_id=sid, vehicle=v)
+        self.alert("info", "호출", f"{v['id']} {v['cargo']} → {sc['name']}", "기사 앱으로 호출 전송(가상)", sector_id=sid, vehicle=v)
 
     def replan(self):
         t = self.t
@@ -362,6 +390,31 @@ class Sim:
         while self.t < minutes:
             self.step()
 
+    # ---------- camera view (what the vision module would report) ----------
+    def dump_angle(self, v):
+        """적재함 각도(도). 실제 하차 시간 기준: 앞 25% 상승, 중간 유지, 끝 20% 내림. 지연이면 들린 채 유지."""
+        real = v["std"] * v["work_factor"]
+        f = v["work_elapsed"] / real if real else 1
+        if f < 0.25:
+            return round(50 * f / 0.25)
+        if f < 0.8:
+            return 50
+        return round(50 * max(1 - f, 0) / 0.2)
+
+    def cam_judge(self, v):
+        if v["state"] == "working":
+            ang = self.dump_angle(v)
+            if ang >= 15:
+                return "하차 중 · 적재함 상승", ang
+            return ("하차 준비 · 정차" if v["work_elapsed"] < v["std"] * v["work_factor"] / 2 else "하차 마무리 · 적재함 내림"), ang
+        if v["state"] == "queue":
+            return "하차 대기 · 정지", 0
+        if v["state"] == "moving":
+            return "진입 중", 0
+        if v["state"] == "done":
+            return "출차 중", 0
+        return "대기장 대기 · 정지", 0
+
     # ---------- state for screens ----------
     def sector_view(self, sid):
         sc = self.sec_cfg[sid]
@@ -371,17 +424,23 @@ class Sim:
         pct = engine.congestion_pct(len(working), len(queue), sc["bays"], sc["queue_slots"])
         nxt = [p for p in self.plan if p["sector_id"] == sid]
         return {
-            "id": sid, "name": sc["name"], "status": "up" if self.sectors[sid]["up"] else "down",
-            "bays": sc["bays"], "queue_slots": sc["queue_slots"], "cargo": sc["cargo"],
+            "id": sid, "name": sc["name"], "role": sc.get("role", ""), "status": "up" if self.sectors[sid]["up"] else "down",
+            "bays": sc["bays"], "queue_slots": sc["queue_slots"], "cargo": sc["cargo"], "cam_id": sc["cam_id"],
             "congestion_pct": pct, "level": engine.level(pct, self.settings),
-            "working": [{"vehicle_id": v["id"], "cargo": v["cargo"], "std": v["std"],
+            "working": [{"vehicle_id": v["id"], "cargo": v["cargo"], "load_t": v["load_t"], "std": v["std"], "bay": v["bay"],
                          "progress_pct": engine.progress_pct(v["work_elapsed"], v["std"]),
                          "elapsed_min": round(v["work_elapsed"], 1),
                          "remain_min": round(engine.remain_min(v["work_elapsed"], v["std"]), 1),
+                         "dump_deg": self.dump_angle(v), "track_id": v["track_id"],
+                         "judge": self.cam_judge(v)[0],
                          "delayed": "delay" in v["flags"]} for v in sorted(working, key=lambda v: v["bay"])],
             "queue": [v["id"] for v in sorted(queue, key=lambda v: v["queue_idx"])],
+            "queue_info": [{"vehicle_id": v["id"], "cargo": v["cargo"], "track_id": v["track_id"],
+                            "since_call_min": round(self.t - v["call_t"], 1) if v["call_t"] is not None else 0.0}
+                           for v in sorted(queue, key=lambda v: v["queue_idx"])],
             "moving": [v["id"] for v in moving],
-            "next_call_at": self.hhmm(nxt[0]["call_t"]) if nxt else None,
+            "idle_min": round(self.sectors[sid]["idle_min"], 1),
+            "next_call_at": self.hhmm(nxt[0]["call_t"]) if nxt and nxt[0]["call_t"] is not None else None,
         }
 
     def state(self):
@@ -391,26 +450,42 @@ class Sim:
             if v["gone"]:
                 continue
             p = next((p for p in self.plan if p["vehicle_id"] == v["id"]), None)
-            vs.append({"id": v["id"], "type": v["type"], "cargo": v["cargo"], "state": v["state"],
-                       "sector_id": v["sector"] or (p and p["sector_id"]), "rank": p and p["rank"],
+            judge, ang = self.cam_judge(v)
+            vs.append({"id": v["id"], "type": v["type"], "cargo": v["cargo"], "load_t": v["load_t"], "trip": v["trip"],
+                       "state": v["state"], "sector_id": v["sector"] or (p and p["sector_id"]), "rank": p and p["rank"],
                        "wait_min": round(t - v["yard_t"], 1) if v["state"] == "yard" and v["yard_t"] is not None else v.get("wait_min"),
                        "urgent": v["urgent"], "due": self.clock(v["due_t"]).isoformat(timespec="seconds"),
+                       "track_id": v["track_id"], "judge": judge, "dump_deg": ang,
                        "xy": [round(c, 1) for c in v["xy"]] if v["xy"] else None})
-        done = [v for v in self.vehicles.values() if v["state"] == "done"]
+        yard = [v for v in self.vehicles.values() if v["state"] == "yard"]
+        up_bays = sum(sc["bays"] for sid, sc in self.sec_cfg.items() if self.sectors[sid]["up"])
+        busy = sum(1 for v in self.vehicles.values() if v["state"] == "working" and self.sectors[v["sector"]]["up"])
+        waits = [d["wait_min"] for d in self.done_trips]
+        sviews = [self.sector_view(sid) for sid in self.sec_cfg]
         return {
             "clock": self.clock().isoformat(timespec="seconds"),
             "t": t, "running": self.running, "speed": self.speed, "seed": self.seed,
             "mode": "recommend",
-            "sectors": [self.sector_view(sid) for sid in self.sec_cfg],
+            "site": self.cfg.get("site", {}),
+            "sectors": sviews,
             "vehicles": vs,
             "queue": [{"rank": p["rank"], "vehicle_id": p["vehicle_id"], "cargo": self.vehicles[p["vehicle_id"]]["cargo"],
+                       "load_t": self.vehicles[p["vehicle_id"]]["load_t"],
                        "urgent": self.vehicles[p["vehicle_id"]]["urgent"], "sector_id": p["sector_id"],
                        "call_at": self.hhmm(p["call_t"]) if p["call_t"] is not None else None,
+                       "due": self.hhmm(self.vehicles[p["vehicle_id"]]["due_t"]),
                        "wait_min": round(t - self.vehicles[p["vehicle_id"]]["yard_t"], 1),
                        "reason": p["reason"]} for p in self.plan],
-            "counts": {"total": len(self.arrivals) + self.urgent_seq, "arrived": len(self.vehicles),
-                       "yard": sum(v["state"] == "yard" for v in self.vehicles.values()),
-                       "done": len(done), "exited": sum(v["gone"] for v in self.vehicles.values())},
-            "kpi": None,   # FIFO 기준선 비교는 다음 라운드
+            "counts": {"fleet": len(self.fleet), "on_site": sum(not v["gone"] for v in self.vehicles.values()),
+                       "yard": len(yard), "moving": sum(v["state"] == "moving" for v in self.vehicles.values()),
+                       "trips_done": len(self.done_trips),
+                       "tons_done": round(sum(d["load_t"] for d in self.done_trips), 1),
+                       "arrived": len(self.vehicles), "exited": len(self.done_trips),
+                       "total": len(self.done_trips) + sum(not v["gone"] for v in self.vehicles.values()) + len(self.pending_arrivals)},
+            "kpi": {"yard_avg_wait": round(sum(t - v["yard_t"] for v in yard) / len(yard), 1) if yard else 0.0,
+                    "done_avg_wait": round(sum(waits) / len(waits), 1) if waits else 0.0,
+                    "util_pct": round(busy / up_bays * 100) if up_bays else 0,
+                    "levels": {lv: sum(1 for s in sviews if s["status"] == "up" and s["level"] == lv) for lv in ("ok", "warn", "crit")},
+                    "up": sum(1 for s in sviews if s["status"] == "up"), "late": sum(d["late"] for d in self.done_trips)},
             "alerts": self.alerts[:40],
         }

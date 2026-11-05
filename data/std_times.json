@@ -1,10 +1,13 @@
 {
-  "_note": "표준 작업시간(분). 모두 가정값이며 현장 데이터가 생기면 이 값만 바꾼다.",
+  "_note": "덤프 하차 표준시간(분): 호퍼 진입·정차 → 적재함 상승 → 하차·털어내기 → 적재함 내림 → 출발. 모두 가정값. 슬러지·더스트는 들러붙어 털어내는 시간이 더 걸린다고 가정.",
   "items": [
-    { "vehicle": "트레일러", "cargo": "열연코일", "minutes": 25 },
-    { "vehicle": "트레일러", "cargo": "냉연코일", "minutes": 25 },
-    { "vehicle": "트레일러", "cargo": "후판", "minutes": 35 },
-    { "vehicle": "카고", "cargo": "선재", "minutes": 20 },
-    { "vehicle": "카고", "cargo": "열연코일", "minutes": 18 }
+    { "vehicle": "덤프 25.5t", "cargo": "석회석", "minutes": 9 },
+    { "vehicle": "덤프 25.5t", "cargo": "사문암", "minutes": 9 },
+    { "vehicle": "덤프 25.5t", "cargo": "규석", "minutes": 9 },
+    { "vehicle": "덤프 25.5t", "cargo": "밀스케일", "minutes": 11 },
+    { "vehicle": "덤프 25.5t", "cargo": "슬러지", "minutes": 15 },
+    { "vehicle": "덤프 25.5t", "cargo": "집진더스트", "minutes": 13 },
+    { "vehicle": "덤프 25.5t", "cargo": "분코크스", "minutes": 8 },
+    { "vehicle": "덤프 25.5t", "cargo": "무연탄", "minutes": 8 }
   ]
 }

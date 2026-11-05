@@ -9,3 +9,9 @@
 5. 추론은 GPU 노트북/Colab에서 미리 돌려 `vision/out/<CAM>.events.jsonl` + `<CAM>.mp4`로 저장. 실시간은 1채널만 초당 2~5장.
 
 차종은 영상으로 나누지 않는다(출하 지시 정보 사용). 꼭 필요하면 박스 길이·가로세로비로 대형/소형 2구분.
+
+## 덤프 적재함 판정 (소결 호퍼)
+
+`python vision/dump_state.py <사진> --weights yolo11n.pt --out web/assets/dump_sample.jpg`
+— 트럭 박스들을 합친 전체 박스의 세로/가로 비율이 0.6 이상이면 적재함 상승(하차 중). 팀 제공 사진: 0.79 → 하차 중.
+카메라는 호퍼 옆에서 차량 측면을 보게 둔다(가정). 영상이 생기면 프레임마다 이 판정을 내고 `CRANE_START`(상승 시작)·`CRANE_DONE`(내림 완료)을 `source: "cam"`으로 보낸다.

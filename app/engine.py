@@ -35,11 +35,11 @@ def reason_head(v: dict, now: float, settings: dict) -> str:
     """추천 이유 앞부분: 순번을 정한 기준(긴급 출하 / 마감 임박 / 마감 순) + 오래 기다렸으면 대기 시간."""
     left = int(v["due_t"] - now)
     if v["urgent"]:
-        head = "긴급 출하"
-    elif left <= 60:
-        head = f"마감 임박({left}분 남음)"
+        head = "긴급 반입"
+    elif left <= settings.get("due_soon_min", 30):
+        head = f"투입 기한 임박({left}분 남음)"
     else:
-        head = f"마감 순({left}분 남음)"
+        head = f"투입 기한 순({left}분 남음)"
     waited = int(now - v["yard_t"])
     if waited >= settings["wait"]["target_min"]:
         head += f" · 오래 기다림({waited}분)"
@@ -86,9 +86,11 @@ def plan(yard: list, sectors: list, now: float, settings: dict) -> list:
         heapq.heapreplace(heaps[sid], start + v["std"])
         call_t = now + max(0.0, start - s["travel_min"] - margin)
         if len(fits) == 1:
-            tail = f"{s['name']} 전용 화물"
+            tail = f"{s['name']} 전용 원료"
         else:
-            tail = f"{s['name']}가 가장 빨리 빔"
+            other = [c for c in cand[1:] if c[1] != sid]
+            gap = f" ({int(other[0][0] - start)}분 먼저)" if other and other[0][0] - start >= 1 else ""
+            tail = f"{s['name']}가 가장 빨리 빔{gap}"
         out.append({"vehicle_id": v["id"], "sector_id": sid, "call_t": call_t, "start_t": now + start,
                     "reason": f"{head} · {tail}"})
     for i, p in enumerate(out, 1):
