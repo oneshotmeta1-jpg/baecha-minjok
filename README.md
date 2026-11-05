@@ -1,6 +1,6 @@
 # 배차의 민족 — 상하역 지연 관제 대시보드
 
-K-뉴딜 아카데미 내부 해커톤(비전 AI 안전관제). CCTV로 하역 섹터의 차량 상태를 판정하고, 혼잡도·작업 진척도로 대기장 차량의 하역 순번(순서·섹터·호출 시점)을 정해 주는 관제 대시보드입니다.
+K-뉴딜 아카데미 내부 해커톤(비전 AI 안전관제). 포항제철소 소결공장에 부원료·재활용 원료·연료를 나르는 덤프트럭을 CCTV로 판정하고(적재함 상승 = 하차 중), 호퍼별 혼잡도·하차 진척도로 대기장 차량의 하차 순번(순서·호퍼·호출 시점)을 정해 주는 관제 대시보드입니다.
 
 - 큰틀·로드맵: [PLAN.md](PLAN.md)
 - 모듈 간 이벤트 형식: [docs/events.md](docs/events.md)
@@ -28,8 +28,14 @@ python app/server.py --lan
 - 접속이 안 되면: Windows 네트워크가 "개인(Private)"인지, 방화벽에서 이 Python이 허용됐는지 확인합니다. 행사장 와이파이는 기기끼리 통신을 막아 두는 경우가 있어, 그때는 휴대폰 핫스팟에 다 같이 붙으면 됩니다.
 - 와이파이를 다시 잡으면 IP가 바뀔 수 있으니 실행 창의 주소를 다시 확인합니다.
 
+## 사진 한 장으로 적재함 판정
+
+```bash
+python vision/dump_state.py 사진.jpg --weights yolo11n.pt --out web/assets/dump_sample.jpg
+```
+
 ## 확인
 
 ```bash
-python tests/test_r1.py
+python tests/test_sim.py
 ```

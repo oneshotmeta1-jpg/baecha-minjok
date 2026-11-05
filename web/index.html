@@ -3,166 +3,229 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>상하역 지연 관제</title>
+<title>소결 원료 하역관제</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
 <style>
-/* 관제실 한 화면: 왼쪽 위 좌표 맵(주인공), 오른쪽 위 CAM, 왼쪽 아래 통합하역작업 탭, 오른쪽 아래 Alert. 1920x1080에서 스크롤 없이. */
+/* 시안(하역 관제 대시보드) 기준: 밝은 회색 바탕, 흰 카드, 알약형 상단 메뉴. 1920x1080 한 화면 — 위 KPI, 왼쪽 맵, 오른쪽 CAM, 아래 통합하역작업·Alert */
 :root{
-  --bg:#0e1319; --panel:#151d26; --panel-2:#1c2733; --line:#2a3846; --line-2:#374859;
-  --fg:#e6edf4; --muted:#8c9cad; --dim:#5d6d7e;
-  --accent:#4aa3ff; --ok:#38b97a; --warn:#f0a92e; --crit:#ef5350; --info:#6f8cff;
-  --s-yard:#9fb3c8; --s-moving:#4aa3ff; --s-queue:#f0a92e; --s-working:#38b97a; --s-done:#5d6d7e;
-  --sans:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
-  --mono:"Consolas","D2Coding",ui-monospace,monospace;
+  --bg:#EDEDEB; --card:#FFFFFF; --soft:#F3F3F1; --soft-2:#EFEFEC; --line:#E4E4E1; --line-2:#DADAD6;
+  --ink:#141414; --ink-2:#3C4043; --muted:#5F6368; --dim:#9AA0A6;
+  --blue:#1D47B8; --blue-bg:#E6EDFF; --orange:#B8420A; --orange-bg:#FFE9DD; --red:#D7263D; --red-bg:#FBDDE1;
+  --green:#1F7A4F; --green-bg:#DDF0E5;
+  --s-yard:#5F6368; --s-moving:#1D47B8; --s-queue:#B8420A; --s-working:#1F7A4F; --s-done:#9AA0A6;
+  --sans:"Inter","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;
 }
 *{box-sizing:border-box}
-html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px}
-body{display:flex;flex-direction:column}
-button,select{font:inherit;color:inherit;background:var(--panel-2);border:1px solid var(--line-2);border-radius:4px;padding:5px 10px;cursor:pointer}
-button:hover{border-color:var(--accent)}
-button:disabled{opacity:.45;cursor:not-allowed}
-button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-button.primary{background:var(--accent);border-color:var(--accent);color:#04121f;font-weight:700}
-button.danger{border-color:var(--crit);color:var(--crit)}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px}
+body{display:flex;flex-direction:column;gap:12px;padding:14px 20px}
 .num{font-variant-numeric:tabular-nums}
+button,select{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.pill-btn{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line-2);background:var(--card);font-weight:600;font-size:13px}
+.pill-btn:hover{border-color:var(--ink)}
+.pill-btn.dark{background:var(--ink);border-color:var(--ink);color:#fff}
+.pill-btn.danger{color:var(--red);border-color:var(--red)}
+.pill-btn:disabled{opacity:.45;cursor:not-allowed}
+select.pill-btn{padding-right:8px}
 
-header{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
-header h1{margin:0;font-size:16px;letter-spacing:.02em}
-.chip{font-size:12px;padding:2px 8px;border:1px solid var(--line-2);border-radius:10px;color:var(--muted);white-space:nowrap}
-.clock{font-family:var(--mono);font-size:20px;font-weight:700;min-width:5ch}
-.group{display:flex;gap:6px;align-items:center}
-.sep{width:1px;height:24px;background:var(--line)}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;background:var(--card);border-radius:999px;padding:8px 10px 8px 12px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:40px;height:40px;border-radius:14px;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center}
+.brand b{display:block;font-size:15px}
+.brand small{font-size:12px;color:var(--muted)}
+nav{display:flex;gap:4px;background:var(--soft);border-radius:999px;padding:4px}
+nav a,nav span{display:inline-flex;align-items:center;min-height:36px;padding:0 16px;border-radius:999px;font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none}
+nav a[aria-current]{background:var(--ink);color:#fff}
+nav span{color:var(--dim);cursor:not-allowed}
 .sp{flex:1}
-.lbl{font-size:12px;color:var(--muted)}
+.grp{display:flex;align-items:center;gap:6px;background:var(--soft);border-radius:999px;padding:4px 4px 4px 12px}
+.grp .lbl{font-size:12px;color:var(--muted);font-weight:600}
+.clock{font-size:20px;font-weight:700;letter-spacing:.01em;padding:0 4px}
+.conn{width:8px;height:8px;border-radius:50%;background:var(--dim)}
+.conn.on{background:var(--green)}
 
-main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(360px,1fr);grid-template-rows:minmax(0,1.12fr) minmax(0,1fr);gap:10px;padding:10px 16px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;min-width:0;min-height:0;display:flex;flex-direction:column}
-.card>h2{margin:0;padding:7px 12px;font-size:13px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:baseline}
-.card>h2 small{color:var(--muted);font-weight:400}
-.card>h2 .sp{flex:1}
-.body{flex:1;min-height:0;padding:8px 12px;overflow:auto}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.kpi{background:var(--card);border-radius:20px;padding:12px 18px;display:flex;flex-direction:column;gap:2px}
+.kpi .k{font-size:12px;color:var(--muted);font-weight:600}
+.kpi .v{font-size:28px;font-weight:700;line-height:1.15}
+.kpi .v small{font-size:14px;font-weight:600;color:var(--muted);margin-left:2px}
+.kpi .s{font-size:12px;color:var(--ink-2)}
+
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.42fr) minmax(0,1fr);grid-template-rows:minmax(0,1.3fr) minmax(0,1fr);gap:12px}
+.card{background:var(--card);border-radius:20px;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.card>.hd{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;padding:12px 16px 8px}
+.card>.hd h2{margin:0;font-size:15px;font-weight:700}
+.card>.hd .sub{font-size:12px;color:var(--muted)}
+.card>.bd{flex:1;min-height:0;padding:0 16px 14px;overflow:auto}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--soft);color:var(--ink-2);white-space:nowrap}
+.chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.chip.ok{background:var(--green-bg);color:var(--green)} .chip.warn{background:var(--orange-bg);color:var(--orange)} .chip.crit{background:var(--red-bg);color:var(--red)}
+.chip.down{background:var(--red);color:#fff} .chip.blue{background:var(--blue-bg);color:var(--blue)} .chip.dark{background:var(--ink);color:#fff}
 
 /* ① 맵 */
-#mapBody{padding:6px;display:flex;flex-direction:column;gap:4px;overflow:hidden}
+#mapBd{display:flex;flex-direction:column;gap:6px;overflow:hidden}
 #mapSvg{flex:1;min-height:0;width:100%}
+#mapSvg .hop{cursor:pointer}
 .veh{transition:transform .28s linear}
-.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);padding:0 6px}
-.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
-.legend b{display:inline-block;width:14px;height:10px;margin-right:4px;vertical-align:-1px;border-radius:2px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 6px}
 
 /* ③ CAM */
-.cams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;height:100%}
-.cam{position:relative;background:#06090c;border:1px solid var(--line);border-radius:4px;min-height:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:12px}
-.cam .t{position:absolute;left:8px;top:6px;color:var(--fg);font-size:12px;font-weight:700}
-.cam .c{position:absolute;left:8px;bottom:6px;color:var(--muted);font-size:12px}
-.cam .rec{position:absolute;right:8px;top:6px;font-size:11px;color:var(--dim)}
-.cam.down{border-color:var(--crit)}
-.cam.down .rec{color:var(--crit)}
+.cams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:10px;height:100%}
+.cam{position:relative;border-radius:14px;overflow:hidden;background:#1b1d1f;min-height:0;cursor:pointer;border:2px solid transparent;display:flex;flex-direction:column}
+.cam:hover{border-color:var(--ink)}
+.cam.down{border-color:var(--red)}
+.cam canvas{display:block;width:100%;flex:1;min-height:0;object-fit:contain;background:#1b1d1f}
+.cam .jd{font-size:12px;color:#fff;background:#141414;padding:5px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ② 탭 */
-.tabs{display:flex;gap:4px;padding:6px 12px 0;border-bottom:1px solid var(--line)}
-.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;padding:6px 10px;color:var(--muted)}
-.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent);font-weight:700}
-.sector-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.sc{background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;min-width:0}
-.sc.down{border-color:var(--crit)}
-.sc .top{display:flex;align-items:center;gap:8px}
-.sc .pct{font-size:24px;font-weight:700;margin-left:auto}
-.lv{font-size:11px;font-weight:700;padding:1px 7px;border-radius:9px;border:1px solid}
-.lv.ok{color:var(--ok);border-color:var(--ok)} .lv.warn{color:var(--warn);border-color:var(--warn)} .lv.crit{color:var(--crit);border-color:var(--crit)} .lv.down{color:#fff;background:var(--crit);border-color:var(--crit)}
-.cbar{height:6px;background:var(--bg);border-radius:3px;overflow:hidden}
-.cbar i{display:block;height:100%}
-.work{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;font-size:12px}
-.pbar{height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
-.pbar i{display:block;height:100%;background:var(--s-working)}
-.pbar.late i{background:var(--crit)}
-.late-t{color:var(--crit)}
+.tabs{display:flex;gap:4px;background:var(--soft);border-radius:999px;padding:3px;margin-left:auto}
+.tabs button{border:0;background:transparent;border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.tabs button[aria-selected="true"]{background:var(--ink);color:#fff}
+.hoppers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.hp{border:1px solid var(--line);border-radius:16px;padding:10px 12px;display:flex;flex-direction:column;gap:7px;min-width:0;cursor:pointer}
+.hp:hover{border-color:var(--ink)}
+.hp.down{border-color:var(--red);background:#fff7f8}
+.hp .top{display:flex;align-items:center;gap:8px}
+.hp .top b{font-size:14px}
+.hp .role{font-size:11.5px;color:var(--muted)}
+.hp .pct{margin-left:auto;font-size:24px;font-weight:700}
+.bar{height:6px;background:var(--soft-2);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%}
+.work{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:3px 8px;align-items:center;font-size:12px}
+.pbar{height:8px;background:var(--soft-2);border-radius:4px;overflow:hidden}
+.pbar i{display:block;height:100%;background:var(--green)}
+.pbar.late i{background:var(--red)}
+.late-t{color:var(--red);font-weight:600}
 .meta{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:2px 10px}
-.meta b{color:var(--fg);font-weight:500}
+.meta b{color:var(--ink);font-weight:600}
 .empty{color:var(--muted);font-size:13px}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;font-weight:500;color:var(--muted);font-size:12px;padding:4px 6px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
-td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:top}
-td.r{text-align:right}
-.badge{font-size:11px;font-weight:700;padding:0 6px;border-radius:3px;background:var(--crit);color:#fff;margin-left:4px}
-.assumed{font-size:11px;color:var(--warn);border:1px solid var(--warn);border-radius:3px;padding:0 5px}
+th{text-align:left;font-weight:600;color:var(--muted);font-size:12px;padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card)}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.r,th.r{text-align:right}
+.rank{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.plate{font-weight:700}
+.badge{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--red);color:#fff;margin-left:4px}
+.assumed{font-size:11px;font-weight:700;color:var(--orange);background:var(--orange-bg);border-radius:999px;padding:1px 8px}
 
 /* ④ Alert */
-.alerts{display:flex;flex-direction:column;gap:6px}
-.al{display:grid;grid-template-columns:4px minmax(0,1fr) auto;gap:2px 10px;background:var(--panel-2);border-radius:4px;padding:6px 8px 6px 0;font-size:13px}
-.al .bar{grid-row:1/3;border-radius:2px}
-.al.crit .bar{background:var(--crit)} .al.warn .bar{background:var(--warn)} .al.info .bar{background:var(--info)}
-.al .h{grid-column:2;grid-row:1;display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;min-width:0}
-.al .h b{font-size:12px}
-.al .act{grid-column:2;grid-row:2;color:var(--muted);font-size:12px}
+.alerts{display:flex;flex-direction:column;gap:8px}
+.al{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;border-radius:14px;padding:9px 12px;background:var(--soft);border-left:4px solid var(--dim);font-size:13px}
+.al.crit{background:#FFF1F3;border-left-color:var(--red)} .al.warn{background:#FFF5EE;border-left-color:var(--orange)} .al.info{border-left-color:var(--blue)}
+.al .h{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;min-width:0}
+.al .h .t{color:var(--muted);font-size:12px}
+.al .h b{font-size:12.5px}
+.al .act{grid-column:1;color:var(--ink-2);font-size:12px}
+.al .bs{grid-column:2;grid-row:1/3;align-self:center}
 .al.ack{opacity:.5}
-.al .btn-slot{grid-column:3;grid-row:1/3;align-self:center}
-.al button{font-size:12px;padding:2px 8px}
+.al button{border:1px solid var(--line-2);background:var(--card);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600}
 
-@media (max-width:1100px){
+/* CAM 크게 보기 */
+dialog{border:0;border-radius:24px;padding:0;width:min(1500px,96vw);max-height:94vh;background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(20,20,20,.55)}
+.dlg{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr);gap:16px;padding:18px}
+.dlg .hd{grid-column:1/-1;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dlg .hd h3{margin:0;font-size:18px}
+.dlg canvas{width:100%;border-radius:14px;background:#1b1d1f;display:block}
+.dlg .side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.dlg .ref img{width:100%;max-height:42vh;object-fit:contain;background:var(--soft);border-radius:12px;display:block}
+.cap{font-size:12px;color:var(--muted);line-height:1.5}
+.chs{display:flex;gap:6px;flex-wrap:wrap}
+
+@media (max-width:1280px){
   html,body{height:auto} main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
-  #mapBody{height:60vw} .cams{height:auto;grid-template-rows:repeat(2,120px)} .sector-cards{grid-template-columns:minmax(0,1fr)}
+  #mapBd{height:56vw} .cams{height:auto} .cam canvas{aspect-ratio:16/9} .hoppers{grid-template-columns:minmax(0,1fr)} .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .dlg{grid-template-columns:minmax(0,1fr)}
 }
 @media (prefers-reduced-motion:reduce){.veh{transition:none}}
 </style>
 </head>
 <body>
 <header>
-  <h1>상하역 지연 관제</h1>
-  <span class="chip" id="ver">v1</span>
-  <span class="clock num" id="clock">--:--</span>
-  <div class="group">
-    <button class="primary" id="runBtn">시작</button>
-    <label class="lbl" for="speedSel">배속</label>
-    <select id="speedSel"><option value="30">x30</option><option value="60" selected>x60</option><option value="120">x120</option><option value="300">x300</option></select>
-    <button id="resetBtn">초기화</button>
+  <div class="brand">
+    <div class="logo" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16h10V9H3z"/><path d="M13 12h4l3 3v1h-7z"/><path d="M5 9l4-5 6 2-2 3"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="16.5" cy="17.5" r="1.8"/></svg></div>
+    <div><b>하역관제</b><small id="siteName">포항제철소 소결공장 · 시뮬레이션</small></div>
   </div>
-  <span class="chip num" id="counts">도착 0 · 대기장 0 · 출차 0/0</span>
+  <nav aria-label="주 메뉴"><a href="/" aria-current="page">관제 화면</a><span title="다음 라운드">통합하역작업</span><span title="다음 라운드">운영 분석</span><span title="다음 라운드">알림 이력</span></nav>
   <span class="sp"></span>
-  <div class="group" aria-label="돌발 이벤트 (시연용)">
-    <span class="lbl">돌발</span>
-    <select id="downSel" aria-label="정지할 섹터"></select>
-    <button class="danger" id="downBtn">섹터 정지</button>
-    <button id="urgentBtn">긴급 출하 넣기</button>
+  <div class="grp" aria-label="시뮬레이션">
+    <span class="conn" id="conn" title="연결 중"></span>
+    <span class="clock num" id="clock">--:--</span>
+    <button class="pill-btn dark" id="runBtn">시작</button>
+    <select class="pill-btn" id="speedSel" aria-label="배속"><option value="30">×30</option><option value="60" selected>×60</option><option value="120">×120</option><option value="300">×300</option></select>
+    <button class="pill-btn" id="resetBtn">초기화</button>
+  </div>
+  <div class="grp" aria-label="시연용 돌발 이벤트">
+    <span class="lbl">시연</span>
+    <select class="pill-btn" id="downSel" aria-label="정지할 호퍼"></select>
+    <button class="pill-btn danger" id="downBtn">호퍼 정지</button>
+    <button class="pill-btn" id="urgentBtn">긴급 반입 넣기</button>
   </div>
 </header>
 
+<section class="kpis" aria-label="요약">
+  <div class="kpi"><span class="k">대기장 대기 차량</span><span class="v num" id="kWait">0<small>대</small></span><span class="s" id="kWaitS">—</span></div>
+  <div class="kpi"><span class="k">평균 대기시간 (호출까지)</span><span class="v num" id="kAvg">0<small>분</small></span><span class="s" id="kAvgS">—</span></div>
+  <div class="kpi"><span class="k">호퍼 하차구 가동률</span><span class="v num" id="kUtil">0<small>%</small></span><span class="s" id="kUtilS">—</span></div>
+  <div class="kpi"><span class="k">오늘 반입 실적</span><span class="v num" id="kTrips">0<small>회</small></span><span class="s" id="kTripsS">—</span></div>
+</section>
+
 <main>
   <section class="card" aria-label="시나리오 좌표 맵">
-    <h2>① 시나리오 좌표 맵 <small>섹터 색 = 혼잡도 단계 · 점 = 차량 상태</small><span class="sp"></span><small id="conn">연결 중…</small></h2>
-    <div class="body" id="mapBody">
-      <svg id="mapSvg" role="img" aria-label="하역장 배치도와 차량 위치" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="hd"><h2>① 시나리오 좌표 맵</h2><span class="sub">포항제철소 원료·소결 지구 개념도 · 호퍼를 누르면 CAM 크게 보기</span><span class="sp"></span>
+      <span class="chip" title="실제 도면·위성사진이 아닌 가상 배치">개념도 · 실제 도면 아님</span></div>
+    <div class="bd" id="mapBd">
+      <svg id="mapSvg" role="img" aria-label="소결공장 원료 반입 배치도와 덤프트럭 위치" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="legend">
-        <span><i style="background:var(--s-yard)"></i>대기장 대기</span><span><i style="background:var(--s-moving)"></i>이동 중</span>
-        <span><i style="background:var(--s-queue)"></i>섹터 대기</span><span><i style="background:var(--s-working)"></i>작업 중</span>
-        <span><i style="background:var(--s-done)"></i>출차</span><span><i style="background:none;border:2px solid var(--crit)"></i>긴급</span>
-        <span><b style="background:rgba(56,185,122,.35)"></b>원활 &lt;60%</span><span><b style="background:rgba(240,169,46,.4)"></b>주의 60~85%</span><span><b style="background:rgba(239,83,80,.45)"></b>혼잡 85%+</span>
+        <span class="chip ok">원활 &lt;60%</span><span class="chip warn">주의 60~85%</span><span class="chip crit">혼잡 85%+</span>
+        <span class="chip"><i style="background:var(--s-yard)"></i>대기장 대기</span><span class="chip"><i style="background:var(--s-moving)"></i>호출 이동</span>
+        <span class="chip"><i style="background:var(--s-queue)"></i>호퍼 대기</span><span class="chip"><i style="background:var(--s-working)"></i>하차 중</span>
+        <span class="chip"><i style="background:var(--s-done)"></i>공차 출차</span><span class="chip"><i style="background:#fff;border:2px solid var(--red)"></i>긴급</span>
       </div>
     </div>
   </section>
 
   <section class="card" aria-label="CAM 4채널">
-    <h2>③ CAM 4채널 <small>섹터 A·B·C + 대기장</small></h2>
-    <div class="body"><div class="cams" id="cams"></div></div>
+    <div class="hd"><h2>③ CAM 4채널</h2><span class="sub">호퍼 A·B·C 측면 + 대기장 · 박스·추적 ID·구역 선·적재함 판정</span><span class="sp"></span><span class="chip blue">추론 재생 (시뮬레이션)</span></div>
+    <div class="bd"><div class="cams" id="cams"></div></div>
   </section>
 
   <section class="card" aria-label="통합하역작업">
-    <h2>② 통합하역작업 <small>섹터 현황 · 호출 순번</small></h2>
-    <div class="tabs" role="tablist">
-      <button role="tab" aria-selected="true" data-tab="sectors">섹터 현황</button>
-      <button role="tab" aria-selected="false" data-tab="queue">호출 순번 <span id="qCount" class="num"></span></button>
-      <button role="tab" aria-selected="false" data-tab="assume">가정값</button>
-      <button role="tab" aria-selected="false" disabled title="다음 라운드">KPI 비교</button>
+    <div class="hd"><h2>② 통합하역작업</h2><span class="sub" id="tabSub">호퍼별 혼잡도·하차 진척도</span>
+      <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-tab="hoppers">호퍼 현황</button>
+        <button role="tab" aria-selected="false" data-tab="queue">호출 순번 <span id="qCount" class="num"></span></button>
+        <button role="tab" aria-selected="false" data-tab="assume">가정값</button>
+      </div>
     </div>
-    <div class="body" id="tab-sectors"><div class="sector-cards" id="sectorCards"></div></div>
-    <div class="body" id="tab-queue" hidden></div>
-    <div class="body" id="tab-assume" hidden></div>
+    <div class="bd" id="tab-hoppers"><div class="hoppers" id="hoppers"></div></div>
+    <div class="bd" id="tab-queue" hidden></div>
+    <div class="bd" id="tab-assume" hidden></div>
   </section>
 
   <section class="card" aria-label="Alert">
-    <h2>④ Alert <small id="alertCount"></small><span class="sp"></span><label class="lbl"><input type="checkbox" id="showCalls"> 호출 알림 보기</label></h2>
-    <div class="body"><div class="alerts" id="alerts"><div class="empty">아직 알림이 없습니다.</div></div></div>
+    <div class="hd"><h2>④ Alert</h2><span class="sub" id="alertCount"></span><span class="sp"></span>
+      <label class="chip"><input type="checkbox" id="showCalls"> 호출 알림 보기</label></div>
+    <div class="bd"><div class="alerts" id="alerts"><div class="empty">아직 알림이 없습니다. 시작을 누르면 덤프트럭이 들어옵니다.</div></div></div>
   </section>
 </main>
+
+<dialog id="camDlg" aria-label="CAM 크게 보기">
+  <div class="dlg">
+    <div class="hd"><h3 id="dlgTitle">CAM</h3><span class="chip blue">추론 재생 (시뮬레이션)</span><span class="chips chs" id="dlgChs"></span><span class="sp"></span><button class="pill-btn" id="dlgClose">닫기</button></div>
+    <div><canvas id="bigCam" width="960" height="540"></canvas>
+      <p class="cap">판정 규칙: 박스 아래 중심점이 하차구·대기선 구역 안에 3초 이상 있으면 진입으로 본다. 덤프트럭 전체 박스의 세로/가로 비율이 0.6 이상이면 적재함 상승(하차 중)으로 판정한다. 지금 화면의 차량·각도는 시뮬레이터가 만든 값이다.</p></div>
+    <div class="side">
+      <div><b style="font-size:14px">탐지 목록</b> <span class="cap" id="dlgCount"></span>
+        <table><thead><tr><th>ID</th><th>차량</th><th>구역</th><th class="r">체류</th><th class="r">적재함</th><th>판정</th></tr></thead><tbody id="dlgRows"></tbody></table></div>
+      <div class="ref"><b style="font-size:14px">실제 사진 판정 예시</b>
+        <img src="/web/assets/dump_sample.jpg" alt="덤프트럭이 적재함을 들어 올린 사진에 YOLO 박스와 '하차 중 · 적재함 상승' 판정이 표시됨">
+        <p class="cap" id="refCap">팀 제공 사진 · YOLO11n 사전학습(COCO truck) 그대로 실행한 결과</p></div>
+    </div>
+  </div>
+</dialog>
 
 <script>
 (async function(){
@@ -173,38 +236,57 @@ const NS='http://www.w3.org/2000/svg';
 const el=(tag,attrs,text)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text!=null)e.textContent=text;return e;};
 const pts=p=>p.map(x=>x.join(',')).join(' ');
 const center=p=>[p.reduce((s,x)=>s+x[0],0)/p.length,p.reduce((s,x)=>s+x[1],0)/p.length];
+const bbox=p=>{const xs=p.map(q=>q[0]),ys=p.map(q=>q[1]);return [Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];};
 const hhmm=iso=>iso?iso.slice(11,16):'';
-const STATE_COLOR={arrived:'var(--s-yard)',yard:'var(--s-yard)',moving:'var(--s-moving)',queue:'var(--s-queue)',working:'var(--s-working)',done:'var(--s-done)'};
-const LV_FILL={ok:'rgba(56,185,122,.22)',warn:'rgba(240,169,46,.30)',crit:'rgba(239,83,80,.36)'};
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const STATE_COLOR={arrived:css('--s-yard'),yard:css('--s-yard'),moving:css('--s-moving'),queue:css('--s-queue'),working:css('--s-working'),done:css('--s-done')};
+const LV_FILL={ok:'#DDF0E5',warn:'#FFE9DD',crit:'#FBD5DA'};
 const LV_TEXT={ok:'원활',warn:'주의',crit:'혼잡',down:'정지'};
+const PILE_COLOR={'분광':'#9C5B47','석회석':'#D8D4C8','사문암·규석':'#8FA58C','밀스케일·더스트':'#5A5856','분코크스·무연탄':'#2F2F2F'};
 
 const cfg=await (await fetch('/api/config')).json();
 const S=cfg.sectors;
-$('#ver').textContent=cfg.version;
+if(S.site) $('#siteName').textContent=S.site.name+' · 시뮬레이션';
 $('#downSel').innerHTML=S.sectors.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('');
+let ref=null; try{ ref=await (await fetch('/web/assets/dump_sample.json')).json(); }catch(e){}
+if(ref&&ref.judge) $('#refCap').textContent='팀 제공 사진 · '+ref.model+' 사전학습(COCO truck) 그대로 실행 · truck '+ref.judge.conf+' · 전체 박스 세로/가로 '+ref.judge.ratio+' → '+ref.judge.label;
 
-/* ---------- 맵 (한 번 그리고, 상태는 색과 위치만 바꿈) ---------- */
+/* ---------- 맵 ---------- */
 const svg=$('#mapSvg');
 svg.setAttribute('viewBox','0 0 '+S.map.width+' '+S.map.height);
 const defs=el('defs',{});
-const pat=el('pattern',{id:'hatch',width:24,height:24,patternUnits:'userSpaceOnUse',patternTransform:'rotate(45)'});
-pat.appendChild(el('rect',{width:24,height:24,fill:'rgba(239,83,80,.18)'}));
-pat.appendChild(el('rect',{width:8,height:24,fill:'rgba(239,83,80,.45)'}));
-defs.appendChild(pat); svg.appendChild(defs);
-svg.appendChild(el('rect',{x:0,y:0,width:S.map.width,height:S.map.height,fill:'#111922',rx:8}));
-S.roads.forEach(r=>{svg.appendChild(el('polyline',{points:pts(r.points),fill:'none',stroke:'#2b3a49','stroke-width':26,'stroke-linejoin':'round','stroke-linecap':'round'}));
-  svg.appendChild(el('polyline',{points:pts(r.points),fill:'none',stroke:'#4a5d70','stroke-width':2,'stroke-dasharray':'14 12'}));});
-S.zones.forEach(z=>{const c=center(z.poly);svg.appendChild(el('polygon',{points:pts(z.poly),fill:'#1a2430',stroke:'#4a5d70','stroke-width':3}));
-  svg.appendChild(el('text',{x:c[0],y:z.id==='YARD'?z.poly[0][1]-14:c[1]-90,fill:'#c9d5e1','font-size':30,'text-anchor':'middle'},z.name));});
+const pat=el('pattern',{id:'hatch',width:18,height:18,patternUnits:'userSpaceOnUse',patternTransform:'rotate(45)'});
+pat.appendChild(el('rect',{width:18,height:18,fill:'#FBD5DA'}));pat.appendChild(el('rect',{width:6,height:18,fill:'#D7263D'}));
+defs.appendChild(pat);svg.appendChild(defs);
+svg.appendChild(el('rect',{x:0,y:0,width:S.map.width,height:S.map.height,fill:'#F6F6F4',rx:18}));
+const T=(x,y,s,attrs)=>svg.appendChild(el('text',Object.assign({x,y,'font-size':22,fill:'#3C4043','text-anchor':'middle','font-family':'Inter,Noto Sans KR,sans-serif'},attrs||{}),s));
+(S.context||[]).forEach(c=>{
+  if(c.kind==='sea'){svg.appendChild(el('polygon',{points:pts(c.poly),fill:'#DCE7F3'}));const m=center(c.poly);T(m[0]+40,m[1]-10,c.name,{fill:'#5B7DA8','font-size':26,'font-weight':600});}
+  else if(c.kind==='pier'){svg.appendChild(el('polygon',{points:pts(c.poly),fill:'#C5CDD6'}));const m=center(c.poly);T(m[0],m[1],c.name,{'font-size':16,fill:'#5F6368',transform:'rotate(70 '+m[0]+' '+m[1]+')'});}
+  else if(c.kind==='yard'){svg.appendChild(el('polygon',{points:pts(c.poly),fill:'#EFEBE3',stroke:'#DAD4C6','stroke-width':2}));const b=bbox(c.poly);T(b[0]+18,b[1]+34,c.name,{'text-anchor':'start','font-size':24,'font-weight':700,fill:'#5F6368'});}
+  else if(c.kind==='pile'){svg.appendChild(el('ellipse',{cx:c.c[0],cy:c.c[1],rx:c.r[0],ry:c.r[1],fill:PILE_COLOR[c.name]||'#888',opacity:.85}));T(c.c[0],c.c[1]+c.r[1]+22,c.name,{'font-size':17,fill:'#5F6368'});}
+  else if(c.kind==='building'){svg.appendChild(el('polygon',{points:pts(c.poly),fill:'#E4E4E1',stroke:'#C9C9C4','stroke-width':2}));const b=bbox(c.poly);T(b[0]+18,b[1]+34,c.name,{'text-anchor':'start','font-size':24,'font-weight':700,fill:'#141414'});}
+  else if(c.kind==='strand'){svg.appendChild(el('polygon',{points:pts(c.poly),fill:'#C2C2BC'}));const b=bbox(c.poly);T(b[2]-10,b[1]+22,c.name,{'text-anchor':'end','font-size':15,fill:'#3C4043'});}
+  else if(c.kind==='furnace'){svg.appendChild(el('circle',{cx:c.c[0],cy:c.c[1],r:c.r[0],fill:'#3C4043'}));T(c.c[0],c.c[1]+7,c.name,{fill:'#fff','font-size':20,'font-weight':700});}
+  else if(c.kind==='conveyor'){svg.appendChild(el('polyline',{points:pts(c.points),fill:'none',stroke:'#9AA0A6','stroke-width':5,'stroke-dasharray':'2 7','stroke-linecap':'round'}));if(c.name){const p=c.points[Math.floor(c.points.length/2)];T(p[0]+8,p[1]-10,c.name,{'font-size':15,fill:'#5F6368','text-anchor':'start'});}}
+  else if(c.kind==='return'){svg.appendChild(el('polyline',{points:pts(c.points),fill:'none',stroke:'#D2D2CD','stroke-width':16,'stroke-linejoin':'round'}));const p=c.points[2];T((p[0]+c.points[3][0])/2,p[1]-14,c.name,{'font-size':17,fill:'#5F6368'});}
+});
+S.roads.forEach(r=>svg.appendChild(el('polyline',{points:pts(r.points),fill:'none',stroke:'#CFCFCA','stroke-width':22,'stroke-linejoin':'round','stroke-linecap':'round'})));
+S.zones.forEach(z=>{const b=bbox(z.poly);svg.appendChild(el('polygon',{points:pts(z.poly),fill:'#FFFFFF',stroke:'#B9BDC2','stroke-width':2.5}));T((b[0]+b[2])/2,b[1]-10,z.name,{'font-size':19,'font-weight':600});});
 const secShape={};
 S.sectors.forEach(s=>{
-  const g=el('g',{});
-  const poly=el('polygon',{points:pts(s.poly),fill:LV_FILL.ok,stroke:'#4a5d70','stroke-width':3});
-  const xs=s.poly.map(p=>p[0]),ys=s.poly.map(p=>p[1]);
-  const name=el('text',{x:Math.max(...xs)-16,y:Math.min(...ys)+40,fill:'#e6edf4','font-size':30,'font-weight':700,'text-anchor':'end'},s.name);
-  const pct=el('text',{x:Math.max(...xs)-16,y:Math.max(...ys)-18,fill:'#e6edf4','font-size':30,'text-anchor':'end','font-family':'Consolas,monospace'},'0%');
-  g.appendChild(poly);g.appendChild(name);g.appendChild(pct);svg.appendChild(g);
-  secShape[s.id]={poly,pct};
+  const g=el('g',{class:'hop',tabindex:0,role:'button','aria-label':s.name+' CAM 크게 보기'});
+  const b=bbox(s.poly);
+  const poly=el('polygon',{points:pts(s.poly),fill:LV_FILL.ok,stroke:'#141414','stroke-width':2});
+  g.appendChild(poly);
+  for(let i=0;i<s.bays;i++){const x=b[0]+(b[2]-b[0])*(0.5+0.45*(i+0.5)/s.bays);g.appendChild(el('rect',{x:x-26,y:b[1]+18,width:52,height:34,fill:'#141414',opacity:.18,rx:4}));}
+  g.appendChild(el('text',{x:b[0]+10,y:b[1]+26,'font-size':20,'font-weight':700,fill:'#141414'},s.name));
+  g.appendChild(el('text',{x:b[0]+10,y:b[1]+48,'font-size':14,fill:'#3C4043'},s.cargo.join('·')));
+  const pct=el('text',{x:b[2]-10,y:b[3]-12,'font-size':24,'font-weight':700,'text-anchor':'end',fill:'#141414'},'0%');
+  g.appendChild(pct);
+  g.addEventListener('click',()=>openCam(s.cam_id));
+  g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openCam(s.cam_id);}});
+  svg.appendChild(g); secShape[s.id]={poly,pct};
 });
 const vehLayer=el('g',{}); svg.appendChild(vehLayer);
 const vehNodes={};
@@ -216,42 +298,150 @@ function drawVehicles(vs){
     let n=vehNodes[v.id];
     if(!n){
       n=el('g',{class:'veh'});
-      n.appendChild(el('circle',{r:15,'stroke-width':4}));
-      n.appendChild(el('text',{y:36,'font-size':17,'text-anchor':'middle',fill:'#c9d5e1','font-family':'Consolas,monospace'}));
+      n.appendChild(el('rect',{x:-15,y:-10,width:30,height:20,rx:5,'stroke-width':3}));
+      n.appendChild(el('text',{y:30,'font-size':15,'font-weight':600,'text-anchor':'middle',fill:'#141414'}));
       n.appendChild(el('title',{}));
       vehLayer.appendChild(n); vehNodes[v.id]=n;
     }
     n.style.transform='translate('+v.xy[0]+'px,'+v.xy[1]+'px)';
-    const c=n.firstChild;
-    c.setAttribute('fill',STATE_COLOR[v.state]||'#999');
-    c.setAttribute('stroke',v.urgent?'#ef5350':'#0e1319');
-    n.childNodes[1].textContent=v.id.slice(-3);
-    n.childNodes[2].textContent=v.id+' · '+v.cargo+' · '+v.state;
+    const r=n.firstChild;
+    r.setAttribute('fill',STATE_COLOR[v.state]||'#999');
+    r.setAttribute('stroke',v.urgent?'#D7263D':'#FFFFFF');
+    n.childNodes[1].textContent=v.id.slice(-4);
+    n.childNodes[2].textContent=v.id+' · '+v.cargo+' '+v.load_t+'t · '+v.judge;
   });
   Object.keys(vehNodes).forEach(id=>{ if(!seen.has(id)){ vehNodes[id].remove(); delete vehNodes[id]; } });
 }
 
-/* ---------- CAM 자리 ---------- */
-$('#cams').innerHTML=S.cams.map(c=>'<div class="cam" id="cam-'+c.id+'"><span class="t">'+esc(c.id)+' · '+esc(c.name)+'</span><span class="rec">● 영상 준비 중</span>영상 소스 연결 전<span class="c num"></span></div>').join('');
-const camSector=Object.fromEntries(S.sectors.map(s=>[s.cam_id,s.id]));
+/* ---------- CAM (측면 시점 합성 화면 + 판정 오버레이) ---------- */
+$('#cams').innerHTML=S.cams.map(c=>'<div class="cam" id="cam-'+c.id+'" role="button" tabindex="0" aria-label="'+esc(c.id+' '+c.name)+' 크게 보기"><canvas width="640" height="330"></canvas><div class="jd">영상 준비 중</div></div>').join('');
+S.cams.forEach(c=>{const b=$('#cam-'+c.id);b.addEventListener('click',()=>openCam(c.id));b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openCam(c.id);}});});
+const camOf=Object.fromEntries(S.cams.map(c=>[c.id,c]));
 
-/* ---------- 가정값 탭 (설정 파일 그대로) ---------- */
-const st=cfg.settings;
-$('#tab-assume').innerHTML='<p class="lbl">모든 수치는 <span class="assumed">가정값</span>입니다. 현장 데이터가 생기면 data/*.json 값만 바꾸면 됩니다.</p>'+
+function truckGeom(x,gy,k,deg){
+  // 옆모습 덤프트럭: 왼쪽 캡, 오른쪽 끝(후단)이 적재함 회전축. 반환: 그리기용 값 + 전체 박스
+  const L=150*k, cabW=36*k, cabH=40*k, chH=10*k, bodyW=L-cabW-6*k, bodyH=30*k, wr=10*k;
+  const chY=gy-wr*1.6-chH, pivot=[x+L,chY];
+  const a=deg*Math.PI/180, corners=[[-bodyW,0],[0,0],[0,-bodyH],[-bodyW,-bodyH]].map(([dx,dy])=>[pivot[0]+dx*Math.cos(a)-dy*Math.sin(a),pivot[1]+dx*Math.sin(a)+dy*Math.cos(a)]);
+  const xs=corners.map(c=>c[0]).concat([x,x+L]), ys=corners.map(c=>c[1]).concat([chY-cabH,gy]);
+  return {L,cabW,cabH,chH,bodyW,bodyH,wr,chY,pivot,a,box:[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)]};
+}
+function drawTruck(ctx,x,gy,k,deg,cab,label,boxColor,dumping){
+  const g=truckGeom(x,gy,k,deg);
+  ctx.fillStyle='#222'; ctx.fillRect(x+4*k,g.chY,g.L-4*k,g.chH);
+  ctx.save(); ctx.translate(g.pivot[0],g.pivot[1]); ctx.rotate(g.a);
+  ctx.fillStyle='#7d8287'; ctx.fillRect(-g.bodyW,-g.bodyH,g.bodyW,g.bodyH);
+  ctx.fillStyle='#62676c'; for(let i=1;i<4;i++) ctx.fillRect(-g.bodyW+i*g.bodyW/4,-g.bodyH,2*k,g.bodyH);
+  ctx.restore();
+  if(dumping && deg>25){ ctx.fillStyle='rgba(120,92,70,.85)'; for(let i=0;i<14;i++){ const px=g.pivot[0]+4*k+(i%4)*4*k, py=g.pivot[1]+(i*7%30)*k*0.9; ctx.fillRect(px,py,3*k,3*k);} }
+  if(deg>3){ ctx.strokeStyle='#c9ccd0'; ctx.lineWidth=4*k; ctx.beginPath(); ctx.moveTo(x+g.cabW+8*k,g.chY); const tip=[g.pivot[0]-g.bodyW*0.55*Math.cos(g.a),g.pivot[1]-g.bodyW*0.55*Math.sin(g.a)]; ctx.lineTo(tip[0],tip[1]); ctx.stroke(); }
+  ctx.fillStyle=cab; ctx.fillRect(x,g.chY-g.cabH,g.cabW,g.cabH+g.chH);
+  ctx.fillStyle='#bcd3e0'; ctx.fillRect(x+5*k,g.chY-g.cabH+6*k,g.cabW-12*k,14*k);
+  [x+18*k,x+58*k,x+g.L-42*k,x+g.L-16*k].forEach(cx=>{ctx.fillStyle='#111';ctx.beginPath();ctx.arc(cx,gy-g.wr,g.wr,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ddd';ctx.beginPath();ctx.arc(cx,gy-g.wr,g.wr*0.45,0,Math.PI*2);ctx.fill();});
+  if(label){
+    const b=g.box; ctx.strokeStyle=boxColor; ctx.lineWidth=2; ctx.strokeRect(b[0]-3,b[1]-3,b[2]-b[0]+6,b[3]-b[1]+6);
+    ctx.font='600 '+Math.max(11,Math.round(12*k/0.8))+'px Inter,Noto Sans KR,sans-serif';
+    const tw=ctx.measureText(label).width; ctx.fillStyle=boxColor; ctx.fillRect(b[0]-3,b[1]-21,tw+10,18); ctx.fillStyle='#fff'; ctx.fillText(label,b[0]+2,b[1]-7);
+  }
+  return g.box;
+}
+function scene(ctx,W,H,title,clock,down){
+  const sky=ctx.createLinearGradient(0,0,0,H*0.62); sky.addColorStop(0,'#c9d0d6'); sky.addColorStop(1,'#e6e8ea');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#9aa0a6'; ctx.fillRect(0,H*0.30,W,H*0.32*0.35); // 뒤편 소결공장 벽
+  ctx.fillStyle='#7f858b'; for(let i=0;i<6;i++) ctx.fillRect(i*W/6+10,H*0.27,W/12,H*0.05);
+  ctx.fillStyle='#55595d'; ctx.fillRect(0,H*0.78,W,H*0.22);
+  ctx.fillStyle='#4a4e52'; ctx.fillRect(0,H*0.78,W,3);
+  ctx.font='600 13px Inter,Noto Sans KR,sans-serif'; ctx.fillStyle='rgba(20,20,20,.72)'; ctx.fillRect(8,8,ctx.measureText(title).width+14,22); ctx.fillStyle='#fff'; ctx.fillText(title,15,24);
+  const ct=clock; ctx.fillStyle='rgba(20,20,20,.72)'; const cw=ctx.measureText(ct).width+14; ctx.fillRect(W-cw-8,8,cw,22); ctx.fillStyle='#fff'; ctx.fillText(ct,W-cw-1,24);
+  if(down){ ctx.fillStyle='rgba(215,38,61,.82)'; ctx.fillRect(0,H*0.42,W,30); ctx.fillStyle='#fff'; ctx.font='700 15px Inter,Noto Sans KR,sans-serif'; ctx.fillText('호퍼 정지 · 하차 일시 중지',14,H*0.42+20); }
+}
+function renderHopperCam(cv,cam,sec,vehById,clock){
+  const ctx=cv.getContext('2d'), W=cv.width, H=cv.height, gy=H*0.86, k=W/640*0.9;
+  scene(ctx,W,H,cam.id+' · '+cam.name+' 측면',clock,sec.status==='down');
+  // 구역 선: 대기선(왼쪽) · 하차구(오른쪽, 호퍼 투입구)
+  const qx1=W*0.30; ctx.setLineDash([6,5]); ctx.lineWidth=2;
+  ctx.strokeStyle='#F0A54A'; ctx.strokeRect(6,H*0.40,qx1-12,gy-H*0.40+4);
+  ctx.strokeStyle='#5BD38F'; ctx.strokeRect(qx1,H*0.18,W-qx1-6,gy-H*0.18+4); ctx.setLineDash([]);
+  ctx.font='600 11px Inter,Noto Sans KR,sans-serif'; ctx.fillStyle='#F0A54A'; ctx.fillText('대기선',12,H*0.40+14); ctx.fillStyle='#5BD38F'; ctx.fillText('하차구 ('+sec.bays+')',qx1+6,H*0.18+14);
+  const bayW=(W-qx1-6)/sec.bays;
+  for(let b=0;b<sec.bays;b++){ const px=qx1+bayW*(b+0.5); ctx.fillStyle='#2b2d2f'; ctx.beginPath(); ctx.moveTo(px-44*k,gy+2); ctx.lineTo(px+44*k,gy+2); ctx.lineTo(px+26*k,H); ctx.lineTo(px-26*k,H); ctx.fill(); }
+  const det=[];
+  sec.working.forEach(w=>{
+    const v=vehById[w.vehicle_id]; const bx=qx1+bayW*(w.bay+0.5)-75*k;
+    const color=w.delayed?'#D7263D':(w.dump_deg>=15?'#F0A54A':'#5BD38F');
+    const label='#'+w.track_id+' '+w.vehicle_id.slice(-4)+' · '+w.judge+(w.dump_deg?' '+w.dump_deg+'°':'');
+    drawTruck(ctx,bx,gy,k,w.dump_deg,'#b3302b',label,color,w.dump_deg>=15);
+    det.push({id:w.track_id,veh:w.vehicle_id,zone:'하차구 '+(w.bay+1),stay:w.elapsed_min,deg:w.dump_deg,judge:w.judge+(w.delayed?' · 지연':'')});
+  });
+  (sec.queue_info||[]).slice(0,1).forEach(q=>{
+    drawTruck(ctx,14,gy,k*0.82,0,'#8f2a26','#'+q.track_id+' '+q.vehicle_id.slice(-4)+' · 하차 대기','#F0A54A',false);
+  });
+  (sec.queue_info||[]).forEach(q=>det.push({id:q.track_id,veh:q.vehicle_id,zone:'대기선',stay:q.since_call_min,deg:0,judge:'하차 대기 · 정지'}));
+  if((sec.queue_info||[]).length>1){ ctx.fillStyle='#F0A54A'; ctx.font='700 13px Inter,sans-serif'; ctx.fillText('+'+(sec.queue_info.length-1),qx1-34,H*0.40+30); }
+  return det;
+}
+function renderYardCam(cv,cam,st,clock){
+  const ctx=cv.getContext('2d'), W=cv.width, H=cv.height, gy=H*0.86;
+  scene(ctx,W,H,cam.id+' · '+cam.name+' · 계근대 쪽',clock,false);
+  const yard=st.vehicles.filter(v=>v.state==='yard'||v.state==='arrived');
+  ctx.setLineDash([6,5]); ctx.lineWidth=2; ctx.strokeStyle='#8FB3FF'; ctx.strokeRect(6,H*0.36,W-12,gy-H*0.36+4); ctx.setLineDash([]);
+  ctx.font='600 11px Inter,Noto Sans KR,sans-serif'; ctx.fillStyle='#8FB3FF'; ctx.fillText('대기장 구역',12,H*0.36+14);
+  const det=[]; const k=W/640*0.5;
+  yard.slice(0,8).forEach((v,i)=>{
+    const row=i<4?0:1, x=16+(i%4)*(W-24)/4, y=row?gy:gy-46*k*2.2;
+    drawTruck(ctx,x,y,k,0,v.urgent?'#D7263D':'#b3302b','#'+v.track_id+' '+v.id.slice(-4),v.urgent?'#D7263D':'#8FB3FF',false);
+  });
+  yard.forEach(v=>det.push({id:v.track_id,veh:v.id,zone:v.state==='arrived'?'계근대':'대기장',stay:v.wait_min||0,deg:0,judge:v.judge}));
+  if(yard.length>8){ ctx.fillStyle='#fff'; ctx.font='700 14px Inter,sans-serif'; ctx.fillText('+'+(yard.length-8)+'대',W-60,H*0.36+18); }
+  return det;
+}
+function camSummary(cam,st){
+  if(!cam.sector_id){ const y=st.counts.yard; return '대기 '+y+'대 · 호출 이동 '+st.counts.moving+'대'; }
+  const s=st.sectors.find(x=>x.id===cam.sector_id);
+  if(s.status==='down') return '호퍼 정지 · 하차 중 '+s.working.length+'대 일시 중지';
+  const w=s.working.map(x=>x.vehicle_id.slice(-4)+' '+x.judge+(x.dump_deg?' '+x.dump_deg+'°':'')+(x.delayed?' · 지연':''));
+  return (w.join(' / ')||'하차구 비어 있음')+(s.queue.length?' · 대기 '+s.queue.length:'');
+}
+function drawCams(st){
+  const byId=Object.fromEntries(st.vehicles.map(v=>[v.id,v])), clock=hhmm(st.clock);
+  S.cams.forEach(c=>{
+    const box=$('#cam-'+c.id), cv=box.querySelector('canvas');
+    if(c.sector_id){ const s=st.sectors.find(x=>x.id===c.sector_id); renderHopperCam(cv,c,s,byId,clock); box.classList.toggle('down',s.status==='down'); }
+    else renderYardCam(cv,c,st,clock);
+    box.querySelector('.jd').textContent='판정 · '+camSummary(c,st);
+  });
+  if(dlgCam && $('#camDlg').open) drawBig(st);
+}
+let dlgCam=null;
+function openCam(id){ dlgCam=id; $('#dlgChs').innerHTML=S.cams.map(c=>'<button class="pill-btn'+(c.id===id?' dark':'')+'" data-cam="'+c.id+'">'+esc(c.id+' · '+c.name)+'</button>').join(''); if(!$('#camDlg').open) $('#camDlg').showModal(); if(last) drawBig(last); }
+function drawBig(st){
+  const c=camOf[dlgCam], cv=$('#bigCam'), byId=Object.fromEntries(st.vehicles.map(v=>[v.id,v]));
+  $('#dlgTitle').textContent=c.id+' · '+c.name+' 크게 보기';
+  const det=c.sector_id?renderHopperCam(cv,c,st.sectors.find(x=>x.id===c.sector_id),byId,hhmm(st.clock)):renderYardCam(cv,c,st,hhmm(st.clock));
+  $('#dlgCount').textContent='이 프레임 · '+det.length+'대';
+  $('#dlgRows').innerHTML=det.length?det.map(d=>'<tr><td class="num">#'+esc(d.id)+'</td><td class="plate">'+esc(d.veh)+'</td><td>'+esc(d.zone)+'</td><td class="r num">'+Math.floor(d.stay)+'분</td><td class="r num">'+(d.deg?d.deg+'°':'—')+'</td><td>'+esc(d.judge)+'</td></tr>').join(''):'<tr><td colspan="6" class="empty">이 채널에 잡힌 차량이 없습니다.</td></tr>';
+}
+$('#dlgChs').addEventListener('click',e=>{const b=e.target.closest('[data-cam]'); if(b) openCam(b.dataset.cam);});
+$('#dlgClose').addEventListener('click',()=>$('#camDlg').close());
+
+/* ---------- 가정값 탭 ---------- */
+const st0=cfg.settings, fl=st0.fleet;
+$('#tab-assume').innerHTML='<p class="cap" style="margin:0 0 8px">모든 수치는 <span class="assumed">가정값</span>입니다. 현장 값이 생기면 data/*.json만 바꾸면 됩니다.</p>'+
  '<table><thead><tr><th>항목</th><th class="r">값</th></tr></thead><tbody>'+
- [['혼잡도 주의 / 혼잡 기준',st.congestion.warn_pct+'% / '+st.congestion.crit_pct+'%'],['혼잡 알림: 지속 시간',st.congestion.crit_hold_min+'분'],
-  ['목표 대기시간',st.wait.target_min+'분'],['작업 지연 기준','표준 x '+st.delay.factor],['호출 여유시간',st.call.margin_min+'분'],
-  ['대기 단가 (다음 라운드 KPI용)',st.cost.wait_won_per_hour.toLocaleString()+'원/시간'],['섹터 유휴 단가 (다음 라운드 KPI용)',st.cost.sector_idle_won_per_hour.toLocaleString()+'원/시간']]
+ [['덤프트럭',fl.trucks+'대 · 25.5t급 · 적재 '+fl.load_t[0]+'~'+fl.load_t[1]+'t'],['원료야드 왕복·재상차',fl.cycle_min[0]+'~'+fl.cycle_min[1]+'분'],['투입 기한(도착 후)',fl.due_min[0]+'~'+fl.due_min[1]+'분'],
+  ['혼잡도 주의 / 혼잡',st0.congestion.warn_pct+'% / '+st0.congestion.crit_pct+'%'],['목표 대기시간',st0.wait.target_min+'분'],['하차 지연 기준','표준 × '+st0.delay.factor],['호출 여유시간',st0.call.margin_min+'분'],
+  ['적재함 상승 판정','박스 세로/가로 ≥ '+st0.vision.dump_raised_ratio],['대기 단가','₩'+st0.cost.wait_won_per_hour.toLocaleString()+'/시간']]
   .map(r=>'<tr><td>'+esc(r[0])+'</td><td class="r num">'+esc(r[1])+'</td></tr>').join('')+'</tbody></table>'+
- '<table style="margin-top:10px"><thead><tr><th>차종</th><th>화물</th><th class="r">표준 작업시간</th></tr></thead><tbody>'+
- cfg.std_times.items.map(i=>'<tr><td>'+esc(i.vehicle)+'</td><td>'+esc(i.cargo)+'</td><td class="r num">'+i.minutes+'분</td></tr>').join('')+'</tbody></table>'+
- '<table style="margin-top:10px"><thead><tr><th>섹터</th><th>취급 화물</th><th class="r">베이</th><th class="r">대기 슬롯</th><th class="r">대기장→섹터</th></tr></thead><tbody>'+
- S.sectors.map(s=>'<tr><td>'+esc(s.name)+'</td><td>'+esc(s.cargo.join(', '))+'</td><td class="r num">'+s.bays+'</td><td class="r num">'+s.queue_slots+'</td><td class="r num">'+s.travel_min+'분</td></tr>').join('')+'</tbody></table>';
+ '<table style="margin-top:10px"><thead><tr><th>원료</th><th class="r">하차 표준시간</th><th>받는 호퍼</th></tr></thead><tbody>'+
+ cfg.std_times.items.map(i=>'<tr><td>'+esc(i.cargo)+'</td><td class="r num">'+i.minutes+'분</td><td>'+esc(S.sectors.filter(s=>s.cargo.includes(i.cargo)).map(s=>s.name).join(', '))+'</td></tr>').join('')+'</tbody></table>';
 
 /* ---------- 탭 ---------- */
-document.querySelectorAll('.tabs button[data-tab]').forEach(b=>b.addEventListener('click',()=>{
-  document.querySelectorAll('.tabs button[data-tab]').forEach(x=>x.setAttribute('aria-selected',x===b?'true':'false'));
-  ['sectors','queue','assume'].forEach(k=>$('#tab-'+k).hidden=(k!==b.dataset.tab));
+const SUB={hoppers:'호퍼별 혼잡도·하차 진척도',queue:'투입 기한이 급한 차량부터, 가장 빨리 비는 호퍼로',assume:'계산에 쓰는 가정값'};
+document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b?'true':'false'));
+  ['hoppers','queue','assume'].forEach(k=>$('#tab-'+k).hidden=(k!==b.dataset.tab));
+  $('#tabSub').textContent=SUB[b.dataset.tab];
 }));
 
 /* ---------- 상태 그리기 ---------- */
@@ -261,60 +451,63 @@ function render(s){
   $('#clock').textContent=hhmm(s.clock);
   $('#runBtn').textContent=s.running?'일시정지':'시작';
   $('#speedSel').value=String(s.speed);
-  const c=s.counts;
-  $('#counts').textContent='도착 '+c.arrived+' · 대기장 '+c.yard+' · 출차 '+c.exited+'/'+c.total;
   const sel=s.sectors.find(x=>x.id===$('#downSel').value);
-  $('#downBtn').textContent=sel&&sel.status==='down'?'섹터 복구':'섹터 정지';
+  $('#downBtn').textContent=sel&&sel.status==='down'?'호퍼 복구':'호퍼 정지';
+
+  const c=s.counts, k=s.kpi;
+  $('#kWait').innerHTML=c.yard+'<small>대</small>'; $('#kWaitS').textContent='호출 이동 '+c.moving+'대 · 구내 '+c.on_site+'대 / 운행 '+c.fleet+'대';
+  $('#kAvg').innerHTML=k.done_avg_wait+'<small>분</small>'; $('#kAvgS').textContent='지금 대기장 평균 '+k.yard_avg_wait+'분 · 목표 '+cfg.settings.wait.target_min+'분';
+  $('#kUtil').innerHTML=k.util_pct+'<small>%</small>'; $('#kUtilS').textContent='혼잡 '+k.levels.crit+' · 주의 '+k.levels.warn+' · 가동 호퍼 '+k.up+'/'+s.sectors.length;
+  $('#kTrips').innerHTML=c.trips_done+'<small>회</small>'; $('#kTripsS').textContent=c.tons_done.toLocaleString()+'t 하차 · 투입 기한 초과 '+k.late+'건';
 
   s.sectors.forEach(x=>{
     const sh=secShape[x.id];
     sh.poly.setAttribute('fill',x.status==='down'?'url(#hatch)':LV_FILL[x.level]);
-    sh.poly.setAttribute('stroke',x.status==='down'?'#ef5350':'#4a5d70');
     sh.pct.textContent=x.status==='down'?'정지':x.congestion_pct+'%';
   });
   drawVehicles(s.vehicles);
+  drawCams(s);
 
-  $('#sectorCards').innerHTML=s.sectors.map(x=>{
+  $('#hoppers').innerHTML=s.sectors.map(x=>{
     const lv=x.status==='down'?'down':x.level;
     const work=x.working.length?x.working.map(w=>{
       const late=w.elapsed_min>w.std;
-      return '<span class="num">'+esc(w.vehicle_id)+'</span><div class="pbar'+(w.delayed?' late':'')+'" title="진척도 '+w.progress_pct+'%"><i style="width:'+w.progress_pct+'%"></i></div>'+
-        '<span class="num'+(late?' late-t':'')+'">'+(late?'표준 +'+Math.round(w.elapsed_min-w.std)+'분':w.progress_pct+'% · 남은 '+Math.ceil(w.remain_min)+'분')+'</span>';
-    }).join(''):'<span class="empty" style="grid-column:1/-1">작업 중인 차량 없음</span>';
-    return '<div class="sc'+(x.status==='down'?' down':'')+'"><div class="top"><b>'+esc(x.name)+'</b><span class="lv '+lv+'">'+LV_TEXT[lv]+'</span><span class="pct num">'+x.congestion_pct+'%</span></div>'+
-      '<div class="cbar" title="혼잡도"><i style="width:'+Math.min(x.congestion_pct,100)+'%;background:var(--'+(lv==='down'?'crit':lv)+')"></i></div>'+
+      return '<span class="plate num">'+esc(w.vehicle_id)+'</span><div class="pbar'+(w.delayed?' late':'')+'" title="하차 진척도 '+w.progress_pct+'%"><i style="width:'+w.progress_pct+'%"></i></div>'+
+        '<span class="num'+(late?' late-t':'')+'">'+(late?'표준 +'+Math.round(w.elapsed_min-w.std)+'분':w.progress_pct+'% · 남은 '+Math.ceil(w.remain_min)+'분')+'</span>'+
+        '<span></span><span style="grid-column:2/-1;color:var(--muted)">'+esc(w.cargo)+' '+w.load_t+'t · 적재함 '+w.dump_deg+'° · '+esc(w.judge)+'</span>';
+    }).join(''):'<span class="empty" style="grid-column:1/-1">하차구 비어 있음</span>';
+    const lvColor={ok:'var(--green)',warn:'var(--orange)',crit:'var(--red)',down:'var(--red)'}[lv];
+    return '<div class="hp'+(x.status==='down'?' down':'')+'" data-cam="'+x.cam_id+'" tabindex="0" role="button" aria-label="'+esc(x.name)+' CAM 크게 보기"><div class="top"><div><b>'+esc(x.name)+'</b><div class="role">'+esc(x.role)+' · '+esc(x.cargo.join('·'))+'</div></div><span class="chip '+lv+'">'+LV_TEXT[lv]+'</span><span class="pct num">'+x.congestion_pct+'%</span></div>'+
+      '<div class="bar" title="혼잡도"><i style="width:'+Math.min(x.congestion_pct,100)+'%;background:'+lvColor+'"></i></div>'+
       '<div class="work">'+work+'</div>'+
-      '<div class="meta"><span>섹터 대기 <b class="num">'+x.queue.length+'</b></span><span>이동 중 <b class="num">'+x.moving.length+'</b></span><span>베이 <b class="num">'+x.working.length+'/'+x.bays+'</b></span><span>다음 호출 <b class="num">'+(x.next_call_at||'—')+'</b></span></div></div>';
+      '<div class="meta"><span>호퍼 대기 <b class="num">'+x.queue.length+'</b></span><span>호출 이동 <b class="num">'+x.moving.length+'</b></span><span>하차구 <b class="num">'+x.working.length+'/'+x.bays+'</b></span><span>다음 호출 <b class="num">'+(x.next_call_at||'—')+'</b></span><span>유휴 누적 <b class="num">'+Math.round(x.idle_min)+'분</b></span></div></div>';
   }).join('');
 
   $('#qCount').textContent=s.queue.length?'('+s.queue.length+')':'';
-  $('#tab-queue').innerHTML=s.queue.length?'<table><thead><tr><th class="r">순번</th><th>차량</th><th>화물</th><th>섹터</th><th class="r">호출 예정</th><th class="r">대기</th><th>추천 이유</th></tr></thead><tbody>'+
-    s.queue.map(q=>'<tr><td class="r num">'+q.rank+'</td><td class="num">'+esc(q.vehicle_id)+(q.urgent?'<span class="badge">긴급</span>':'')+'</td><td>'+esc(q.cargo)+'</td><td>'+esc(q.sector_id||'보류')+'</td>'+
-      '<td class="r num">'+esc(q.call_at||'—')+'</td><td class="r num">'+Math.floor(q.wait_min)+'분</td><td>'+esc(q.reason)+'</td></tr>').join('')+'</tbody></table>'
-    :'<div class="empty">대기장에 순번을 기다리는 차량이 없습니다. 시작을 누르면 차량이 도착합니다.</div>';
-
-  S.cams.forEach(cm=>{
-    const box=$('#cam-'+cm.id), cnt=box.querySelector('.c'), sid=camSector[cm.id];
-    if(sid){ const x=s.sectors.find(y=>y.id===sid); box.classList.toggle('down',x.status==='down'); box.querySelector('.rec').textContent=x.status==='down'?'● 섹터 정지':'● 영상 준비 중';
-      cnt.textContent='작업 '+x.working.length+' · 대기 '+x.queue.length; }
-    else cnt.textContent='대기장 '+s.counts.yard+'대';
-  });
+  const sname=Object.fromEntries(S.sectors.map(x=>[x.id,x.name]));
+  $('#tab-queue').innerHTML=s.queue.length?'<table><thead><tr><th>순번</th><th>차량</th><th>원료</th><th class="r">투입 기한</th><th class="r">대기</th><th>보낼 호퍼</th><th class="r">호출 예정</th><th>추천 이유</th></tr></thead><tbody>'+
+    s.queue.map(q=>'<tr><td><span class="rank">'+q.rank+'</span></td><td><span class="plate">'+esc(q.vehicle_id)+'</span>'+(q.urgent?'<span class="badge">긴급</span>':'')+'</td><td>'+esc(q.cargo)+' '+q.load_t+'t</td><td class="r num">'+esc(q.due)+'</td>'+
+      '<td class="r num">'+Math.floor(q.wait_min)+'분</td><td>'+esc(q.sector_id?sname[q.sector_id]:'보류')+'</td><td class="r num">'+esc(q.call_at||'—')+'</td><td>'+esc(q.reason)+'</td></tr>').join('')+'</tbody></table>'
+    :'<div class="empty">대기장에서 순번을 기다리는 덤프트럭이 없습니다.</div>';
   renderAlerts();
 }
 function renderAlerts(){
   if(!last) return;
   const show=$('#showCalls').checked;
   const list=last.alerts.filter(a=>show||a.kind!=='호출');
+  const pinned=list.filter(a=>a.level==='crit'&&!a.ack), rest=list.filter(a=>!(a.level==='crit'&&!a.ack));
   const open=last.alerts.filter(a=>!a.ack&&a.kind!=='호출').length;
   $('#alertCount').textContent=open?'확인 안 한 알림 '+open+'건':'';
-  $('#alerts').innerHTML=list.length?list.map(a=>'<div class="al '+a.level+(a.ack?' ack':'')+'"><span class="bar"></span><div class="h"><span class="num lbl">'+esc(a.ts)+'</span><b>'+esc(a.kind)+'</b><span>'+esc(a.text)+'</span></div>'+
-    '<span class="btn-slot">'+(a.ack?'<span class="lbl">확인함</span>':'<button data-ack="'+esc(a.id)+'">확인</button>')+'</span>'+'<div class="act">권장 조치: '+esc(a.action)+'</div></div>').join('')
-    :'<div class="empty">아직 알림이 없습니다.</div>';
+  const row=a=>'<div class="al '+a.level+(a.ack?' ack':'')+'"><div class="h"><span class="t num">'+esc(a.ts)+'</span><b>'+esc(a.kind)+'</b><span>'+esc(a.text)+'</span></div>'+
+    '<span class="bs">'+(a.ack?'<span class="t">확인함</span>':'<button data-ack="'+esc(a.id)+'">확인</button>')+'</span><div class="act">권장 조치 · '+esc(a.action)+'</div></div>';
+  $('#alerts').innerHTML=(pinned.concat(rest)).length?pinned.concat(rest).map(row).join(''):'<div class="empty">아직 알림이 없습니다. 시작을 누르면 덤프트럭이 들어옵니다.</div>';
 }
 $('#showCalls').addEventListener('change',renderAlerts);
+$('#hoppers').addEventListener('click',e=>{const h=e.target.closest('[data-cam]'); if(h) openCam(h.dataset.cam);});
+$('#hoppers').addEventListener('keydown',e=>{const h=e.target.closest('[data-cam]'); if(h&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openCam(h.dataset.cam);}});
 
 /* ---------- 조작 ---------- */
-const post=(u)=>fetch(u,{method:'POST'}).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); });
+const post=u=>fetch(u,{method:'POST'}).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); });
 const refresh=()=>fetch('/api/state').then(r=>r.json()).then(render).catch(()=>{});
 $('#runBtn').addEventListener('click',()=>post(last&&last.running?'/api/sim/pause':'/api/sim/start').then(refresh));
 $('#speedSel').addEventListener('change',e=>post('/api/sim/speed?value='+e.target.value).then(refresh));
@@ -325,13 +518,13 @@ $('#downBtn').addEventListener('click',()=>{ const id=$('#downSel').value, x=las
 $('#urgentBtn').addEventListener('click',()=>post('/api/events/urgent').then(refresh));
 $('#alerts').addEventListener('click',e=>{ const b=e.target.closest('[data-ack]'); if(b) post('/api/alerts/'+encodeURIComponent(b.dataset.ack)+'/ack').then(refresh); });
 
-/* ---------- 실시간 연결 (WebSocket, 끊기면 1초 폴링) ---------- */
+/* ---------- 실시간 연결 ---------- */
 let poll=null;
 function connect(){
   const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws');
-  ws.onopen=()=>{ $('#conn').textContent='실시간 연결됨'; if(poll){clearInterval(poll);poll=null;} };
+  ws.onopen=()=>{ $('#conn').classList.add('on'); $('#conn').title='실시간 연결됨'; if(poll){clearInterval(poll);poll=null;} };
   ws.onmessage=e=>render(JSON.parse(e.data));
-  ws.onclose=()=>{ $('#conn').textContent='재연결 중…'; if(!poll) poll=setInterval(refresh,1000); setTimeout(connect,2000); };
+  ws.onclose=()=>{ $('#conn').classList.remove('on'); $('#conn').title='재연결 중'; if(!poll) poll=setInterval(refresh,1000); setTimeout(connect,2000); };
 }
 refresh(); connect();
 })();
