@@ -1,5 +1,5 @@
 {
-  "_note": "임계값·단가·운행 조건은 모두 가정값. 화면 가정값 탭에 그대로 보인다. 원료 구성은 석회석 비중이 크고 연료(분코크스·무연탄) 덤프 반입은 적다고 가정 — 원료마다 고정 호퍼에 줄서는 기존 방식(FIFO)에서는 호퍼 A에 몰리고 공용 호퍼 C가 논다. call.switch_gain_min: 다른 호퍼가 이만큼 이상 빨리 빌 때만 원래 호퍼 대신 보낸다.",
+  "_note": "임계값·단가·운행 조건은 모두 가정값. 화면 가정값 탭에 그대로 보인다. 원료 구성은 석회석 비중이 크고 연료(분코크스·무연탄) 덤프 반입은 적다고 가정 — 원료마다 고정 호퍼에 줄서는 기존 방식(FIFO)에서는 호퍼 A에 몰리고 공용 호퍼 C가 논다. call.switch_gain_min: 다른 호퍼가 이만큼 이상 빨리 빌 때만 원래 호퍼 대신 보낸다. road: 제철소 안 제한속도 30km/h(현장 규정). 감속 계수는 교차로·회전·진입로 서행을 뭉뚱그린 가정값(1.15 = 평균 26km/h). 경로 거리는 data/sectors.json roads[].length_m(OSM 도로를 따라 잰 값). fleet.load_min: 원료야드에서 상차 대기·상차에 걸리는 시간(가정).",
   "congestion": {
     "warn_pct": 60,
     "crit_pct": 85,
@@ -14,6 +14,10 @@
   "call": {
     "margin_min": 2,
     "switch_gain_min": 4
+  },
+  "road": {
+    "speed_limit_kmh": 30,
+    "slow_factor": 1.15
   },
   "alert": {
     "cooldown_min": 5
@@ -31,9 +35,9 @@
     "trucks": 20,
     "shift_min": 240,
     "first_wave_min": 25,
-    "cycle_min": [
-      22,
-      38
+    "load_min": [
+      14,
+      30
     ],
     "due_min": [
       25,

@@ -246,15 +246,15 @@ dialog::backdrop{background:rgba(20,20,20,.55)}
 
 <main>
   <section class="card" aria-label="시나리오 좌표 맵">
-    <div class="hd"><h2>① 시나리오 좌표 맵</h2><span class="sub">포항제철소 원료·소결 지구 개념도 · 호퍼를 누르면 CAM 크게 보기</span><span class="sp"></span>
-      <span class="chip" title="실제 도면·위성사진이 아닌 가상 배치">개념도 · 실제 도면 아님</span></div>
+    <div class="hd"><h2>① 시나리오 좌표 맵</h2><span class="sub">포항제철소 원료·소결 지구 · 호퍼를 누르면 CAM, 경로를 누르면 거리·시간</span><span class="sp"></span>
+      <span class="chip" title="배경 지도와 경로 거리는 OpenStreetMap 실제 데이터, 원료야드·계근대·대기장·호퍼 위치는 가정">OSM 실제 지도 · 시설 위치 가정</span></div>
     <div class="bd" id="mapBd">
       <svg id="mapSvg" role="img" aria-label="소결공장 원료 반입 배치도와 덤프트럭 위치" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="legend">
         <span class="chip ok">원활 &lt;60%</span><span class="chip warn">주의 60~85%</span><span class="chip crit">혼잡 85%+</span>
         <span class="chip"><i style="background:var(--s-yard)"></i>대기장 대기</span><span class="chip"><i style="background:var(--s-moving)"></i>호출 이동</span>
         <span class="chip"><i style="background:var(--s-queue)"></i>호퍼 대기</span><span class="chip"><i style="background:var(--s-working)"></i>하차 중</span>
-        <span class="chip"><i style="background:var(--s-done)"></i>공차 출차</span><span class="chip"><i style="background:#fff;border:2px solid var(--red)"></i>긴급</span>
+        <span class="chip"><i style="background:var(--s-done)"></i>공차 출차</span><span class="chip"><i style="background:#BDC1C6"></i>공차 복귀</span><span class="chip"><i style="background:#B08A7A"></i>상차</span><span class="chip"><i style="background:#8C6D4F"></i>적재 반입</span><span class="chip"><i style="background:#fff;border:2px solid var(--red)"></i>긴급</span>
       </div>
     </div>
   </section>
@@ -391,41 +391,119 @@ svg.setAttribute('viewBox','0 0 '+S.map.width+' '+S.map.height);
 const defs=el('defs',{});
 const pat=el('pattern',{id:'hatch',width:18,height:18,patternUnits:'userSpaceOnUse',patternTransform:'rotate(45)'});
 pat.appendChild(el('rect',{width:18,height:18,fill:'#FBD5DA'}));pat.appendChild(el('rect',{width:6,height:18,fill:'#D7263D'}));
-defs.appendChild(pat);svg.appendChild(defs);
-svg.appendChild(el('rect',{x:0,y:0,width:S.map.width,height:S.map.height,fill:'#F6F6F4',rx:18}));
-const T=(x,y,s,attrs)=>svg.appendChild(el('text',Object.assign({x,y,'font-size':22,fill:'#3C4043','text-anchor':'middle','font-family':'Inter,Noto Sans KR,sans-serif'},attrs||{}),s));
-(S.context||[]).forEach(c=>{
-  if(c.kind==='sea'){svg.appendChild(el('polygon',{points:pts(c.poly),fill:'#DCE7F3'}));const m=center(c.poly);T(m[0]+40,m[1]-10,c.name,{fill:'#5B7DA8','font-size':26,'font-weight':600});}
-  else if(c.kind==='pier'){svg.appendChild(el('polygon',{points:pts(c.poly),fill:'#C5CDD6'}));const m=center(c.poly);T(m[0],m[1],c.name,{'font-size':16,fill:'#5F6368',transform:'rotate(70 '+m[0]+' '+m[1]+')'});}
-  else if(c.kind==='yard'){svg.appendChild(el('polygon',{points:pts(c.poly),fill:'#EFEBE3',stroke:'#DAD4C6','stroke-width':2}));const b=bbox(c.poly);T(b[0]+18,b[1]+34,c.name,{'text-anchor':'start','font-size':24,'font-weight':700,fill:'#5F6368'});}
-  else if(c.kind==='pile'){svg.appendChild(el('ellipse',{cx:c.c[0],cy:c.c[1],rx:c.r[0],ry:c.r[1],fill:PILE_COLOR[c.name]||'#888',opacity:.85}));T(c.c[0],c.c[1]+c.r[1]+22,c.name,{'font-size':17,fill:'#5F6368'});}
-  else if(c.kind==='building'){svg.appendChild(el('polygon',{points:pts(c.poly),fill:'#E4E4E1',stroke:'#C9C9C4','stroke-width':2}));const b=bbox(c.poly);T(b[0]+18,b[1]+34,c.name,{'text-anchor':'start','font-size':24,'font-weight':700,fill:'#141414'});}
-  else if(c.kind==='strand'){svg.appendChild(el('polygon',{points:pts(c.poly),fill:'#C2C2BC'}));const b=bbox(c.poly);T(b[2]-10,b[1]+22,c.name,{'text-anchor':'end','font-size':15,fill:'#3C4043'});}
-  else if(c.kind==='furnace'){svg.appendChild(el('circle',{cx:c.c[0],cy:c.c[1],r:c.r[0],fill:'#3C4043'}));T(c.c[0],c.c[1]+7,c.name,{fill:'#fff','font-size':20,'font-weight':700});}
-  else if(c.kind==='conveyor'){svg.appendChild(el('polyline',{points:pts(c.points),fill:'none',stroke:'#9AA0A6','stroke-width':5,'stroke-dasharray':'2 7','stroke-linecap':'round'}));if(c.name){const p=c.points[Math.floor(c.points.length/2)];T(p[0]+8,p[1]-10,c.name,{'font-size':15,fill:'#5F6368','text-anchor':'start'});}}
-  else if(c.kind==='return'){svg.appendChild(el('polyline',{points:pts(c.points),fill:'none',stroke:'#D2D2CD','stroke-width':16,'stroke-linejoin':'round'}));const p=c.points[2];T((p[0]+c.points[3][0])/2,p[1]-14,c.name,{'font-size':17,fill:'#5F6368'});}
+defs.appendChild(pat);
+const clip=el('clipPath',{id:'mapClip'});clip.appendChild(el('rect',{x:0,y:0,width:S.map.width,height:S.map.height,rx:18}));defs.appendChild(clip);
+svg.appendChild(defs);
+const T=(x,y,s,attrs,parent)=>(parent||svg).appendChild(el('text',Object.assign({x,y,'font-size':22,fill:'#3C4043','text-anchor':'middle','font-family':'Inter,Noto Sans KR,sans-serif'},attrs||{}),s));
+const HALO={stroke:'#F3F2EE','stroke-width':4,'paint-order':'stroke'};
+/* 배경: OpenStreetMap 실제 지도 (흐리게 — 혼잡도 색이 묻히지 않게) */
+const M=cfg.site_map, L=M.layers, base=el('g',{'clip-path':'url(#mapClip)'}); svg.appendChild(base);
+base.appendChild(el('rect',{x:0,y:0,width:S.map.width,height:S.map.height,fill:'#F3F2EE'}));
+const line=(p,attrs)=>base.appendChild(el('polyline',Object.assign({points:pts(p),fill:'none','stroke-linejoin':'round','stroke-linecap':'round'},attrs)));
+L.industrial.forEach(r=>base.appendChild(el('polygon',{points:pts(r.p),fill:'#EAE8E2',stroke:'#DDDAD2','stroke-width':1.5})));
+L.water.forEach(r=>base.appendChild(el('polygon',{points:pts(r.p),fill:'#DCE7F3'})));
+L.coast.forEach(r=>line(r.p,{stroke:'#A9C1DD','stroke-width':5}));
+L.pier.forEach(r=>line(r.p,{stroke:'#BFC7CF','stroke-width':6}));
+L.rail.forEach(r=>line(r.p,{stroke:'#CFCBC2','stroke-width':2,'stroke-dasharray':'6 5'}));
+const RW={main:[11,7.5],mid:[8,5.5],minor:[5.5,3.5]};
+['minor','mid','main'].forEach(c=>L.roads.filter(r=>r.c===c).forEach(r=>line(r.p,{stroke:'#DAD7CF','stroke-width':RW[c][0]})));
+['minor','mid','main'].forEach(c=>L.roads.filter(r=>r.c===c).forEach(r=>line(r.p,{stroke:c==='main'?'#FFFFFF':'#FBFAF7','stroke-width':RW[c][1]})));
+(S.labels||[]).forEach(l=>T(l.xy[0],l.xy[1],l.t,l.kind==='water'?{fill:'#7D99BC','font-size':26,'font-weight':600,'font-style':'italic',transform:l.rot?'rotate('+l.rot+' '+l.xy[0]+' '+l.xy[1]+')':''}:l.kind==='plant'?{fill:'#8A8F94','font-size':17,'font-weight':600}:{fill:'#9AA0A6','font-size':18},base));
+/* 시나리오 경로 (OSM 도로를 따라 잰 실제 거리) — 누르면 거리·이동시간 */
+const LEG_NAME={ORE:'원료야드',GATE:'계근대(입)',YARD:'대기장',EXIT:'계근대(출)',A:'호퍼 A',B:'호퍼 B',C:'호퍼 C'};
+const legKey=r=>r.from+'-'+r.to, routeG=el('g',{}), pillG=el('g',{}); svg.appendChild(routeG);
+const legEls={}, pillPos=[];
+const legStyle=(r,on)=>{const ret=r.to==='ORE';return {stroke:on?'#1D47B8':(ret?'#9AA0A6':'#5F6368'),'stroke-opacity':on?.95:(ret?.75:.55),'stroke-width':on?8:(ret?4:5)};};
+S.roads.forEach(r=>{
+  const ret=r.to==='ORE', g=el('g',{class:'leg',tabindex:0,role:'button','aria-label':LEG_NAME[r.from]+'에서 '+LEG_NAME[r.to]+' 경로 거리와 이동시간'});
+  g.appendChild(el('polyline',Object.assign({points:pts(r.points),fill:'none','stroke-dasharray':ret?'10 8':'','stroke-linejoin':'round','stroke-linecap':'round',class:'leg-line'},legStyle(r,false))));
+  g.appendChild(el('polyline',{points:pts(r.points),fill:'none',stroke:'transparent','stroke-width':22,'stroke-linejoin':'round'}));
+  g.appendChild(el('title',{},LEG_NAME[r.from]+' → '+LEG_NAME[r.to]+' · '+r.length_m.toLocaleString()+' m'));
+  const open=()=>showLeg(r); g.addEventListener('click',open); g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});
+  routeG.appendChild(g);
+  // 소요시간 알약 (경로 가운데쯤)
+  // 상자·다른 알약과 겹치지 않는 자리를 고른다
+  const segs=r.points.slice(1).map((p,i)=>Math.hypot(p[0]-r.points[i][0],p[1]-r.points[i][1])), tot=segs.reduce((a,b)=>a+b,0);
+  const at=f=>{let d=tot*f;for(let i=0;i<segs.length;i++){ if(d<=segs[i]){const a=r.points[i],b=r.points[i+1],k=d/segs[i];return [a[0]+(b[0]-a[0])*k,a[1]+(b[1]-a[1])*k];} d-=segs[i]; } return r.points[r.points.length-1];};
+  const boxes=S.sectors.concat(S.zones,[S.ore]).map(z=>bbox(z.poly));
+  const free=q=>!boxes.some(b=>q[0]>b[0]-40&&q[0]<b[2]+40&&q[1]>b[1]-20&&q[1]<b[3]+20)&&!pillPos.some(o=>Math.abs(o[0]-q[0])<70&&Math.abs(o[1]-q[1])<30);
+  const cands=(ret?[0.8,0.7,0.9,0.6]:[0.5,0.4,0.6,0.3,0.7,0.25,0.75]).map(at);
+  const mid=cands.find(free)||cands[0]; pillPos.push(mid);
+  const pg=el('g',{class:'leg-pill',transform:'translate('+mid[0].toFixed(1)+','+mid[1].toFixed(1)+')'});
+  pg.appendChild(el('rect',{x:-30,y:-12,width:60,height:24,rx:12,fill:'#fff',stroke:ret?'#BDC1C6':'#5F6368','stroke-width':1.5}));
+  pg.appendChild(el('text',{y:5,'font-size':14,'font-weight':700,'text-anchor':'middle',fill:'#141414','font-family':'Inter,Noto Sans KR,sans-serif'},'—'));
+  pg.addEventListener('click',open); pg.style.cursor='pointer';
+  pillG.appendChild(pg); legEls[legKey(r)]={g,pill:pg,r};
 });
-S.roads.forEach(r=>svg.appendChild(el('polyline',{points:pts(r.points),fill:'none',stroke:'#CFCFCA','stroke-width':22,'stroke-linejoin':'round','stroke-linecap':'round'})));
-S.zones.forEach(z=>{const b=bbox(z.poly);svg.appendChild(el('polygon',{points:pts(z.poly),fill:'#FFFFFF',stroke:'#B9BDC2','stroke-width':2.5}));T((b[0]+b[2])/2,b[1]-10,z.name,{'font-size':19,'font-weight':600});});
+/* 계근대·대기장·원료야드 (위치·크기는 가정, 상자는 기호) */
+const zoneBox=(z,fill,stroke)=>{const b=bbox(z.poly);svg.appendChild(el('polygon',{points:pts(z.poly),fill,stroke,'stroke-width':2.5}));T((b[0]+b[2])/2,b[1]-9,z.name,Object.assign({'font-size':17,'font-weight':700,fill:'#141414'},HALO));};
+if(S.ore) zoneBox(S.ore,'rgba(156,91,71,.13)','#B08A7A');
+S.zones.forEach(z=>zoneBox(z,'rgba(255,255,255,.92)','#9AA0A6'));
 const secShape={};
 S.sectors.forEach(s=>{
   const g=el('g',{class:'hop',tabindex:0,role:'button','aria-label':s.name+' CAM 크게 보기'});
   const b=bbox(s.poly);
   const poly=el('polygon',{points:pts(s.poly),fill:LV_FILL.ok,stroke:'#141414','stroke-width':2});
   g.appendChild(poly);
-  for(let i=0;i<s.bays;i++){const x=b[0]+(b[2]-b[0])*(0.5+0.45*(i+0.5)/s.bays);g.appendChild(el('rect',{x:x-26,y:b[1]+18,width:52,height:34,fill:'#141414',opacity:.18,rx:4}));}
-  g.appendChild(el('text',{x:b[0]+10,y:b[1]+26,'font-size':20,'font-weight':700,fill:'#141414'},s.name));
-  g.appendChild(el('text',{x:b[0]+10,y:b[1]+48,'font-size':14,fill:'#3C4043'},s.cargo.join('·')));
-  const pct=el('text',{x:b[2]-10,y:b[3]-12,'font-size':24,'font-weight':700,'text-anchor':'end',fill:'#141414'},'0%');
+  for(let i=0;i<s.bays;i++){const x=b[0]+(b[2]-b[0])*(0.5+0.45*(i+0.5)/s.bays);g.appendChild(el('rect',{x:x-20,y:b[1]+46,width:40,height:26,fill:'#141414',opacity:.16,rx:4}));}
+  g.appendChild(el('text',{x:b[0]+8,y:b[1]+21,'font-size':18,'font-weight':700,fill:'#141414'},s.name));
+  g.appendChild(el('text',{x:b[0]+8,y:b[1]+38,'font-size':12,fill:'#3C4043'},s.cargo.join('·')));
+  const pct=el('text',{x:b[2]-8,y:b[1]+21,'font-size':19,'font-weight':700,'text-anchor':'end',fill:'#141414'},'0%');
   g.appendChild(pct);
   g.addEventListener('click',()=>openCam(s.cam_id));
   g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openCam(s.cam_id);}});
   svg.appendChild(g); secShape[s.id]={poly,pct};
 });
-const vehLayer=el('g',{}); svg.appendChild(vehLayer);
+svg.appendChild(pillG);
+/* 구내 제한속도 표지 + 축척 + 출처 */
+const sign=el('g',{transform:'translate(46,48)'});
+sign.appendChild(el('circle',{r:30,fill:'#fff',stroke:'#D7263D','stroke-width':7}));
+const signNum=el('text',{y:9,'font-size':25,'font-weight':800,'text-anchor':'middle',fill:'#141414','font-family':'Inter,sans-serif'},String(cfg.settings.road.speed_limit_kmh));
+sign.appendChild(signNum); svg.appendChild(sign);
+const signTxt=T(86,42,'구내 제한속도 '+cfg.settings.road.speed_limit_kmh+'km/h',Object.assign({'text-anchor':'start','font-size':17,'font-weight':700,fill:'#141414'},HALO));
+const signSub=T(86,64,'',Object.assign({'text-anchor':'start','font-size':14,fill:'#3C4043'},HALO));
+const sb=500/S.map.mpp, sx=S.map.width-30-sb, sy=S.map.height-44;
+svg.appendChild(el('rect',{x:sx-14,y:sy-26,width:sb+28,height:52,rx:8,fill:'rgba(255,255,255,.88)'}));
+svg.appendChild(el('line',{x1:sx,y1:sy,x2:sx+sb,y2:sy,stroke:'#141414','stroke-width':3}));
+[sx,sx+sb].forEach(x=>svg.appendChild(el('line',{x1:x,y1:sy-6,x2:x,y2:sy+6,stroke:'#141414','stroke-width':3})));
+T(sx+sb/2,sy-9,'500 m',{'font-size':14,'font-weight':600,fill:'#141414'});
+T(sx+sb/2,sy+19,M.attribution,{'font-size':11.5,fill:'#5F6368'});
+/* 경로 정보 상자 */
+const legInfo=el('g',{visibility:'hidden'});
+let legSel=null,lastRoutes=null,lastRoad=null;
+function showLeg(r){
+  legSel=(legSel&&legKey(legSel)===legKey(r))?null:r;
+  Object.values(legEls).forEach(o=>{const ln=o.g.querySelector('.leg-line'),st=legStyle(o.r,legSel&&legKey(o.r)===legKey(legSel));for(const k in st) ln.setAttribute(k,st[k]);});
+  renderLegInfo();
+}
+function renderLegInfo(){
+  legInfo.innerHTML='';
+  if(!legSel){legInfo.setAttribute('visibility','hidden');return;}
+  const rv=(lastRoutes||[]).find(x=>x.from===legSel.from&&x.to===legSel.to)||{base_min:'—',travel_min:'—'};
+  const sp=lastRoad||cfg.settings.road;
+  const rows=[[LEG_NAME[legSel.from]+' → '+LEG_NAME[legSel.to],17,700,'#141414'],
+    ['거리 '+legSel.length_m.toLocaleString()+' m (OSM 도로를 따라 잰 값)',14,500,'#141414'],
+    ['제한속도 '+sp.speed_limit_kmh+'km/h로만 달리면 '+rv.base_min+'분',14,500,'#141414'],
+    ['감속 계수 ×'+sp.slow_factor+' 반영 → '+rv.travel_min+'분',14,700,'#1D47B8'],
+    ['감속 계수 = 교차로·진입로 서행 (가정값)',12.5,500,'#5F6368']];
+  const W=340,H=20+rows.length*23, x=20, y=96;
+  legInfo.appendChild(el('rect',{x,y,width:W,height:H,rx:12,fill:'#fff',stroke:'#1D47B8','stroke-width':2}));
+  rows.forEach((l,i)=>legInfo.appendChild(el('text',{x:x+16,y:y+28+i*23,'font-size':l[1],'font-weight':l[2],fill:l[3],'font-family':'Inter,Noto Sans KR,sans-serif'},l[0])));
+  legInfo.setAttribute('visibility','visible');
+}
+function drawRoutes(st){
+  lastRoutes=st.routes; lastRoad=st.road_cfg||null;
+  (st.routes||[]).forEach(rv=>{const o=legEls[rv.from+'-'+rv.to]; if(o) o.pill.lastChild.textContent=rv.travel_min+'분';});
+  if(st.road_cfg){ signNum.textContent=st.road_cfg.speed_limit_kmh; signTxt.textContent='구내 제한속도 '+st.road_cfg.speed_limit_kmh+'km/h';
+    signSub.textContent='이동시간 = 거리 ÷ '+st.road_cfg.speed_limit_kmh+'km/h × 감속 '+st.road_cfg.slow_factor+' · 알약 = 구간 분'; }
+  if(legSel) renderLegInfo();
+}
+const vehLayer=el('g',{}); svg.appendChild(vehLayer); svg.appendChild(legInfo);
 const vehNodes={};
-function drawVehicles(vs){
+const ROAD_PHASE={return:['공차 복귀','#BDC1C6'],loading:['원료야드 상차','#B08A7A'],inbound:['적재 반입','#8C6D4F']};
+function drawVehicles(vs,road){
   const seen=new Set();
+  vs=vs.concat((road||[]).map(r=>({id:r.id,xy:r.xy,state:'road_'+r.phase,urgent:false,cargo:r.cargo,load_t:r.load_t,judge:ROAD_PHASE[r.phase][0]+' · '+r.trip+'회차'})));
   vs.forEach(v=>{
     if(!v.xy) return;
     seen.add(v.id);
@@ -439,9 +517,9 @@ function drawVehicles(vs){
     }
     n.style.transform='translate('+v.xy[0]+'px,'+v.xy[1]+'px)';
     const r=n.firstChild;
-    r.setAttribute('fill',STATE_COLOR[v.state]||'#999');
+    r.setAttribute('fill',STATE_COLOR[v.state]||(v.state.startsWith('road_')?ROAD_PHASE[v.state.slice(5)][1]:'#999'));
     r.setAttribute('stroke',v.urgent?'#D7263D':'#FFFFFF');
-    n.childNodes[1].textContent=v.id.slice(-4);
+    n.childNodes[1].textContent=(v.urgent||v.state==='moving'||v.state==='done'||v.state==='road_inbound'||v.state==='road_return')?v.id.slice(-4):'';
     n.childNodes[2].textContent=v.id+' · '+v.cargo+' '+v.load_t+'t · '+v.judge;
   });
   Object.keys(vehNodes).forEach(id=>{ if(!seen.has(id)){ vehNodes[id].remove(); delete vehNodes[id]; } });
@@ -563,7 +641,7 @@ $('#dlgClose').addEventListener('click',()=>$('#camDlg').close());
 const st0=cfg.settings, fl=st0.fleet;
 $('#tab-assume').innerHTML='<p class="cap" style="margin:0 0 8px">모든 수치는 <span class="assumed">가정값</span>입니다. 현장 값이 생기면 data/*.json만 바꾸면 됩니다.</p>'+
  '<table><thead><tr><th>항목</th><th class="r">값</th></tr></thead><tbody>'+
- [['덤프트럭',fl.trucks+'대 · 25.5t급 · 적재 '+fl.load_t[0]+'~'+fl.load_t[1]+'t'],['원료야드 왕복·재상차',fl.cycle_min[0]+'~'+fl.cycle_min[1]+'분'],['투입 기한(도착 후)',fl.due_min[0]+'~'+fl.due_min[1]+'분'],
+ [['덤프트럭',fl.trucks+'대 · 25.5t급 · 적재 '+fl.load_t[0]+'~'+fl.load_t[1]+'t'],['구내 제한속도 · 감속 계수',st0.road.speed_limit_kmh+'km/h · ×'+st0.road.slow_factor],['원료야드 상차 대기·상차',fl.load_min[0]+'~'+fl.load_min[1]+'분'],['투입 기한(도착 후)',fl.due_min[0]+'~'+fl.due_min[1]+'분'],
   ['혼잡도 주의 / 혼잡',st0.congestion.warn_pct+'% / '+st0.congestion.crit_pct+'%'],['목표 대기시간',st0.wait.target_min+'분'],['하차 지연 기준','표준 × '+st0.delay.factor],['호출 여유시간',st0.call.margin_min+'분'],
   ['적재함 상승 판정','박스 세로/가로 ≥ '+st0.vision.dump_raised_ratio],['대기 단가','₩'+st0.cost.wait_won_per_hour.toLocaleString()+'/시간']]
   .map(r=>'<tr><td>'+esc(r[0])+'</td><td class="r num">'+esc(r[1])+'</td></tr>').join('')+'</tbody></table>'+
@@ -603,7 +681,7 @@ function render(s){
   $('#navAlert').hidden=!openN; $('#navAlert').textContent=openN;
   if(view==='dock') renderOrders(s);
   if(view!=='monitor'){ renderAlerts(); return; }
-  drawVehicles(s.vehicles);
+  drawVehicles(s.vehicles,s.road); drawRoutes(s);
   drawCams(s);
 
   $('#hoppers').innerHTML=s.sectors.map(x=>{
@@ -618,7 +696,7 @@ function render(s){
     return '<div class="hp'+(x.status==='down'?' down':'')+'" data-cam="'+x.cam_id+'" tabindex="0" role="button" aria-label="'+esc(x.name)+' CAM 크게 보기"><div class="top"><div><b>'+esc(x.name)+'</b><div class="role">'+esc(x.role)+' · '+esc(x.cargo.join('·'))+'</div></div><span class="chip '+lv+'">'+LV_TEXT[lv]+'</span><span class="pct num">'+x.congestion_pct+'%</span></div>'+
       '<div class="bar" title="혼잡도"><i style="width:'+Math.min(x.congestion_pct,100)+'%;background:'+lvColor+'"></i></div>'+
       '<div class="work">'+work+'</div>'+
-      '<div class="meta"><span>호퍼 대기 <b class="num">'+x.queue.length+'</b></span><span>호출 이동 <b class="num">'+x.moving.length+'</b></span><span>하차구 <b class="num">'+x.working.length+'/'+x.bays+'</b></span><span>다음 호출 <b class="num">'+(x.next_call_at||'—')+'</b></span><span>유휴 누적 <b class="num">'+Math.round(x.idle_min)+'분</b></span></div></div>';
+      '<div class="meta"><span>호퍼 대기 <b class="num">'+x.queue.length+'</b></span><span>호출 이동 <b class="num">'+x.moving.length+'</b></span><span>하차구 <b class="num">'+x.working.length+'/'+x.bays+'</b></span><span>다음 호출 <b class="num">'+(x.next_call_at||'—')+'</b></span><span>대기장에서 <b class="num">'+(x.route_m||0).toLocaleString()+'m · '+x.travel_min+'분</b></span><span>유휴 누적 <b class="num">'+Math.round(x.idle_min)+'분</b></span></div></div>';
   }).join('');
 
   $('#qCount').textContent=s.queue.length?'('+s.queue.length+')':'';
@@ -701,7 +779,7 @@ function hopperCard(x){
   return '<div class="hp'+(x.status==='down'?' down':'')+'"><div class="top"><div><b>'+esc(x.name)+'</b><div class="role">'+esc(x.role)+' · '+esc(x.cargo.join('·'))+'</div></div><span class="chip '+lv+'">'+LV_TEXT[lv]+'</span><span class="pct num">'+x.congestion_pct+'%</span></div>'+
     '<div class="ruler" title="혼잡도 '+x.congestion_pct+'%"><i style="width:'+pos(x.congestion_pct)+'%;background:'+lvColor+'"></i><b style="left:'+pos(x.warn_pct)+'%"></b><b style="left:'+pos(x.crit_pct)+'%"></b></div>'+
     '<div class="ruler-l"><span>0</span><span>주의 '+x.warn_pct+' · 혼잡 '+x.crit_pct+'</span><span>120%</span></div>'+
-    '<div class="meta"><span>배정 대기 <b class="num">'+x.assigned+'대</b></span><span>오늘 처리 <b class="num">'+x.done+'대</b></span><span>평균 하차 <b class="num">'+(x.done?x.avg_unload+'분':'—')+'</b></span><span>하차구 <b class="num">'+x.working.length+'/'+x.bays+'</b></span></div>'+
+    '<div class="meta"><span>배정 대기 <b class="num">'+x.assigned+'대</b></span><span>오늘 처리 <b class="num">'+x.done+'대</b></span><span>평균 하차 <b class="num">'+(x.done?x.avg_unload+'분':'—')+'</b></span><span>하차구 <b class="num">'+x.working.length+'/'+x.bays+'</b></span><span>대기장→ <b class="num">'+(x.route_m||0).toLocaleString()+'m · '+x.travel_min+'분</b></span></div>'+
     (delayed.length?'<div class="hold">하차 지연 (표준 ×'+cfg.settings.delay.factor+' 초과) · 다음 호출 보류 · '+esc(delayed.map(w=>w.vehicle_id).join(', '))+'</div>':'')+
     (x.status==='down'?'<div class="hold">호퍼 정지 · 배정 차량은 다른 호퍼로</div>':'')+
     '<div class="work">'+work+'</div></div>';
@@ -764,7 +842,7 @@ $('#orderTable').addEventListener('click',async e=>{
 });
 $('#approveAll').addEventListener('click',async()=>{ try{ const r=await postJ('/api/order/approve_all'); dockMsg=r.approved+'대 승인했습니다.'; await refresh(); pollView(true);}catch(e){} });
 const AFIELDS=[['sec','혼잡·대기'],['warn_pct','혼잡 주의 기준 (%)'],['crit_pct','혼잡 기준 (%)'],['target_wait_min','목표 대기시간 (분)'],['call_margin_min','호출 여유시간 (분)'],['delay_factor','하차 지연 기준 (표준 ×)'],
-  ['sec','단가 (가정)'],['wait_won_per_hour','차량 대기 단가 (원/시간)'],['idle_won_per_hour','호퍼 유휴 단가 (원/시간)'],['sec','원료별 하차 표준시간 (분)']];
+  ['sec','구내 운행'],['speed_limit_kmh','구내 제한속도 (km/h)'],['slow_factor','감속 계수 (×, 1 이상)'],['sec','단가 (가정)'],['wait_won_per_hour','차량 대기 단가 (원/시간)'],['idle_won_per_hour','호퍼 유휴 단가 (원/시간)'],['sec','원료별 하차 표준시간 (분)']];
 let formBuilt=false;
 function buildForm(a){
   $('#assumeForm').innerHTML=AFIELDS.map(([k,l])=>k==='sec'?'<div class="sec">'+esc(l)+'</div>':'<label for="as-'+k+'">'+esc(l)+'</label><input id="as-'+k+'" data-k="'+k+'" inputmode="decimal" value="'+a[k]+'">').join('')+

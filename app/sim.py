@@ -18,7 +18,6 @@ from . import engine
 
 STEP = 0.25            # 시뮬레이션 한 걸음(분)
 GATE_HOLD = 1.0        # 계근·등록에 걸리는 시간(분)
-EXIT_MIN = 2.0         # 호퍼 → 계근대(출) 이동(분)
 VEHICLE = "덤프 25.5t"
 PLATE_HEAD = ["80", "81", "82", "83", "85", "86", "87", "88"]
 PLATE_MID = "사아바자"
@@ -74,6 +73,7 @@ def default_assumptions() -> dict:
             "warn_pct": st["congestion"]["warn_pct"], "crit_pct": st["congestion"]["crit_pct"],
             "target_wait_min": st["wait"]["target_min"], "call_margin_min": st["call"]["margin_min"],
             "delay_factor": st["delay"]["factor"],
+            "speed_limit_kmh": st["road"]["speed_limit_kmh"], "slow_factor": st["road"]["slow_factor"],
             "wait_won_per_hour": st["cost"]["wait_won_per_hour"], "idle_won_per_hour": st["cost"]["sector_idle_won_per_hour"]}
 
 
@@ -86,7 +86,8 @@ def apply_assumptions(settings: dict, std_items: list, a: dict):
             it["minutes"] = a["std_times"][it["cargo"]]
     m = {"warn_pct": ("congestion", "warn_pct"), "crit_pct": ("congestion", "crit_pct"),
          "target_wait_min": ("wait", "target_min"), "call_margin_min": ("call", "margin_min"),
-         "delay_factor": ("delay", "factor"), "wait_won_per_hour": ("cost", "wait_won_per_hour"),
+         "delay_factor": ("delay", "factor"), "speed_limit_kmh": ("road", "speed_limit_kmh"),
+         "slow_factor": ("road", "slow_factor"), "wait_won_per_hour": ("cost", "wait_won_per_hour"),
          "idle_won_per_hour": ("cost", "sector_idle_won_per_hour")}
     for k, (sec, key) in m.items():
         if k in a:
@@ -107,8 +108,9 @@ class Sim:
         self.speed = self.settings["sim"]["speed"]
         self.zone = {z["id"]: z for z in self.cfg["zones"]}
         self.sec_cfg = {s["id"]: s for s in self.cfg["sectors"]}
-        self.roads = {(r["from"], r["to"]): r["points"] for r in self.cfg["roads"]}
-        self.lane_y = self.cfg["map"].get("lane_y", 525)
+        self.routes = {(r["from"], r["to"]): r for r in self.cfg["roads"]}
+        self.mpp = self.cfg["map"]["mpp"]          # 화면 1px = 몇 m (실제 지도 축척)
+        self.ore = self.cfg["ore"]
         self.reset()
 
     # ---------- setup ----------
@@ -189,17 +191,33 @@ class Sim:
 
     def queue_xy(self, sid, idx):
         x0, y0, x1, y1 = bbox(self.sec_cfg[sid]["poly"])
-        return [x0 + (x1 - x0) * (0.14 + 0.16 * (idx % 2)), y0 + (y1 - y0) * (0.72 - 0.0 * idx)]
+        return [x0 + (x1 - x0) * (0.14 + 0.16 * (idx % 2)), y0 + (y1 - y0) * 0.64]
 
     def bay_xy(self, sid, idx):
         x0, y0, x1, y1 = bbox(self.sec_cfg[sid]["poly"])
         n = self.sec_cfg[sid]["bays"]
-        return [x0 + (x1 - x0) * (0.5 + 0.45 * (idx + 0.5) / n), y0 + (y1 - y0) * 0.4]
+        return [x0 + (x1 - x0) * (0.5 + 0.45 * (idx + 0.5) / n), y0 + (y1 - y0) * 0.64]
 
-    def start_path(self, v, pts, minutes):
+    # ---------- 거리·이동시간 (제철소 안 제한속도) ----------
+    def m_per_min(self):
+        """감속까지 반영한 평균 속도(m/분). 30km/h = 500m/분, 감속 계수 1.15면 약 435m/분."""
+        r = self.settings["road"]
+        return r["speed_limit_kmh"] * 1000 / 60 / max(r["slow_factor"], 1.0)
+
+    def route_m(self, a, b):
+        return self.routes[(a, b)]["length_m"]
+
+    def travel(self, a, b):
+        """구간 이동시간(분) = 경로 길이 ÷ 제한속도 × 감속 계수."""
+        return round(self.route_m(a, b) / self.m_per_min(), 2)
+
+    def start_path(self, v, pts, leg):
+        """경로를 따라 이동 시작. 거리는 그 구간의 도로 경로 길이(OSM, m), 시간 = 거리 ÷ (제한속도 ÷ 감속 계수).
+        화면 상자 안의 자리(대기장 칸·호퍼 대기 줄) 차이는 기호일 뿐이라 거리에 넣지 않는다."""
         v["path"] = [list(p) for p in pts]
         v["path_t0"] = self.t
-        v["path_dur"] = max(minutes, STEP)
+        v["path_m"] = self.route_m(*leg)
+        v["path_dur"] = max(v["path_m"] / self.m_per_min(), STEP)
 
     def walk(self, v):
         """경로 위 현재 위치. 끝에 닿으면 True."""
@@ -291,7 +309,7 @@ class Sim:
                 elif v["state"] == "moving":
                     pend.append((max(v["path_t0"] + v["path_dur"] - t, 0.0), v["std"]))
             secs.append({"id": sid, "name": sc["name"], "up": self.sectors[sid]["up"], "bays": sc["bays"],
-                         "travel_min": sc["travel_min"], "cargo": sc["cargo"],
+                         "travel_min": self.travel("YARD", sid), "cargo": sc["cargo"],
                          "working_remain": [engine.remain_min(v["work_elapsed"], v["std"]) for v in working],
                          "pending_eta": pend})
         return secs
@@ -356,9 +374,8 @@ class Sim:
                               payload={"stand_in": "dump", "load_t": v["load_t"]})
                     self.emit("ZONE_EXIT", "sim", vehicle=v, sector_id=s_id, zone="bay", cam_id=cam,
                               payload={"stand_in": "cam"})
-                    road = self.roads.get((s_id, "EXIT"), [])
                     v.update(state="done", done_t=t)
-                    self.start_path(v, [v["xy"]] + road + [center(self.zone["EXIT"]["poly"])], EXIT_MIN)
+                    self.start_path(v, [v["xy"]] + self.routes[(s_id, "EXIT")]["points"][1:], (s_id, "EXIT"))
             elif v["state"] == "done" and not v["gone"]:
                 if self.walk(v):
                     v["gone"] = True
@@ -370,9 +387,14 @@ class Sim:
                                             "delayed": "delay" in v["flags"], "late": v["work_start"] > v["due_t"]})
                     # 공차 복귀 → 원료야드 재상차 → 다음 회차 (근무 시간 안에서만)
                     if not self.truck[v["id"]].get("extra"):
-                        nxt = t + random.Random(f"{self.seed}|{v['id']}|cycle|{v['trip']}").uniform(*self.fc["cycle_min"])
+                        # 계근대(출) → 원료야드(공차, 제한속도) → 상차 대기·상차(가정) → 계근대(입)(적재, 제한속도)
+                        back = self.travel("EXIT", "ORE")
+                        load = random.Random(f"{self.seed}|{v['id']}|cycle|{v['trip']}").uniform(*self.fc["load_min"])
+                        inbound = self.travel("ORE", "GATE")
+                        nxt = t + back + load + inbound
                         if nxt < self.fc["shift_min"]:
                             a = trip(self.seed, self.truck[v["id"]], v["trip"] + 1, nxt, self.fc)
+                            a["ret"] = {"exit_t": t, "ore_t": round(t + back, 2), "dep_t": round(nxt - inbound, 2)}
                             self.pending_arrivals.append(a)
                             self.pending_arrivals.sort(key=lambda x: (x["arr_t"], x["id"]))
 
@@ -442,14 +464,15 @@ class Sim:
         self.yard_slots.pop(v["id"], None)
         self.overrides.pop(v["id"], None)
         q = self.queue_xy(sid, 0)
-        if v.get("rerouted"):
-            pts = [v["xy"], [v["xy"][0], self.lane_y], [q[0], self.lane_y], q]
-        else:
-            pts = [v["xy"]] + self.roads.get(("YARD", sid), []) + [q]
+        road = self.routes[("YARD", sid)]["points"]
+        # 정지된 호퍼로 가다 되돌아온 차는 대기장 입구로 돌아간 뒤 새 호퍼 경로를 탄다
+        pts = ([v["xy"]] + road[1:-1] + [q]) if not v.get("rerouted") else ([v["xy"], road[1]] + road[1:-1] + [q])
         v.update(state="moving", sector=sid, call_t=self.t, wait_min=round(self.t - v["yard_t"], 1), rerouted=False)
-        self.emit("CALL", "engine", vehicle=v, sector_id=sid, payload={"rank": p["rank"], "reason": p["reason"]})
+        self.start_path(v, pts, ("YARD", sid))
+        self.emit("CALL", "engine", vehicle=v, sector_id=sid, payload={
+            "rank": p["rank"], "reason": p["reason"], "route_m": v["path_m"], "travel_min": round(v["path_dur"], 1),
+            "speed_limit_kmh": self.settings["road"]["speed_limit_kmh"]})
         self.emit("CALL_ACK", "iot", vehicle=v, sector_id=sid)     # 기사 '출발' (모바일 화면 전까지는 자동 응답)
-        self.start_path(v, pts, sc["travel_min"])
         self.alert("info", "호출", f"{v['id']} {v['cargo']} → {sc['name']}", "기사 앱으로 호출 전송(가상)", sector_id=sid, vehicle=v)
 
     def replan(self):
@@ -526,6 +549,7 @@ class Sim:
                            for v in sorted(queue, key=lambda v: v["queue_idx"])],
             "moving": [v["id"] for v in moving],
             "idle_min": round(self.sectors[sid]["idle_min"], 1),
+            "route_m": self.route_m("YARD", sid), "travel_min": round(self.travel("YARD", sid), 1),
             "assigned": len(nxt),
             "done": sum(1 for d in self.done_trips if d["sector"] == sid),
             "avg_unload": round(sum(d["unload_min"] for d in self.done_trips if d["sector"] == sid) /
@@ -533,6 +557,51 @@ class Sim:
             "warn_pct": self.settings["congestion"]["warn_pct"], "crit_pct": self.settings["congestion"]["crit_pct"],
             "next_call_at": self.hhmm(nxt[0]["call_t"]) if nxt and nxt[0]["call_t"] is not None else None,
         }
+
+    def routes_view(self):
+        """구간별 거리·이동시간. base_min = 제한속도로만 달렸을 때, travel_min = 감속 계수 반영."""
+        r = self.settings["road"]
+        v_max = r["speed_limit_kmh"] * 1000 / 60
+        return [{"from": a, "to": b, "length_m": x["length_m"], "base_min": round(x["length_m"] / v_max, 1),
+                 "travel_min": round(self.travel(a, b), 1)} for (a, b), x in self.routes.items()]
+
+    def along(self, pts, f):
+        """경로 위 비율 f(0~1) 지점."""
+        segs = [((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5 for a, b in zip(pts, pts[1:])]
+        d = max(0.0, min(f, 1.0)) * (sum(segs) or 1)
+        for (a, b), L in zip(zip(pts, pts[1:]), segs):
+            if d <= L and L > 0:
+                k = d / L
+                return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]
+            d -= L
+        return list(pts[-1])
+
+    def ore_xy(self, i):
+        x0, y0, x1, y1 = bbox(self.ore["poly"])
+        return [x0 + (x1 - x0) * ((i % 6) + 0.5) / 6, y0 + (y1 - y0) * (((i // 6) % 3) + 0.6) / 3.4]
+
+    def road_trucks(self):
+        """구내 도로 위 차량 (아직 계근대(입)에 오지 않은 차): 공차 복귀 → 원료야드 상차 → 적재 반입."""
+        t, out, k = self.t, [], 0
+        back = self.routes[("EXIT", "ORE")]["points"]
+        inb = self.routes[("ORE", "GATE")]["points"]
+        for a in self.pending_arrivals:
+            if a["arr_t"] - t > 120:
+                continue
+            ret = a.get("ret")
+            dep = ret["dep_t"] if ret else a["arr_t"] - self.travel("ORE", "GATE")
+            if ret and t < ret["ore_t"]:
+                if t < ret["exit_t"]:
+                    continue
+                phase, xy = "return", self.along(back, (t - ret["exit_t"]) / max(ret["ore_t"] - ret["exit_t"], 1e-6))
+            elif t < dep:
+                phase, xy = "loading", self.ore_xy(k)
+                k += 1
+            else:
+                phase, xy = "inbound", self.along(inb, (t - dep) / max(a["arr_t"] - dep, 1e-6))
+            out.append({"id": a["id"], "cargo": a["cargo"], "trip": a["trip"], "phase": phase,
+                        "load_t": a["load_t"] if phase == "inbound" else 0, "xy": [round(c, 1) for c in xy]})
+        return out
 
     def state(self):
         t = self.t
@@ -579,4 +648,7 @@ class Sim:
                     "levels": {lv: sum(1 for s in sviews if s["status"] == "up" and s["level"] == lv) for lv in ("ok", "warn", "crit")},
                     "up": sum(1 for s in sviews if s["status"] == "up"), "late": sum(d["late"] for d in self.done_trips)},
             "alerts": self.alerts[:40],
+            "road": self.road_trucks(),
+            "road_cfg": self.settings["road"],
+            "routes": self.routes_view(),
         }

@@ -31,11 +31,35 @@
 - 영상·설비가 붙기 전에는 시뮬레이터가 대신 내며 `source: "sim"`, `payload.stand_in: "cam" | "crane"`으로 표시한다.
   비전 파트는 같은 이벤트를 `source: "cam"`으로 내면 된다.
 
+### 경로 거리·이동시간 (R3)
+
+- `CALL.payload.route_m`: 대기장 → 배정 호퍼 경로 길이(m). OpenStreetMap 도로를 따라 잰 값(`data/sectors.json` `roads[].length_m`).
+- `CALL.payload.travel_min`: 이동시간(분) = route_m ÷ (구내 제한속도 km/h × 1000 ÷ 60) × 감속 계수. 예: 672m ÷ 500m/분 × 1.15 = 1.5분.
+- `CALL.payload.speed_limit_kmh`: 계산에 쓴 제한속도(기본 30, 가정값 탭에서 바꿀 수 있음). 기사 화면은 이 값을 그대로 보여 주면 된다.
+- 엔진의 호출 시점 공식(남은 하차 시간 ≤ 이동시간 + 여유)도 같은 travel_min을 쓴다.
+
+```json
+{"ts": "2026-11-09T08:58:00", "type": "CALL", "source": "engine", "cam_id": null, "sector_id": "B", "zone": null,
+ "track_id": 22, "vehicle_id": "87사 4622",
+ "payload": {"rank": 1, "reason": "투입 기한 순(64분 남음) · 호퍼 B 전용 원료", "route_m": 672, "travel_min": 1.5, "speed_limit_kmh": 30}}
+```
+
+`data/sectors.json`의 `roads[]` 한 구간:
+
+```json
+{"from": "YARD", "to": "B", "points": [[896, 424], [778, 418], "..."], "length_m": 672, "road_m": 273, "osm_nodes": 9}
+```
+
+- `points`는 화면 좌표(px, 1600x900), `map.mpp`(1px = m)를 곱하면 길이가 `length_m`와 같다.
+- `road_m`은 OSM 도로 위 길이, 나머지는 시설 상자 ↔ 도로 진입로. 시설 위치는 가정이다.
+- 구간: 원료야드→계근대(입)→대기장→호퍼 A/B/C→계근대(출)→원료야드. 다시 만들기: `py tools/build_map.py` (지도 © OpenStreetMap contributors, ODbL).
+
 ## 서버 API (app/server.py)
 
 | 주소 | 하는 일 |
 |---|---|
-| `GET /api/state`, `WS /ws` | 아래 상태 (WebSocket은 0.1초마다 밀어 줌) |
+| `GET /api/state`, `WS /ws` | 아래 상태 (WebSocket은 0.1초마다 밀어 줌). R3부터 `routes`(구간별 거리·이동시간), `road`(계근대(입) 전 구내 도로 위 차량: 공차 복귀·상차·적재 반입), `road_cfg`(제한속도·감속 계수) 추가 |
+| `GET /api/config` | 배치(sectors.json) + 실제 지도 레이어(site_map.json) + 설정 |
 | `GET /api/events?limit=50` | 최근 이벤트 로그 (SQLite `data/events.db`) |
 | `POST /api/sim/start` · `pause` · `reset` · `speed?value=60` | 시뮬레이션 시계 (speed = 시뮬레이션 초 / 실제 초) |
 | `POST /api/events/sector_down?sector_id=A` · `sector_up` | 섹터 정지·복구 → 이동·대기 차량 재배정 + Alert |
@@ -50,7 +74,7 @@
 | `BEACON_NEAR` | 기사 앱(가정) → 시뮬레이터 | 차량이 어느 구역 근처인지. 영상 이벤트에 vehicle_id를 붙이는 데 씀 |
 | `ZONE_ENTER` / `ZONE_EXIT` | 영상 | 구역(`yard`·`queue`·`bay`) 진입·이탈, 3초 이상 유지 시에만 |
 | `VEHICLE_STOPPED` | 영상 | 구역 안에서 멈춤 → 대기 또는 작업 시작 |
-| `CALL` | 배정 엔진 | 차량 호출 (payload: sector_id, rank, reason) → 기사 화면 알림 |
+| `CALL` | 배정 엔진 | 차량 호출 (payload: rank, reason, route_m, travel_min, speed_limit_kmh) → 기사 화면 알림 |
 | `CALL_ACK` | 기사 모바일 화면 | 기사가 ‘출발’을 누름 |
 | `CRANE_START` / `CRANE_DONE` | 설비 신호(가정) 또는 담당자 화면 버튼 | 크레인 상하역 시작·완료 (DONE이면 진척도 100% 확정) |
 | `SECTOR_DOWN` / `SECTOR_UP` | 돌발 이벤트 버튼 | 섹터 정지·복구 → 재배정 |

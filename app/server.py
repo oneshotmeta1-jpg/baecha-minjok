@@ -26,7 +26,7 @@ from app.sim import STEP, load  # noqa: E402
 
 DATA = ROOT / "data"
 WEB = ROOT / "web"
-VERSION = "v3"
+VERSION = "v4"
 TICK = 0.1  # 실제 초
 
 rt = Runtime(seed=7, db_path=DATA / "events.db", assumptions_path=DATA / "assumptions.json")
@@ -87,7 +87,7 @@ async def health():
 
 @app.get("/api/config")
 async def config():
-    return JSONResponse({"version": VERSION, "sectors": load("sectors.json"), "std_times": load("std_times.json"),
+    return JSONResponse({"version": VERSION, "sectors": load("sectors.json"), "site_map": load("site_map.json"), "std_times": load("std_times.json"),
                          "settings": rt.rec.settings, "reasons": REASONS})
 
 

@@ -28,6 +28,14 @@ python app/server.py --lan
 - 접속이 안 되면: Windows 네트워크가 "개인(Private)"인지, 방화벽에서 이 Python이 허용됐는지 확인합니다. 행사장 와이파이는 기기끼리 통신을 막아 두는 경우가 있어, 그때는 휴대폰 핫스팟에 다 같이 붙으면 됩니다.
 - 와이파이를 다시 잡으면 IP가 바뀔 수 있으니 실행 창의 주소를 다시 확인합니다.
 
+## 실제 지도·경로 거리 다시 만들기
+
+```bash
+python tools/build_map.py --fetch
+```
+
+OpenStreetMap에서 포항제철소 주변 지도를 받아 `data/site_map.json`(배경)과 `data/sectors.json`의 경로·거리를 다시 만듭니다. 시설 위치는 `tools/build_map.py`의 `ANCHORS`(위도·경도)에서 바꿉니다. 지도 © OpenStreetMap contributors (ODbL).
+
 ## 사진 한 장으로 적재함 판정
 
 ```bash
