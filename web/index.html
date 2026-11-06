@@ -334,9 +334,10 @@ textarea.sin{width:100%;text-align:left;min-height:54px;resize:vertical}
 #tbarSvg{width:100%;height:100%;display:block}
 .donut{width:88px;height:88px;flex:none}
 /* R6 설정 3열 */
-.set3{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;gap:12px}
+.set3{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:12px}
+#setMsg{min-width:0;flex:0 1 auto;overflow:hidden} #setMsg .notice{margin:0!important;padding:4px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#recalc[hidden]{display:none}
 .set3[hidden]{display:none}
-.set3>.s-hist{grid-column:1/-1}
 .prow{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
 .prow b{font-size:14px} .prow .cap{display:block} .prow .pv{font-size:20px;font-weight:700;text-align:right}
 .tgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:6px 0}
@@ -517,7 +518,7 @@ textarea.sin{width:100%;text-align:left;min-height:54px;resize:vertical}
 
 <!-- 설정 -->
 <div class="view" id="view-settings" hidden>
-  <div class="mon-bar"><h1>설정</h1><span class="simnote">추천·알림·효과 계산에 쓰는 가정값을 한곳에서</span><span class="sp"></span>
+  <div class="mon-bar"><h1>설정</h1><span class="simnote">추천·알림·효과 계산에 쓰는 가정값을 한곳에서</span><span id="setMsg"></span><span class="sp"></span><button class="pill-btn dark" id="recalc">저장하고 다시 계산</button>
     <div class="seg" aria-label="설정 탭"><button data-stab="values" aria-pressed="true">기준값·단가</button><button data-stab="roi" aria-pressed="false">구역(ROI)</button></div></div>
   <div class="set3" id="setValues">
     <section class="card" aria-label="예측값 자동"><div class="hd"><h2>① 예측값 · 자동</h2><span class="sp"></span><span class="chip">읽기 전용</span></div>
@@ -526,8 +527,6 @@ textarea.sin{width:100%;text-align:left;min-height:54px;resize:vertical}
       <div class="bd"><p class="cap" style="margin:0 0 6px">현장을 통제하지 않아요 · 넘으면 기준미달로 기록하고, 알림과 제안을 띄워요 · 바꿔도 순번은 그대로</p><div id="setRules"></div></div></section>
     <section class="card" aria-label="호출 정책 비용 단가"><div class="hd"><h2>③ 호출 정책 · 비용 단가</h2></div>
       <div class="bd"><p class="cap" style="margin:0 0 6px">관제가 정하는 운영 방식 · 바꾸면 순번이 다시 계산돼요 · 실행은 항상 현장 담당자 승인 후</p><div id="setPolicy"></div></div></section>
-    <section class="card s-hist" aria-label="저장 변경 이력"><div class="hd"><h2>저장 · 변경 이력</h2><span class="sub">누가 · 무엇을 · 영향</span><span class="sp"></span><button class="pill-btn dark" id="recalc">저장하고 다시 계산</button></div>
-      <div class="bd"><div id="setMsg"></div><div id="setHist"></div></div></section>
   </div>
   <div class="roi-grid" id="setRoi" hidden>
     <section class="card" aria-label="구역 그림"><div class="hd"><h2 id="roiTitle">구역(ROI)</h2><span class="sub">카메라 첫 프레임 위 다각형 · 이번에는 보기 전용</span><span class="sp"></span><span class="chs" id="roiChs" role="group" aria-label="카메라"></span></div>
@@ -1251,12 +1250,10 @@ function renderSettings(d){
   $('#setMsg').innerHTML=setMsg?'<div class="notice" style="margin-bottom:8px">'+esc(setMsg)+'</div>':'';
   renderPredCol(d);
   if(!formBuilt) buildForm(d);
-  $('#setHist').innerHTML=d.history.length?'<table class="htab"><tbody>'+d.history.map(h=>'<tr><td class="num" style="width:60px">'+esc(h.at)+'</td><td style="width:110px">'+esc(h.by||'관제 담당자')+'</td><td>'+esc(h.text)+'</td><td class="r cap">'+esc(h.impact||'')+'</td></tr>').join('')+'</tbody></table>'
-    :'<span class="cap">아직 바뀐 값이 없습니다. 예측값은 실측이 쌓이면 자동으로 바뀌고 여기에 남아요.</span>';
 }
 document.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click',()=>{ setTab=b.dataset.stab;
   document.querySelectorAll('[data-stab]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
-  $('#setValues').hidden=setTab!=='values'; $('#setRoi').hidden=setTab!=='roi'; if(setTab==='roi') loadRoi(); }));
+  $('#setValues').hidden=setTab!=='values'; $('#setRoi').hidden=setTab!=='roi'; $('#recalc').hidden=setTab!=='values'; if(setTab==='roi') loadRoi(); }));
 /* 구역(ROI) — 보기 전용 */
 let roiData=null, roiCam='CAM-02';
 async function loadRoi(){ if(!roiData){ try{ roiData=await getJ('/api/rois'); }catch(e){ return; } } drawRoi(); }
