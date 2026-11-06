@@ -8,3 +8,7 @@ vision/runs/
 *.db
 data/assumptions.json
 tools/osm_cache/
+
+# 프로젝트 폴더에 둔 사진·스크린샷(피드백 등)은 올리지 않음
+/*.png
+/*.jpg
