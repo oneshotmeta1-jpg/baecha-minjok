@@ -5,9 +5,13 @@
 - 가정값을 바꾸면 처음부터 지금 시각까지 같은 행동 기록으로 다시 돌려(재계산) 결과를 바꾼다. 같은 입력이면 항상 같은 결과.
 FastAPI 없이도 쓸 수 있게 분리해 tests/test_sim.py에서 직접 검사한다.
 """
+import copy
+import csv
+import io
 import json
 import sqlite3
 import time
+from datetime import timedelta
 from pathlib import Path
 
 from .sim import Sim, STEP, default_assumptions
@@ -75,6 +79,9 @@ class Runtime:
 
     # ---------- 만들기 / 다시 돌리기 ----------
     def _new_sims(self):
+        self.expected = {}       # 알림 id → 제안할 때 계산한 예상 효과
+        self.confirmed = set()   # 효과가 확정된 반입 (EFFECT_CONFIRMED를 이미 낸 것)
+        self.fifo = None
         self.rec = Sim(self.seed, on_event=self._on_event, mode="recommend", assumptions=self.assumptions)
         self.fifo = Sim(self.seed, mode="fifo", assumptions=self.assumptions)
         if self.speed:
@@ -89,6 +96,8 @@ class Runtime:
         self.ui_events = []      # 담당자 행동 이벤트 — 재계산 때 같은 시각에 다시 기록
         self.alert_wall = {}     # 알림 id → 발생 실제 시각
         self.auto_approve = True # 자동 승인 스위치 (끄면 현장 담당자가 승인해야 호출 — L2)
+        self.ignored_alerts = set()   # 담당자가 [무시]한 알림
+        self.week_cache = None
         self.store.clear()
         self._new_sims()
 
@@ -97,6 +106,13 @@ class Runtime:
         if ev["type"] == "ALERT":
             a = ev["payload"]["id"]
             self.alert_wall.setdefault(a, self.clock())
+            rel = ev["payload"].get("related") or []
+            if rel and self.fifo is not None:                 # 제안할 때의 예상 효과를 남겨 둔다
+                eff = self.effects()
+                es = [eff[k] for k in rel if k in eff]
+                if es:
+                    m = round(sum(e["effect"] for e in es), 1)
+                    self.expected[a] = {"min": m, "won": int(round(m * self.won_per_min())), "n": len(es)}
             for x in reversed(self.rec.alerts_all):
                 if x["id"] == a:
                     if a in self.acks:              # 재계산 뒤에도 확인 표시 유지
@@ -135,6 +151,36 @@ class Runtime:
     def step(self):
         self.rec.step()
         self.fifo.step()
+        self._confirm_effects()
+
+    def _confirm_effects(self):
+        """두 방식 모두 하차를 시작한 반입의 효과를 확정하고 EFFECT_CONFIRMED를 낸다."""
+        started_f = {f"{d['id']}#{d['trip']}" for d in self.fifo.done_trips}
+        started_f |= {self.fifo.key(v) for v in self.fifo.vehicles.values() if v["state"] in ("working", "done") and not v["gone"]}
+        new = []
+        for v in self.rec.vehicles.values():
+            if v["state"] in ("working", "done") and not v["gone"]:
+                k = self.rec.key(v)
+                if k not in self.confirmed and k in started_f:
+                    new.append(k)
+        for d in self.rec.done_trips:
+            k = f"{d['id']}#{d['trip']}"
+            if k not in self.confirmed and k in started_f:
+                new.append(k)
+        if not new:
+            return
+        eff = self.effects()
+        for k in dict.fromkeys(new):
+            e = eff.get(k)
+            if not e or not e["confirmed"]:
+                continue
+            self.confirmed.add(k)
+            vid, trip = k.split("#")
+            v = self.rec.vehicles.get(vid)
+            self.rec.emit("EFFECT_CONFIRMED", "engine", vehicle={"id": vid, "track_id": v.get("track_id") if v else None},
+                          sector_id=v["sector"] if v else None,
+                          payload={"trip": int(trip), "rec_wait_min": e["rec"], "fifo_wait_min": e["fifo"], "effect_min": e["effect"],
+                                   "won": int(round(e["effect"] * self.won_per_min())), "source": self.source_of(k)})
 
     def advance(self, minutes):
         target = self.rec.t + minutes
@@ -161,6 +207,21 @@ class Runtime:
             self.store.change(c)
         self.running = running
         self.store.commit()
+
+    def clone(self, assumptions=None):
+        """같은 행동 기록으로 지금 시각까지 다시 돌린 복사본 (바꿔보기 미리보기용 — 저장·로그를 건드리지 않음)."""
+        tmp = Runtime(self.seed)
+        tmp.assumptions = copy.deepcopy(assumptions if assumptions is not None else self.assumptions)
+        tmp.actions = copy.deepcopy(self.actions)
+        tmp.ui_events = copy.deepcopy(self.ui_events)
+        tmp.approved = set(self.approved)
+        tmp.changes = copy.deepcopy(self.changes)
+        tmp.acks = dict(self.acks)
+        tmp.auto_approve = self.auto_approve
+        tmp.ignored_alerts = set(self.ignored_alerts)
+        tmp.rec.t = self.rec.t          # rebuild()는 rec.t까지 돌린다
+        tmp.rebuild()
+        return tmp
 
     # ---------- 시연 버튼 ----------
     def _record(self, kind, **kw):
@@ -260,6 +321,14 @@ class Runtime:
         self._ui("ALERT_ACK", None, a["sector_id"], {"alert_id": aid, "ack_sec": a["ack_sec"]})
         return a
 
+    def ignore_alert(self, aid):
+        a = next((x for x in self.rec.alerts_all if x["id"] == aid), None)
+        if not a or aid in self.ignored_alerts:
+            return a
+        self.ignored_alerts.add(aid)
+        self._ui("ALERT_IGNORED", None, a["sector_id"], {"alert_id": aid, "kind": a["kind"]})
+        return a
+
     def alert_list(self, level=None, kind=None, sector_id=None, unacked=False):
         rows = [a for a in reversed(self.rec.alerts_all)
                 if (not level or a["level"] == level) and (not kind or a["kind"] == kind)
@@ -276,6 +345,18 @@ class Runtime:
     def set_assumptions(self, new: dict):
         changed = []
         for k, v in new.items():
+            if k == "idle_in_cost":
+                on = v in (True, "true", "1", 1)
+                if on != bool(self.assumptions.get("idle_in_cost")):
+                    self.assumptions["idle_in_cost"] = on
+                    changed.append("호퍼 유휴 금액 포함 " + ("켬" if on else "끔"))
+                continue
+            if k == "cost_note":
+                note = str(v).strip()[:200]
+                if note != self.assumptions.get("cost_note", ""):
+                    self.assumptions["cost_note"] = note
+                    changed.append("단가 근거 메모 수정")
+                continue
             if k == "std_times":
                 for cargo, m in v.items():
                     old = self.assumptions["std_times"].get(cargo)
@@ -290,7 +371,7 @@ class Runtime:
                 changed.append(f"{LABELS.get(k, k)} {old:g} → {float(v):g}")
         if not changed:
             return []
-        self.history.insert(0, {"at": self.rec.hhmm(self.rec.t), "text": " · ".join(changed)})
+        self.history.insert(0, {"at": self.rec.hhmm(self.rec.t), "by": "관제 담당자", "text": " · ".join(changed)})
         del self.history[20:]
         if self.assumptions_path:
             self.assumptions_path.write_text(json.dumps(dict(self.assumptions, history=self.history), ensure_ascii=False, indent=2) + "\n",
@@ -355,8 +436,7 @@ class Runtime:
                 "saved_wait_min": round(saved_wait, 1), "saved_idle_min": round(saved_idle, 1),
                 "effect": eff,
                 # 금액 = 차량별 효과 합(분) × 대기 단가. 호퍼 유휴는 금액에 넣지 않고 시간으로만 (두 번 세기 방지)
-                "cost": {"total": -eff["won"], "wait": -eff["won"], "idle": 0,
-                         "wait_rate": a["wait_won_per_hour"], "won_per_min": eff["won_per_min"]},
+                "cost": self._cost(eff, saved_idle),
                 "match_pct": round(len(self.approved) / dec * 100) if dec else None,
                 "decisions": {"approved": len(self.approved), "changed": len(self.changes)}}
 
@@ -551,6 +631,329 @@ class Runtime:
     def analysis(self):
         return {"compare": self.compare(), "series": {"rec": self.rec.series, "fifo": self.fifo.series},
                 "cargo": self.cargo_table(), "feedback": self.feedback(), "clock": self.rec.clock().isoformat(timespec="seconds")}
+
+
+    # ---------- 금액 ----------
+    def _cost(self, eff, saved_idle):
+        a = self.assumptions
+        idle_won = int(round(saved_idle / 60 * a["idle_won_per_hour"])) if a.get("idle_in_cost") else 0
+        return {"total": -eff["won"] + idle_won, "wait": -eff["won"], "idle": idle_won, "idle_in_cost": bool(a.get("idle_in_cost")),
+                "wait_rate": a["wait_won_per_hour"], "won_per_min": eff["won_per_min"], "idle_rate": a["idle_won_per_hour"]}
+
+    # ---------- 효과를 만든 것 · 건별 기록 ----------
+    SOURCES = ["가장 빨리 비는 하차구 (일반 추천)", "대기 초과 → 우선 배정", "혼잡 → 호출 보류", "작업 지연 → 호출 늦춤",
+               "긴급 반입 → 순번 올림", "호퍼 정지 → 재배정", "담당자 순번 변경"]
+    ALERT_SOURCE = {"호퍼 이상": "호퍼 정지 → 재배정", "대기 초과": "대기 초과 → 우선 배정", "혼잡": "혼잡 → 호출 보류",
+                    "하차 지연": "작업 지연 → 호출 늦춤"}
+
+    def _source_index(self):
+        idx = {}
+        for a in self.rec.alerts_all:
+            src = self.ALERT_SOURCE.get(a["kind"])
+            if src and a["level"] != "info":
+                for k in a.get("related", []):
+                    idx.setdefault(k, set()).add(src)
+        return idx
+
+    def source_of(self, key, idx=None, changed=None, urgent=None):
+        changed = changed if changed is not None else {f"{c['vehicle_id']}#{c['trip']}" for c in self.changes}
+        if key in changed:
+            return "담당자 순번 변경"
+        if urgent is None:
+            vid = key.split("#")[0]
+            v = self.rec.vehicles.get(vid)
+            d = next((d for d in self.rec.done_trips if f"{d['id']}#{d['trip']}" == key), None)
+            urgent = bool((d and d.get("urgent")) or (v and self.rec.key(v) == key and v["urgent"]))
+        if urgent:
+            return "긴급 반입 → 순번 올림"
+        srcs = (idx if idx is not None else self._source_index()).get(key, set())
+        for s in ["호퍼 정지 → 재배정", "대기 초과 → 우선 배정", "혼잡 → 호출 보류", "작업 지연 → 호출 늦춤"]:
+            if s in srcs:
+                return s
+        return "가장 빨리 비는 하차구 (일반 추천)"
+
+    def records(self, eff=None):
+        """차량별 효과 표 (건별 기록). 효과 합 = effect_total()과 같은 반입 집합."""
+        eff = eff if eff is not None else self.effects()
+        idx, changed = self._source_index(), {f"{c['vehicle_id']}#{c['trip']}" for c in self.changes}
+        hh = self.rec.hhmm
+        rows = []
+        done = {f"{d['id']}#{d['trip']}": d for d in self.rec.done_trips}
+        for k, e in eff.items():
+            vid, trip = k.split("#")
+            d = done.get(k)
+            v = self.rec.vehicles.get(vid)
+            if d:
+                info = dict(cargo=d["cargo"], load_t=d["load_t"], yard_t=d["yard_t"], call_t=d["call_t"], start=d["work_start"],
+                            end=d["unload_end"], urgent=d.get("urgent"), sector=d["sector"], state="이탈")
+            elif v and self.rec.key(v) == k:
+                st = {"yard": "대기", "moving": "이동 중", "queue": "호퍼 앞 대기", "working": "하차 중", "done": "이탈"}.get(v["state"], v["state"])
+                info = dict(cargo=v["cargo"], load_t=v["load_t"], yard_t=v["yard_t"], call_t=v.get("call_t"),
+                            start=v.get("work_start") if v["state"] in ("working", "done") else None,
+                            end=v.get("done_t") if v["state"] == "done" else None, urgent=v["urgent"], sector=v["sector"], state=st)
+            else:
+                continue
+            src = self.source_of(k, idx, changed, info["urgent"])
+            rows.append({"key": k, "vehicle_id": vid, "trip": int(trip), "cargo": info["cargo"], "load_t": info["load_t"],
+                         "sector": info["sector"], "yard": hh(info["yard_t"]), "yard_t": info["yard_t"],
+                         "call": hh(info["call_t"]) if info["call_t"] is not None else None,
+                         "enter": hh(info["start"]) if info["start"] is not None else None,
+                         "exit": hh(info["end"]) if info["end"] is not None else None,
+                         "rec_wait": e["rec"], "fifo_wait": e["fifo"], "fifo_lower": e["fifo_lower"], "effect": e["effect"],
+                         "won": int(round(e["effect"] * self.won_per_min())), "confirmed": e["confirmed"],
+                         "source": src, "state": info["state"] if e["confirmed"] or info["state"] != "이탈" else info["state"]})
+        rows.sort(key=lambda r: -r["yard_t"])
+        return rows
+
+    def sources(self, rows=None):
+        rows = rows if rows is not None else self.records()
+        out = []
+        for s in self.SOURCES:
+            rs = [r for r in rows if r["source"] == s and r["confirmed"]]
+            m = round(sum(r["effect"] for r in rs), 1)
+            out.append({"source": s, "n": len(rs), "min": m, "won": int(round(m * self.won_per_min())),
+                        "saved": round(-sum(min(r["effect"], 0) for r in rs), 1), "added": round(sum(max(r["effect"], 0) for r in rs), 1)})
+        return out
+
+    def cargo_actual(self):
+        """원료별 실측 하차시간 (진입 → 이탈) vs 표준(가정)."""
+        out = []
+        for cargo, std in self.assumptions["std_times"].items():
+            ds = [d for d in self.rec.done_trips if d["cargo"] == cargo]
+            if not ds:
+                out.append({"cargo": cargo, "n": 0, "actual": None, "std": std, "diff": None})
+                continue
+            m = round(sum(d["unload_min"] for d in ds) / len(ds), 1)
+            out.append({"cargo": cargo, "n": len(ds), "actual": m, "std": std, "diff": round(m - std, 1)})
+        return out
+
+    # ---------- 알림 이력: 알림 → 제안 → 처리 → 효과 ----------
+    def handling(self, a):
+        if a["id"] in self.ignored_alerts:
+            return "무시"
+        rel = a.get("related", [])
+        changed = {f"{c['vehicle_id']}#{c['trip']}" for c in self.changes}
+        if any(k in changed for k in rel):
+            return "변경 저장"
+        st = self.alert_status(a) if not a["ack"] else "확인함"
+        if st == "승인 대기":
+            return "승인 대기"
+        if a["kind"] in self.AUTO_DONE or any(not self._in_plan(k) for k in rel):
+            return "실행"
+        return "확인함" if a["ack"] else "제안만"
+
+    def alert_history(self, eff=None):
+        eff = eff if eff is not None else self.effects()
+        rows = []
+        for a in self.rec.alerts_all:
+            if a["kind"] == "호출":
+                continue
+            rel = a.get("related", [])
+            es = [eff[k] for k in rel if k in eff]
+            done = bool(es) and all(e["confirmed"] for e in es) and len(es) == len(rel)
+            act = None
+            if done:
+                m = round(sum(e["effect"] for e in es), 1)
+                act = {"min": m, "won": int(round(m * self.won_per_min()))}
+            rows.append({"id": a["id"], "ts": a["ts"], "t": a["t"], "level": a["level"], "kind": a["kind"], "text": a["text"],
+                         "suggest": a["action"], "handling": self.handling(a), "expected": self.expected.get(a["id"]),
+                         "actual": act, "has_vehicles": bool(rel), "sector_id": a["sector_id"], "vehicle_id": a["vehicle_id"],
+                         "group": "운영", "ack": a["ack"]})
+        for c in self.changes:                          # 순번 변경도 한 줄로
+            k = f"{c['vehicle_id']}#{c['trip']}"
+            e = eff.get(k)
+            rows.append({"id": "CH-" + k, "ts": c["ts"], "t": c["t"], "level": "info", "kind": "순번 변경",
+                         "text": f"{c['vehicle_id']} · {c['reason']}" + (f" · {c['memo']}" if c["memo"] else ""),
+                         "suggest": f"{self.rec.sec_cfg.get(c['from'], {}).get('name', c['from'])} → {self.rec.sec_cfg[c['to']]['name']}",
+                         "handling": "변경 저장",
+                         "expected": {"min": c["delta_min"], "won": int(round(c["delta_min"] * self.won_per_min()))},
+                         "actual": {"min": e["effect"], "won": int(round(e["effect"] * self.won_per_min()))} if e and e["confirmed"] else None,
+                         "has_vehicles": True, "sector_id": c["to"], "vehicle_id": c["vehicle_id"], "group": "순번 변경", "ack": True,
+                         "actual_note": "FIFO 대비"})
+        rows.sort(key=lambda r: -r["t"])
+        return rows
+
+    def alert_funnel(self, rows):
+        ops = [r for r in rows if r["group"] == "운영"]
+        prop = [r for r in ops if r["has_vehicles"]]
+        exe = [r for r in prop if r["handling"] in ("실행", "변경 저장")]
+        conf = [r for r in exe if r["actual"] is not None]
+        both = [r for r in conf if r["expected"] is not None]
+        ign = [r for r in prop if r["handling"] == "무시"]
+        exp_sum = round(sum(r["expected"]["min"] for r in both), 1)
+        act_sum = round(sum(r["actual"]["min"] for r in both), 1)
+        return {"ops": len(ops), "by_kind": {k: sum(r["kind"] == k for r in ops) for k in sorted({r["kind"] for r in ops})},
+                "proposed": len(prop), "executed": len(exe),
+                "waiting": sum(r["handling"] == "승인 대기" for r in prop), "ignored": len(ign),
+                "only": sum(r["handling"] == "제안만" for r in prop), "confirmed": len(conf),
+                "expected_min": exp_sum, "actual_min": act_sum,
+                "ratio_pct": round(act_sum / exp_sum * 100) if exp_sum < -0.05 else None, "compared": len(both),
+                "ignored_rows": [{"ts": r["ts"], "kind": r["kind"], "expected": r["expected"], "actual": r["actual"]} for r in ign]}
+
+    # ---------- 바꿔보기 (저장하지 않는 미리보기) ----------
+    PREVIEW_KEYS = ("target_wait_min", "call_margin_min")
+
+    def preview(self, change):
+        new = copy.deepcopy(self.assumptions)
+        diff = []
+        for cargo, m in (change.get("std_times") or {}).items():
+            if cargo in new["std_times"] and float(m) != float(new["std_times"][cargo]):
+                diff.append({"key": "std:" + cargo, "label": f"{cargo} 표준 하차시간", "old": new["std_times"][cargo], "new": float(m), "unit": "분"})
+                new["std_times"][cargo] = float(m)
+        for k in self.PREVIEW_KEYS:
+            if k in change and float(change[k]) != float(new[k]):
+                diff.append({"key": k, "label": LABELS[k].split("(")[0], "old": new[k], "new": float(change[k]), "unit": "분"})
+                new[k] = float(change[k])
+        if not diff:
+            return {"diff": [], "rows": [], "bays": [], "same": True}
+        tmp = self.clone(new)
+        e0, e1 = self.effects(), tmp.effects()
+        p0 = {p["vehicle_id"]: p for p in self.rec.plan}
+        p1 = {p["vehicle_id"]: p for p in tmp.rec.plan}
+        hh = self.rec.hhmm
+        rows = []
+        for vid in list(dict.fromkeys(list(p0) + list(p1))):
+            a, b = p0.get(vid), p1.get(vid)
+            v = self.rec.vehicles.get(vid) or tmp.rec.vehicles.get(vid)
+            k = f"{vid}#{v['trip']}" if v else None
+            ca = a["call_t"] if a else None
+            cb = b["call_t"] if b else None
+            ea, eb = (e0.get(k) or {}).get("effect"), (e1.get(k) or {}).get("effect")
+            moved = (ca is None) != (cb is None) or (ca is not None and cb is not None and abs(ca - cb) >= 0.5) \
+                or (a and b and a["sector_id"] != b["sector_id"]) or (ea is not None and eb is not None and abs(ea - eb) >= 0.5)
+            rows.append({"vehicle_id": vid, "rank": (b or a)["rank"], "rank_old": a["rank"] if a else None,
+                         "sector_old": a["sector_id"] if a else None, "sector_new": b["sector_id"] if b else None,
+                         "call_old": hh(ca) if ca is not None else None, "call_new": hh(cb) if cb is not None else None,
+                         "effect_old": ea, "effect_new": eb, "changed": bool(moved),
+                         "state_new": (tmp.rec.vehicles.get(vid) or {}).get("state")})
+        s0, s1 = self.schedule(), tmp.schedule()
+        bays = []
+        for r0, r1 in zip(s0["rows"], s1["rows"]):
+            if r0["free_at"] != r1["free_at"]:
+                bays.append({"sector_id": r0["sector_id"], "name": r0["name"], "bay": r0["bay"], "old": r0["free_at"], "new": r1["free_at"]})
+        c0, c1 = self.compare()["effect"], tmp.compare()["effect"]
+        return {"diff": diff, "rows": rows, "bays": bays, "same": False, "schedule": s1,
+                "total_old": c0, "total_new": c1, "changed_n": sum(r["changed"] for r in rows), "values": new}
+
+    # ---------- 최근 7일 (시드를 바꾼 시뮬레이션 날짜) ----------
+    WEEK_SEEDS = [1, 2, 3, 4, 5, 6]
+
+    def _day_summary(self, r, date):
+        eff = r.effects()
+        rows = r.records(eff)
+        c = r.compare()
+        ah = r.alert_history(eff)
+        return {"date": date, "compare": c, "sources": r.sources(rows), "records": rows, "alerts": ah,
+                "funnel": r.alert_funnel(ah), "series": {"rec": r.rec.series, "fifo": r.fifo.series},
+                "cargo_actual": r.cargo_actual()}
+
+    def week(self):
+        return self.week_days() + [self._day_summary(self, self.rec.start.strftime("%m/%d") + " (오늘)")]
+
+    def week_days(self):
+        """지난 6일(시드를 바꾼 시뮬레이션). 가정값이 같으면 캐시를 쓴다. 서버 시작 때 미리 계산해 둔다."""
+        key = json.dumps(self.assumptions, sort_keys=True, ensure_ascii=False)
+        if not self.week_cache or self.week_cache["key"] != key:
+            days = []
+            start = self.rec.start
+            for i, sd in enumerate(self.WEEK_SEEDS):
+                r = Runtime(sd)
+                r.assumptions = copy.deepcopy(self.assumptions)
+                r._new_sims()
+                r.advance(r.rec.fc["shift_min"] + 30)
+                days.append(r._day_summary(r, (start - timedelta(days=len(self.WEEK_SEEDS) - i)).strftime("%m/%d")))
+            self.week_cache = {"key": key, "days": days}
+        return self.week_cache["days"]
+
+    def analysis_range(self, rng="today"):
+        days = self.week() if rng == "week" else [self._day_summary(self, self.rec.start.strftime("%m/%d") + " (오늘)")]
+        today = days[-1]
+        allrec = [dict(r, date=d["date"]) for d in days for r in d["records"]]
+        src = {}
+        for d in days:
+            for s in d["sources"]:
+                x = src.setdefault(s["source"], {"source": s["source"], "n": 0, "min": 0.0, "won": 0, "saved": 0.0, "added": 0.0})
+                for k in ("n", "won"):
+                    x[k] += s[k]
+                for k in ("min", "saved", "added"):
+                    x[k] = round(x[k] + s[k], 1)
+        sm = lambda f: sum(f(d) for d in days)
+        eff_min = round(sm(lambda d: d["compare"]["effect"]["min"]), 1)
+        tot = {"effect_min": eff_min, "won": sm(lambda d: d["compare"]["cost"]["total"]),
+               "vehicles": sm(lambda d: d["compare"]["effect"]["vehicles"]),
+               "saved_min": round(sm(lambda d: d["compare"]["effect"]["saved_min"]), 1),
+               "added_min": round(sm(lambda d: d["compare"]["effect"]["added_min"]), 1),
+               "won_per_min": self.won_per_min(), "idle_in_cost": bool(self.assumptions.get("idle_in_cost")),
+               "idle_won": sm(lambda d: d["compare"]["cost"]["idle"])}
+        metric = lambda side, k: sm(lambda d: d["compare"][side][k])
+        util = lambda side: round(sum(d["compare"][side]["util_pct"] for d in days) / len(days))
+        times = {"util": [util("fifo"), util("rec")], "delays": [metric("fifo", "delays"), metric("rec", "delays")],
+                 "trips": [metric("fifo", "trips_done"), metric("rec", "trips_done")],
+                 "idle": [round(metric("fifo", "idle_min")), round(metric("rec", "idle_min"))],
+                 "avg_wait": [round(sum(d["compare"]["fifo"]["avg_wait"] for d in days) / len(days), 1),
+                              round(sum(d["compare"]["rec"]["avg_wait"] for d in days) / len(days), 1)]}
+        if rng == "week":
+            series = {"rec": [{"hhmm": d["date"].split(" ")[0], "waiting": d["compare"]["rec"]["avg_wait"]} for d in days],
+                      "fifo": [{"hhmm": d["date"].split(" ")[0], "waiting": d["compare"]["fifo"]["avg_wait"]} for d in days],
+                      "unit": "평균 대기(분)"}
+        else:
+            series = dict(today["series"], unit="대기 차량(대)")
+        fb = self.feedback()
+        c = self.compare()
+        return {"range": rng, "days": [{"date": d["date"], "effect_min": d["compare"]["effect"]["min"], "won": d["compare"]["cost"]["total"],
+                                        "avg_wait": [d["compare"]["fifo"]["avg_wait"], d["compare"]["rec"]["avg_wait"]],
+                                        "reduction_pct": d["compare"]["reduction_pct"]} for d in days],
+                "total": tot, "sources": [src[s] for s in self.SOURCES], "times": times, "series": series,
+                "records": allrec, "cargo_actual": today["cargo_actual"], "feedback": fb,
+                "match_pct": c["match_pct"], "decisions": c["decisions"], "compare": c,
+                "simulated_days": rng == "week", "clock": self.rec.clock().isoformat(timespec="seconds")}
+
+    def alerts_range(self, rng="today"):
+        days = self.week() if rng == "week" else [self._day_summary(self, self.rec.start.strftime("%m/%d") + " (오늘)")]
+        rows = [dict(r, date=d["date"]) for d in reversed(days) for r in d["alerts"]]
+        f = self.alert_funnel(rows)
+        return {"range": rng, "rows": rows, "funnel": f, "simulated_days": rng == "week"}
+
+    # ---------- CSV ----------
+    @staticmethod
+    def _csv(header, rows):
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(header)
+        w.writerows(rows)
+        return "﻿" + buf.getvalue()           # 엑셀에서 한글이 깨지지 않게 BOM
+
+    def csv_trips(self, rng="today"):
+        a = self.analysis_range(rng)
+        rows = [[r["date"], r["vehicle_id"], r["trip"], r["cargo"], r["load_t"], r["yard"], r["call"] or "", r["enter"] or "", r["exit"] or "",
+                 r["rec_wait"], ("≥" if r["fifo_lower"] else "") + str(r["fifo_wait"]), r["effect"], r["won"], r["source"], r["state"],
+                 "확정" if r["confirmed"] else "예상"] for r in a["records"]]
+        conf = [r for r in a["records"] if r["confirmed"]]
+        rows.append(["합계(확정)", "", "", "", "", "", "", "", "", "", "", round(sum(r["effect"] for r in conf), 1),
+                     sum(r["won"] for r in conf), f"{len(conf)}대", "", ""])
+        return self._csv(["날짜", "차량", "회차", "원료", "중량(t)", "대기 시작", "호출", "진입", "이탈", "실제 대기(분)", "FIFO였다면(분)",
+                          "효과(분)", "금액(원)", "효과를 만든 것", "상태", "확정"], rows)
+
+    def csv_alerts(self, rng="today"):
+        a = self.alerts_range(rng)
+        fm = lambda e: "" if not e else e["min"]
+        rows = [[r["date"], r["ts"], r["kind"], r["text"], r["suggest"], r["handling"], fm(r["expected"]), fm(r["actual"])] for r in a["rows"]]
+        return self._csv(["날짜", "시각", "알림", "무슨 일", "제안", "처리", "예상 효과(분)", "실제 효과(분)"], rows)
+
+    def csv_report(self, rng="today"):
+        a = self.analysis_range(rng)
+        t = a["total"]
+        rows = [["범위", "최근 7일 (시뮬레이션)" if rng == "week" else "오늘 (시뮬레이션)"],
+                ["오늘 대기 절감(원)" if rng != "week" else "7일 대기 절감(원)", t["won"]],
+                ["효과 합(분)", t["effect_min"]], ["효과 확정 차량", t["vehicles"]], ["단가(원/분)", t["won_per_min"]],
+                ["호퍼 유휴 금액 포함", "예" if t["idle_in_cost"] else "아니오"], [], ["절감이 어디서 나왔나", "건수", "효과(분)", "금액(원)"]]
+        rows += [[s["source"], s["n"], s["min"], s["won"]] for s in a["sources"]]
+        rows += [[], ["시간 지표", "FIFO", "추천"], ["하차구 가동률(%)"] + a["times"]["util"], ["작업 지연(건)"] + a["times"]["delays"],
+                 ["처리(회)"] + a["times"]["trips"], ["호퍼 유휴(분)"] + a["times"]["idle"], ["평균 대기(분)"] + a["times"]["avg_wait"]]
+        if rng == "week":
+            rows += [[], ["날짜", "효과(분)", "절감(원)", "FIFO 평균 대기", "추천 평균 대기"]]
+            rows += [[d["date"], d["effect_min"], d["won"]] + d["avg_wait"] for d in a["days"]]
+        return self._csv(["항목", "값"], rows)
 
 
 LABELS = {"warn_pct": "혼잡 주의 기준(%)", "crit_pct": "혼잡 기준(%)", "target_wait_min": "목표 대기(분)",

@@ -295,6 +295,7 @@ check("재계산해도 승인 모드·승인 기록 유지", ra.rec.require_appr
 ra.set_auto_approve(True)
 ra.advance(1)
 check("자동 승인 다시 켜면 밀린 호출이 풀림", not ra.rec.pending)
+ra.ignore_alert(next(a["id"] for a in ra.rec.alerts_all if a["kind"] != "호출"))
 types_r4 = {e["type"] for e in ra.rec.events}
 check("CALL_PENDING · APPROVAL_MODE 이벤트가 나옴", {"CALL_PENDING", "APPROVAL_MODE"} <= types_r4)
 check("이벤트 종류가 events.md 표와 일대일 (시뮬레이션 + 담당자 행동 + 승인 흐름)", (seen | types_after | types_r4) == types,
@@ -323,6 +324,61 @@ rs.advance(1)
 sch2 = rs.schedule()
 check("호퍼 정지 → 그 줄은 정지 구간, 예약 없음",
       all(not r["up"] and all(g["kind"] in ("stop", "coming") for g in r["segs"]) for r in sch2["rows"] if r["sector_id"] == "B"))
+
+# ---------- R5: 건별 기록 · 효과 출처 · 알림 이력 · 바꿔보기 · 설정 · 구역 ----------
+r5 = Runtime(7)
+r5.advance(200)
+eff5 = r5.effects()
+recs = r5.records(eff5)
+conf5 = [r for r in recs if r["confirmed"]]
+tot5 = r5.effect_total(eff5)
+check("건별 기록 효과 합 = 성과·비용 합계", abs(round(sum(r["effect"] for r in conf5), 1) - tot5["min"]) < 0.05 and len(conf5) == tot5["vehicles"],
+      f"{len(conf5)}대 · {tot5['min']}분")
+srcs = r5.sources(recs)
+check("효과를 만든 것별 합 = 합계 (종류 7가지)", len(srcs) == 7 and abs(round(sum(x["min"] for x in srcs), 1) - tot5["min"]) < 0.05
+      and sum(x["n"] for x in srcs) == tot5["vehicles"],
+      " · ".join(f"{x['source'].split(' ')[0]} {x['n']}" for x in srcs if x["n"]))
+csvt = r5.csv_trips("today").splitlines()
+check("CSV 합계 줄 = 화면 합계", csvt[-1].split(",")[11] == str(round(sum(r["effect"] for r in conf5), 1))
+      and int(csvt[-1].split(",")[12]) == sum(r["won"] for r in conf5), csvt[-1][:60])
+check("EFFECT_CONFIRMED 이벤트 = 확정 차량 수", sum(e["type"] == "EFFECT_CONFIRMED" for e in r5.rec.events) == len(r5.confirmed)
+      and len(r5.confirmed) >= tot5["vehicles"] - sum(1 for k in r5.confirmed if k not in eff5))
+ah5 = r5.alert_history(eff5)
+fn5 = r5.alert_funnel(ah5)
+check("알림 퍼널: 알림 ≥ 제안 ≥ 실행 ≥ 효과 확정, 예상·실제 합은 목록과 같음",
+      fn5["ops"] >= fn5["proposed"] >= fn5["executed"] >= fn5["confirmed"] > 0
+      and abs(fn5["actual_min"] - round(sum(r["actual"]["min"] for r in ah5 if r["group"] == "운영" and r["has_vehicles"]
+                                           and r["handling"] in ("실행", "변경 저장") and r["actual"] and r["expected"]), 1)) < 0.05,
+      f"{fn5['ops']} → {fn5['proposed']} → {fn5['executed']} → {fn5['confirmed']} · 예상 {fn5['expected_min']} / 실제 {fn5['actual_min']}분")
+check("알림마다 예상 효과(제안할 때)가 남음", any(r["expected"] for r in ah5 if r["group"] == "운영"))
+snap = (json.dumps(r5.assumptions, sort_keys=True, ensure_ascii=False), r5.rec.t, len(r5.rec.events), len(r5.history))
+pv = r5.preview({"std_times": {"석회석": 13}, "target_wait_min": 20})
+check("바꿔보기는 저장·기록을 건드리지 않음",
+      snap == (json.dumps(r5.assumptions, sort_keys=True, ensure_ascii=False), r5.rec.t, len(r5.rec.events), len(r5.history)))
+check("바꿔보기 결과: 바뀐 값 2개, 호출이 바뀌는 차량·하차구 비는 시각", len(pv["diff"]) == 2 and pv["rows"] and "schedule" in pv,
+      f"차량 {pv['changed_n']}대 · 하차구 {len(pv['bays'])}줄 · 효과 합 {pv['total_old']['min']} → {pv['total_new']['min']}분")
+same = r5.preview({"target_wait_min": r5.assumptions["target_wait_min"]})
+check("현재 기준과 같으면 미리보기 없음", same["same"] and not same["diff"])
+r5.set_assumptions({"std_times": {"석회석": 13}, "target_wait_min": 20})
+check("[설정에 반영] = 미리보기와 같은 결과", abs(r5.compare()["effect"]["min"] - pv["total_new"]["min"]) < 0.05,
+      f"{r5.compare()['effect']['min']}분")
+c_off = r5.compare()["cost"]
+r5.set_assumptions({"idle_in_cost": True})
+c_on = r5.compare()["cost"]
+check("유휴 금액 포함 스위치: 끄면 대기 절감만, 켜면 유휴 금액이 더해짐",
+      not c_off["idle_in_cost"] and c_off["idle"] == 0 and c_on["idle_in_cost"] and c_on["total"] == c_on["wait"] + c_on["idle"],
+      f"끔 ₩{c_off['total']:,} · 켬 ₩{c_on['total']:,}")
+check("변경 이력에 누가·무엇을", r5.history[0]["by"] == "관제 담당자" and "유휴" in r5.history[0]["text"])
+rois = json.loads((ROOT / "data" / "rois.json").read_text(encoding="utf-8"))
+kinds = {z["type"] for c in rois["cams"] for z in c["zones"]}
+check("구역(ROI) JSON: CAM 4개, 하차·대기·위험 다각형", len(rois["cams"]) == 4 and kinds == {"하차", "대기", "위험"}
+      and all(len(z["points"]) >= 3 for c in rois["cams"] for z in c["zones"]),
+      f"구간 {sum(len(c['zones']) for c in rois['cams'])}개")
+r7 = Runtime(7)
+r7.WEEK_SEEDS = [1, 2]
+wk = r7.analysis_range("week")
+check("최근 7일(시뮬레이션): 날짜별 합 = 기간 합계", len(wk["days"]) == 3 and abs(sum(d["effect_min"] for d in wk["days"]) - wk["total"]["effect_min"]) < 0.1,
+      f"{len(wk['days'])}일 · {wk['total']['effect_min']}분")
 
 if "--samples" in sys.argv:
     out = ROOT / "docs" / "sample_events.jsonl"

@@ -84,6 +84,8 @@
 | `ORDER_CHANGED` | 통합하역작업 탭 | 담당자가 보낼 호퍼 변경 (payload: from, to, reason, memo, delta_min, cost_won) |
 | `ALERT_ACK` | 관제 화면 · 알림 이력 탭 | 알림 확인 (payload: alert_id, ack_sec = 뜬 뒤 확인까지 실제 초) |
 | `ASSUMPTIONS_UPDATED` | 설정 › 가정값·단가 | 가정값 변경 → 처음부터 다시 계산 (payload: changes[]) |
+| `EFFECT_CONFIRMED` | 런타임(효과 계산) | 반입 한 건의 효과 확정 — 두 방식 모두 하차를 시작했을 때 한 번 (payload: trip, rec_wait_min, fifo_wait_min, effect_min, won, source = 효과를 만든 것) |
+| `ALERT_IGNORED` | 알림 이력 [무시] | 담당자가 알림의 제안을 무시 (payload: alert_id, kind). 무시한 알림의 실제 효과도 알림 이력에 남는다 |
 | `APPROVAL_MODE` | 순번·배정 자동 승인 스위치 | 자동 승인 켜기/끄기 (payload: auto). 끄면 승인 전 호출은 `CALL_PENDING`으로 멈춘다 |
 
 R2에서 팀이 제안한 `order_approved` 등 소문자 이름은 기존 형식에 맞춰 대문자로 썼다. 변경 사유 코드는
@@ -131,6 +133,29 @@ R2에서 팀이 제안한 `order_approved` 등 소문자 이름은 기존 형식
  "track_id": 14, "vehicle_id": "82자 2321", "payload": {"rank": 1, "reason": "투입 기한 순(41분 남음) · 호퍼 A 전용 원료", "since": "09:05"}}
 {"ts": "2026-11-09T09:04:00", "type": "APPROVAL_MODE", "source": "ui", "cam_id": null, "sector_id": null, "zone": null,
  "track_id": null, "vehicle_id": null, "payload": {"auto": false}}
+```
+
+### 운영 분석 · 알림 이력 · 설정 · 바꿔보기 (R5)
+
+- **효과를 만든 것(source)**: 그 반입에 붙은 결정·알림으로 하나만 고른다. 담당자 순번 변경 → 긴급 반입 → 호퍼 정지 → 재배정 → 대기 초과 → 우선 배정 → 혼잡 → 호출 보류 → 작업 지연 → 호출 늦춤 → 그 밖은 "가장 빨리 비는 하차구 (일반 추천)".
+- **예상 효과** = 알림이 뜰 때(제안할 때) 관련 반입의 FIFO 대비 효과를 계산해 남긴 값, **실제 효과** = 관련 반입이 모두 `EFFECT_CONFIRMED` 된 뒤의 합.
+- `ASSUMPTIONS_UPDATED`는 설정 저장과 바꿔보기 [설정에 반영] 모두에서 나오고, 변경 이력에 누가(관제 담당자)·언제가 남는다. 바꿔보기 미리보기 자체는 저장하지 않으므로 이벤트를 내지 않는다(같은 행동 기록으로 복사본을 다시 돌려 차이만 돌려줌).
+- **최근 7일**: 시드를 바꾼 시뮬레이션 6일 + 오늘. 실제 운영 기록이 아니다.
+
+| 주소 | 하는 일 |
+|---|---|
+| `GET /api/analysis2?range=today\|week` | 성과·비용(절감 합계, 효과를 만든 것별 합, 시간 지표, 그래프) + 건별 기록(차량별 효과) + 원료별 실측 하차시간 |
+| `GET /api/alerts/history?range=` | 알림 → 제안 → 처리 → 예상·실제 효과 한 줄씩 + 퍼널(알림 → 제안 → 실행 → 효과 확정) + 예상 대 실제 |
+| `POST /api/alerts/{id}/ignore` | 제안 무시 (`ALERT_IGNORED`) |
+| `POST /api/preview` `{std_times?, target_wait_min?, call_margin_min?}` | 바꿔보기: 호출 시각·효과·하차구 비는 시각이 어떻게 바뀌는지 (저장 안 함) |
+| `GET /api/settings` | 가정값 + 변경 이력 + 원료별 실측 평균 + 표준시간 제안 |
+| `GET /api/rois` | CAM별 구역(ROI) 다각형 (data/rois.json, 1920x1080 첫 프레임 기준) |
+| `GET /api/export/report.csv` · `trips.csv` · `alerts.csv` `?range=` | 보고서 · 건별 기록 · 알림 이력 CSV (엑셀용 BOM) |
+
+```json
+{"ts": "2026-11-09T08:41:15", "type": "EFFECT_CONFIRMED", "source": "engine", "cam_id": null, "sector_id": "A", "zone": null,
+ "track_id": 9, "vehicle_id": "81자 1965", "payload": {"trip": 1, "rec_wait_min": 6.5, "fifo_wait_min": 11.25, "effect_min": -4.8,
+ "won": -2375, "source": "가장 빨리 비는 하차구 (일반 추천)"}}
 ```
 
 ### 다음 라운드 예정 (아직 내지 않음)
