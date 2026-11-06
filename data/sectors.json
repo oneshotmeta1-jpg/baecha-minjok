@@ -1,5 +1,5 @@
 {
-  "_note": "포항제철소 원료·소결 지구. 배경 지도는 OpenStreetMap 실제 데이터(data/site_map.json, ODbL), 경로는 OSM 도로를 따라 잰 실제 길이(roads[].length_m, m). 원료야드·계근대·대기장·호퍼 A/B/C의 위치와 크기는 가정(실제 소결공장 호퍼 위치가 아님, 상자 크기는 기호). 좌표는 px(1600x900, 왼쪽 위 0,0), 1px = map.mpp m. tools/build_map.py로 다시 만든다. 덤프트럭은 원료야드에서 부원료·재활용 원료·연료를 싣고 계근대를 거쳐 하차 호퍼에 붓고, 공차로 원료야드에 돌아가 다시 싣는다.",
+  "_note": "포항제철소 원료·소결 지구. 배경 지도는 OpenStreetMap 실제 데이터(data/site_map.json, ODbL), 경로는 OSM 도로를 따라 잰 실제 길이(roads[].length_m, m). 원료야드·계근대·대기장·호퍼 A/B/C의 위치와 크기는 가정(실제 소결공장 호퍼 위치가 아님, 상자 크기는 기호). 좌표는 px(1600x900, 왼쪽 위 0,0), 1px = map.mpp m. tools/build_map.py로 다시 만든다. 덤프트럭은 원료야드에서 부원료·재활용 원료·연료를 싣고 계근대를 거쳐 하차 호퍼에 붓고, 공차로 원료야드에 돌아가 다시 싣는다. R10: 기획서 기준 호퍼 A·B·C마다 베이 3개, 베이마다 원료 1종(bay_cargo). 석회석만 A1·C3 두 곳.",
   "site": {
     "name": "포항제철소 소결공장",
     "area": "원료·소결 지구 (OSM 지도 · 시설 위치 가정)"
@@ -169,8 +169,8 @@
         ]
       ],
       "cam_id": "CAM-01",
-      "bays": 2,
-      "queue_slots": 2,
+      "bays": 3,
+      "queue_slots": 3,
       "cargo": [
         "석회석",
         "사문암",
@@ -179,7 +179,12 @@
       "cam_zones": {
         "bay": [],
         "queue": []
-      }
+      },
+      "bay_cargo": [
+        "석회석",
+        "사문암",
+        "규석"
+      ]
     },
     {
       "id": "B",
@@ -204,8 +209,8 @@
         ]
       ],
       "cam_id": "CAM-02",
-      "bays": 2,
-      "queue_slots": 2,
+      "bays": 3,
+      "queue_slots": 3,
       "cargo": [
         "밀스케일",
         "슬러지",
@@ -214,7 +219,12 @@
       "cam_zones": {
         "bay": [],
         "queue": []
-      }
+      },
+      "bay_cargo": [
+        "밀스케일",
+        "슬러지",
+        "집진더스트"
+      ]
     },
     {
       "id": "C",
@@ -239,8 +249,8 @@
         ]
       ],
       "cam_id": "CAM-03",
-      "bays": 1,
-      "queue_slots": 2,
+      "bays": 3,
+      "queue_slots": 3,
       "cargo": [
         "분코크스",
         "무연탄",
@@ -249,7 +259,12 @@
       "cam_zones": {
         "bay": [],
         "queue": []
-      }
+      },
+      "bay_cargo": [
+        "분코크스",
+        "무연탄",
+        "석회석"
+      ]
     }
   ],
   "roads": [
@@ -972,5 +987,14 @@
       "sector_id": null,
       "source": null
     }
-  ]
+  ],
+  "safety": {
+    "_note": "안전 경고 가정값(확인 필요). 적재함이 올라간 하차 중에 그 하차구 뒤 위험 구역(rois.json의 REAR, 덤프 반경 5m)에 작업자가 들어오는 상황을 반입마다 정해진 확률로 만든다. 같은 시드·같은 반입이면 같은 결과. 30%(가정)는 후진 진입 중 후진 경로(rois.json BACK) 침입, 나머지는 적재함 상승 중 덤프 반경(REAR) 침입. 안전 중지인 베이는 후속 호출을 보류한다.",
+    "radius_m": 5,
+    "per_raised_hour": 0.6,
+    "persist_prob": 0.3,
+    "repeat_min": 3,
+    "auto_clear_min": 6,
+    "reverse_share": 0.3
+  }
 }

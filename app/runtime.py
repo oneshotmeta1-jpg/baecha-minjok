@@ -14,7 +14,9 @@ import time
 from datetime import timedelta
 from pathlib import Path
 
-from .sim import Sim, STEP, default_assumptions
+from datetime import datetime
+
+from .sim import Sim, STEP, default_assumptions, trip
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -62,8 +64,9 @@ class Store:
 
 
 class Runtime:
-    def __init__(self, seed=7, db_path=None, assumptions_path=None, clock=time.monotonic):
+    def __init__(self, seed=7, db_path=None, assumptions_path=None, clock=time.monotonic, video=False):
         self.seed = seed
+        self.video = video          # True: 영상 모드 — 실제 움직임은 POST /api/ingest 이벤트로만
         self.clock = clock
         self.store = Store(db_path or ":memory:")
         self.assumptions_path = Path(assumptions_path) if assumptions_path else None
@@ -82,8 +85,12 @@ class Runtime:
         self.expected = {}       # 알림 id → 제안할 때 계산한 예상 효과
         self.confirmed = set()   # 효과가 확정된 반입 (EFFECT_CONFIRMED를 이미 낸 것)
         self.fifo = None
-        self.rec = Sim(self.seed, on_event=self._on_event, mode="recommend", assumptions=self.assumptions)
+        self.rec = Sim(self.seed, on_event=self._on_event, mode="recommend", assumptions=self.assumptions, driven=self.video)
         self.fifo = Sim(self.seed, mode="fifo", assumptions=self.assumptions)
+        if self.video:                      # FIFO 기준선 = 같은 도착을 기존 방식으로 돌린 가상 결과 (도착은 GATE_IN에서 받음)
+            self.fifo.pending_arrivals = []
+            self.fifo.truck = {}
+            self.ingested = []
         if self.speed:
             self.rec.speed = self.speed
 
@@ -98,12 +105,16 @@ class Runtime:
         self.auto_approve = True # 자동 승인 스위치 (끄면 현장 담당자가 승인해야 호출 — L2)
         self.ignored_alerts = set()   # 담당자가 [무시]한 알림
         self.requested = {}           # 현장 담당자에게 승인 요청을 보낸 반입 → 요청 시각
+        self.safety_wall = {}         # 안전 경고 id → 발생 실제 시각 (확인까지 걸린 초)
+        self.safety_acks = {}         # 안전 경고 id → {how, ack_sec} (재계산 때 유지)
         self.week_cache = None
         self.store.clear()
         self._new_sims()
 
     def _on_event(self, ev):
         self.store.event(ev)
+        if ev["type"] == "SAFETY_ALERT":
+            self.safety_wall.setdefault(ev["payload"]["id"], self.clock())
         if ev["type"] == "ALERT":
             a = ev["payload"]["id"]
             self.alert_wall.setdefault(a, self.clock())
@@ -147,6 +158,10 @@ class Runtime:
             self.rec.approved.add(a["key"])
         elif k == "auto":
             self.rec.require_approval = not a["on"]
+        elif k == "safety_force":
+            self.rec.force_safety(a["sector_id"]); self.fifo.force_safety(a["sector_id"])
+        elif k == "safety":
+            self.rec.safety_resolve(a["id"], a["how"], self.safety_acks.get(a["id"], {}).get("ack_sec"))
         self.rec.replan(); self.fifo.replan()
 
     def step(self):
@@ -224,6 +239,45 @@ class Runtime:
         tmp.rebuild()
         return tmp
 
+    # ---------- 영상 모드: 이벤트 받기 (워크플로우 ② "모든 이벤트는 한 형식으로") ----------
+    def ev_minutes(self, ev):
+        try:
+            return (datetime.fromisoformat(ev["ts"]) - self.rec.start).total_seconds() / 60
+        except (KeyError, ValueError, TypeError):
+            return self.rec.t
+
+    def ingest(self, events):
+        """영상·현장 신호 이벤트를 받는다. 이벤트 시각까지 시계를 돌린 뒤 상태에 반영한다.
+        FIFO 기준선에는 GATE_IN을 같은 시각의 도착으로 넣는다(가상 결과)."""
+        if isinstance(events, dict):
+            events = [events]
+        out = []
+        for ev in sorted(events, key=lambda e: e.get("ts", "")):
+            m = self.ev_minutes(ev)
+            while self.rec.t + 1e-9 < m:
+                self.step()
+            ev = {"source": "cam", "vehicle_id": None, "sector_id": None, "zone": None, "payload": {}, **ev,
+                  "ts": ev.get("ts") or self.rec.clock().isoformat(timespec="seconds")}
+            r = self.rec.ingest(ev)
+            if r == "ok":
+                self.store.event(ev)
+                if getattr(self, "ingested", None) is not None:
+                    self.ingested.append(ev)
+                if ev["type"] == "GATE_IN" and ev.get("vehicle_id"):
+                    v = self.rec.vehicles[ev["vehicle_id"]]
+                    a = {k: v[k] for k in ("id", "trip", "type", "cargo", "arr_t", "due_t", "urgent", "load_t")}
+                    a["work_factor"] = trip(self.seed, {"plate": v["id"], "cargo": v["cargo"]}, v["trip"], v["arr_t"], self.fifo.fc)["work_factor"]
+                    self.fifo.truck.setdefault(v["id"], {"plate": v["id"], "cargo": v["cargo"], "first_t": v["arr_t"], "extra": True})
+                    self.fifo.pending_arrivals.append(a)
+                    self.fifo.pending_arrivals.sort(key=lambda x: (x["arr_t"], x["id"]))
+                elif ev["type"] == "URGENT_IN":
+                    pass
+                elif ev["type"] in ("YARD_DOWN", "YARD_UP") and ev.get("sector_id") in self.fifo.sec_cfg:
+                    (self.fifo.sector_down if ev["type"] == "YARD_DOWN" else self.fifo.sector_up)(ev["sector_id"])
+            out.append(r)
+        self.store.commit()
+        return out
+
     # ---------- 시연 버튼 ----------
     def _record(self, kind, **kw):
         a = dict(kw, kind=kind, t=self.rec.t)
@@ -257,6 +311,24 @@ class Runtime:
         self._ui("ORDER_APPROVED", vid, p["sector_id"], {"rank": p["rank"], "reason": p["reason"]})
         return True
 
+    # ---------- 안전 경고 ----------
+    def force_safety(self, sid):
+        n0 = len(self.rec.safety)
+        self._record("safety_force", sector_id=sid)
+        return self.rec.safety[-1] if len(self.rec.safety) > n0 else None
+
+    def safety_resolve(self, sid_, how):
+        """[확인] 또는 [오탐지]. 하차 중지가 풀리고, 확인까지 걸린 실제 초를 남긴다."""
+        x = next((x for x in self.rec.safety if x["id"] == sid_), None)
+        if not x or x["status"] != "open" or how not in ("ack", "dismiss"):
+            return None
+        wall = self.safety_wall.get(sid_)
+        self.safety_acks[sid_] = {"how": how, "ack_sec": round(self.clock() - wall, 1) if wall is not None else None}
+        self._record("safety", id=sid_, how=how)
+        self._ui("SAFETY_ACK", x["vehicle_id"], x["sector_id"],
+                 {"id": sid_, "how": "확인" if how == "ack" else "오탐지", "ack_sec": self.safety_acks[sid_]["ack_sec"], "repeat": x["repeat"]})
+        return x
+
     def request_approval(self):
         """[현장 담당자에게 승인 요청]: 아직 승인 안 된 순번을 현장 담당자 앱으로 보낸다(가상)."""
         keys = []
@@ -268,7 +340,7 @@ class Runtime:
                 self.requested[k] = self.rec.hhmm(self.rec.t)
                 keys.append(k)
         if keys:
-            self._ui("APPROVAL_REQUESTED", None, None, {"n": len(keys), "vehicles": keys, "to": "현장 담당자"})
+            self._ui("CALL_REQUEST", None, None, {"n": len(keys), "vehicles": keys, "to": "현장 담당자 앱(가상 푸시)"})
         return keys
 
     def set_auto_approve(self, on: bool):
@@ -576,6 +648,64 @@ class Runtime:
                 break
         return out
 
+    CHECK_KINDS = ("하차 지연", "혼잡", "호퍼 이상")
+
+    def panel2(self):
+        """알림 패널(시안 v4): [순번 | 안전] · 순번 › [승인 대기 | 확인 필요]."""
+        sim, eff = self.rec, self.effects()
+        hh = sim.hhmm
+        # 확인 필요: 현장 점검 요청 — 같은 호퍼·같은 종류는 한 카드로
+        groups = {}
+        for a in sim.alerts_all:
+            if a["kind"] not in self.CHECK_KINDS or a["ack"] or a["id"] in self.ignored_alerts or a["level"] == "info":
+                continue
+            g = groups.setdefault((a["sector_id"], a["kind"]), {"sector_id": a["sector_id"], "kind": a["kind"], "items": []})
+            es = [eff[k] for k in a.get("related", []) if k in eff]
+            g["items"].append({"id": a["id"], "ts": a["ts"], "t": a["t"], "text": a["text"], "vehicle_id": a["vehicle_id"],
+                               "suggest": a["action"], "effect": round(sum(e["effect"] for e in es), 1) if es and all(e["confirmed"] for e in es) else None})
+        checks = []
+        for g in groups.values():
+            g["items"].sort(key=lambda x: -x["t"])
+            name = sim.sec_cfg[g["sector_id"]]["name"] if g["sector_id"] in sim.sec_cfg else ""
+            n = len(g["items"])
+            g.update(name=name, n=n, ts=g["items"][0]["ts"], t=g["items"][0]["t"], suggest=g["items"][0]["suggest"],
+                     title=f"{name} {g['kind']}" + (f" {n}건" if n > 1 else ""), ids=[x["id"] for x in g["items"]])
+            checks.append(g)
+        checks.sort(key=lambda g: -g["t"])
+        # 승인 대기: 순번·호출을 바꾸는 제안 (승인해야 운전자에게 호출이 감)
+        cause = {}
+        for g in checks:
+            for a in sim.alerts_all:
+                if a["id"] in g["ids"]:
+                    for k in a.get("related", []):
+                        cause[k] = f"{g['title']} 때문 (확인 필요 탭)"
+        waitover = {k: a for a in sim.alerts_all if a["kind"] == "대기 초과" for k in a.get("related", [])}
+        sched = self.schedule()
+        bay = {g["vehicle_id"]: r["bay"] for r in sched["rows"] for g in r["segs"]}
+        appr = []
+        for p in sim.plan:
+            if not p["sector_id"] or p["vehicle_id"] in sim.overrides:
+                continue
+            v = sim.vehicles[p["vehicle_id"]]
+            k = sim.key(v)
+            if k in self.approved:
+                continue
+            e = eff.get(k)
+            why = cause.get(k) or (f"대기 {int(sim.t - v['yard_t'])}분 (목표 {self.assumptions['target_wait_min']:g}분)" if k in waitover
+                                   else p["reason"].split(" · ")[0])
+            appr.append({"vehicle_id": v["id"], "rank": p["rank"], "sector_id": p["sector_id"], "name": sim.sec_cfg[p["sector_id"]]["name"],
+                         "bay": bay.get(v["id"]), "call_at": hh(p["call_t"]) if p["call_t"] is not None else None,
+                         "travel": round(sim.travel("YARD", p["sector_id"]), 1), "why": why, "urgent": v["urgent"],
+                         "effect": e["effect"] if e else None, "effect_confirmed": bool(e and e["confirmed"]),
+                         "overdue": k in sim.pending, "wait": round(sim.t - v["yard_t"], 1)})
+        safe_open = [x for x in sim.safety if x["status"] == "open"]
+        safe_done = [dict(x, ack_sec=self.safety_acks.get(x["id"], {}).get("ack_sec", x["ack_sec"])) for x in sim.safety if x["status"] != "open"]
+        n_checks = sum(g["n"] for g in checks)
+        return {"approvals": appr, "checks": checks, "safety_open": safe_open, "safety_done": list(reversed(safe_done)),
+                "counts": {"approvals": len(appr), "checks": n_checks, "seq": len(appr) + n_checks, "safety": len(safe_open)},
+                "auto_approve": self.auto_approve, "total": self.effect_total(eff), "clock": hh(sim.t),
+                "sector_names": {sid: sc["name"] for sid, sc in sim.sec_cfg.items()}}
+
     def panel(self):
         eff = self.effects()
         cards = self.alert_cards(eff=eff)
@@ -584,7 +714,7 @@ class Runtime:
                            "open": sum(c["status"] in ("승인 대기", "확인 필요") for c in cards)},
                 "clock": self.rec.hhmm(self.rec.t)}
 
-    # ---------- 순번·배정: 하차구(베이) 비는 시각 시간표 ----------
+    # ---------- 순번·배정: 베이 비는 시각 시간표 ----------
     def schedule(self, before=5, after=40):
         sim, t = self.rec, self.rec.t
         t0, t1 = t - before, t + after
@@ -690,7 +820,7 @@ class Runtime:
                 "wait_rate": a["wait_won_per_hour"], "won_per_min": eff["won_per_min"], "idle_rate": a["idle_won_per_hour"]}
 
     # ---------- 효과를 만든 것 · 건별 기록 ----------
-    SOURCES = ["가장 빨리 비는 하차구 (일반 추천)", "대기 초과 → 우선 배정", "혼잡 → 호출 보류", "작업 지연 → 호출 늦춤",
+    SOURCES = ["가장 빨리 비는 베이 (일반 추천)", "대기 초과 → 우선 배정", "혼잡 → 호출 보류", "작업 지연 → 호출 늦춤",
                "긴급 반입 → 순번 올림", "호퍼 정지 → 재배정", "담당자 순번 변경"]
     ALERT_SOURCE = {"호퍼 이상": "호퍼 정지 → 재배정", "대기 초과": "대기 초과 → 우선 배정", "혼잡": "혼잡 → 호출 보류",
                     "하차 지연": "작업 지연 → 호출 늦춤"}
@@ -719,7 +849,7 @@ class Runtime:
         for s in ["호퍼 정지 → 재배정", "대기 초과 → 우선 배정", "혼잡 → 호출 보류", "작업 지연 → 호출 늦춤"]:
             if s in srcs:
                 return s
-        return "가장 빨리 비는 하차구 (일반 추천)"
+        return "가장 빨리 비는 베이 (일반 추천)"
 
     def records(self, eff=None):
         """차량별 효과 표 (건별 기록). 효과 합 = effect_total()과 같은 반입 집합."""
@@ -819,6 +949,15 @@ class Runtime:
                          "actual": {"min": e["effect"], "won": int(round(e["effect"] * self.won_per_min()))} if e and e["confirmed"] else None,
                          "has_vehicles": True, "sector_id": c["to"], "vehicle_id": c["vehicle_id"], "group": "순번 변경", "ack": True,
                          "actual_note": "FIFO 대비"})
+        for x in self.rec.safety:                        # 안전 경고도 한 줄로 (금액 계산 안 함)
+            how = {"open": "미확인", "ack": "확인", "dismissed": "오탐지", "auto": "자동 해제 · 미확인"}[x["status"]]
+            ack = self.safety_acks.get(x["id"], {}).get("ack_sec")
+            rows.append({"id": x["id"], "ts": x["ts"][:5], "t": x["t"], "level": "crit", "kind": "안전",
+                         "text": f"{self.rec.sec_cfg[x['sector_id']]['name']} · {x['cargo']} {x.get('rule_text', '덤프 반경')} 안 작업자 ({x['dist_m']}m) · {x['vehicle_id']}"
+                                 + (" · 다시 감지" if x["repeat"] else ""),
+                         "suggest": "L3 자동 실행: 앱 경고 · 하차 중지 요청 (가상)", "handling": how + (f" · {ack}초" if ack is not None else ""),
+                         "expected": None, "actual": None, "has_vehicles": False, "sector_id": x["sector_id"], "vehicle_id": x["vehicle_id"],
+                         "group": "안전", "ack": x["status"] != "open", "actual_note": "금액 없음"})
         rows.sort(key=lambda r: -r["t"])
         return rows
 
@@ -1041,6 +1180,12 @@ class Runtime:
                 r.sector_up(a["sector_id"])
             elif a["kind"] == "urgent":
                 r.add_urgent()
+            elif a["kind"] == "safety":
+                x = r.force_safety(a["sector_id"])
+                if x:                                    # 시연: 관제 담당자가 40초 뒤 확인했다고 가정
+                    r.advance(0.75)
+                    r.safety_wall[x["id"]] = r.clock() - 40
+                    r.safety_resolve(x["id"], "ack")
         r.advance(r.rec.fc["shift_min"] + 30 - r.rec.t)
         day = r._day_summary(r, demo["label"])
         day["demo"] = demo
@@ -1081,7 +1226,7 @@ class Runtime:
                 ["효과 합(분)", t["effect_min"]], ["효과 확정 차량", t["vehicles"]], ["단가(원/분)", t["won_per_min"]],
                 ["호퍼 유휴 금액 포함", "예" if t["idle_in_cost"] else "아니오"], [], ["절감이 어디서 나왔나", "건수", "효과(분)", "금액(원)"]]
         rows += [[s["source"], s["n"], s["min"], s["won"]] for s in a["sources"]]
-        rows += [[], ["시간 지표", "FIFO", "추천"], ["하차구 가동률(%)"] + a["times"]["util"], ["작업 지연(건)"] + a["times"]["delays"],
+        rows += [[], ["시간 지표", "FIFO", "추천"], ["베이 가동률(%)"] + a["times"]["util"], ["작업 지연(건)"] + a["times"]["delays"],
                  ["처리(회)"] + a["times"]["trips"], ["호퍼 유휴(분)"] + a["times"]["idle"], ["평균 대기(분)"] + a["times"]["avg_wait"]]
         if rng == "week":
             rows += [[], ["날짜", "효과(분)", "절감(원)", "FIFO 평균 대기", "추천 평균 대기"]]

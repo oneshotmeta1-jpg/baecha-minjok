@@ -27,7 +27,7 @@
 
 - 샘플: [sample_events.jsonl](sample_events.jsonl) — 소결공장 시나리오, 시드 7, 덤프트럭 20대 4시간 순환 운행, 호퍼 A 정지(08:02)·긴급 반입·A 복구 포함 1,244건
 - 다시 만들기·형식 확인: `py tests/test_sim.py --samples`
-- 소결 호퍼에서는 `CRANE_START`/`CRANE_DONE`을 **덤프 하차 시작·완료**로 쓴다(`payload.stand_in: "dump"`, DONE에는 `load_t`). `GATE_IN.payload`에 `load_t`(적재 t)·`trip`(회차)이 있다.
+- 이벤트 이름은 워크플로우 ⑤(데이터·이벤트 구조)와 같다. 하역 시작·끝은 `BAY_ENTER`/`BAY_EXIT`(베이 1~3), 하역장 정지는 `YARD_DOWN/UP`, 긴급은 `URGENT_IN`, 승인 요청은 `CALL_REQUEST`. `GATE_IN.payload`에 `load_t`(적재 t)·`trip`(회차)이 있다.
 - 영상·설비가 붙기 전에는 시뮬레이터가 대신 내며 `source: "sim"`, `payload.stand_in: "cam" | "crane"`으로 표시한다.
   비전 파트는 같은 이벤트를 `source: "cam"`으로 내면 된다.
 
@@ -71,14 +71,18 @@
 | type | 내는 곳 | 의미 |
 |---|---|---|
 | `GATE_IN` | 기사 앱(가정) → 시뮬레이터 | 도착, 차량 등록 (payload: vehicle, cargo, due, urgent) |
-| `BEACON_NEAR` | 기사 앱(가정) → 시뮬레이터 | 차량이 어느 구역 근처인지. 영상 이벤트에 vehicle_id를 붙이는 데 씀 |
+| `ZONE_ARRIVE` | 기사 앱 위치(가정) → 시뮬레이터 | 차량 대기장 도착 (zone=yard) |
+| `BEACON_NEAR` | 기사 앱(가정) → 시뮬레이터 | 차량이 어느 구역 근처인지(호퍼 대기선). 영상 이벤트에 vehicle_id를 붙이는 데 씀 |
 | `ZONE_ENTER` / `ZONE_EXIT` | 영상 | 구역(`yard`·`queue`·`bay`) 진입·이탈, 3초 이상 유지 시에만 |
 | `VEHICLE_STOPPED` | 영상 | 구역 안에서 멈춤 → 대기 또는 작업 시작 |
 | `CALL` | 배정 엔진 | 차량 호출 (payload: rank, reason, route_m, travel_min, speed_limit_kmh, approval = auto · approved · changed) → 기사 화면 알림 |
 | `CALL_PENDING` | 배정 엔진 | 호출 시각이 됐지만 현장 담당자 승인을 기다림 (자동 승인 꺼짐 · L2). payload: rank, reason, since |
 | `CALL_ACK` | 기사 모바일 화면 | 기사가 ‘출발’을 누름 |
-| `CRANE_START` / `CRANE_DONE` | 설비 신호(가정) 또는 담당자 화면 버튼 | 크레인 상하역 시작·완료 (DONE이면 진척도 100% 확정) |
-| `SECTOR_DOWN` / `SECTOR_UP` | 돌발 이벤트 버튼 | 섹터 정지·복구 → 재배정 |
+| `BAY_ENTER` / `BAY_EXIT` | 영상(베이 구역 3초 이상) | 하역 시작 · 끝 (payload: bay 1~3, cargo / load_t, unload_min). 진입→이탈 = 건별 작업 기록 · 예측 하역시간의 근거 |
+| `YARD_DOWN` / `YARD_UP` | 시연 버튼 | 하역장 정지 · 복구 → 영향 차량 재배정 |
+| `URGENT_IN` | 시연 버튼 | 긴급 입고(소결 재고 부족) → 순번 맨 앞 |
+| `SAFETY_ALERT` | 영상(합성) · 시뮬레이터 | 안전 경고: 적재함 상승 중 덤프 반경(가정 5m, rois.json REAR 구역) 안 작업자 → L3 자동 실행(기사 앱 경고 · 하차 중지 요청, 가상). 하차 진행이 멈춤 (payload: id, level=L3, rule, dist_m, bay, dump_deg, repeat, action, stand_in) |
+| `SAFETY_ACK` | 맵 위 안전 띠 · 알림 패널 안전 탭 | 관제·현장 담당자가 안전 경고 확인 또는 오탐지 → 하차 재개 (payload: id, how = 확인/오탐지, ack_sec = 뜬 뒤 확인까지 실제 초, repeat). 같은 위험이 계속 감지되면 SAFETY_ALERT(repeat=1)가 다시 온다 |
 | `ALERT` | 배정 엔진 | 알림 발생 (payload: level, kind, text, action, related = 제안이 영향을 주는 반입 "차량#회차" 목록) |
 | `ORDER_APPROVED` | 통합하역작업 탭 | 담당자가 추천 순번 승인 (payload: rank, reason) |
 | `ORDER_CHANGED` | 통합하역작업 탭 | 담당자가 보낼 호퍼 변경 (payload: from, to, reason, memo, delta_min, cost_won) |
@@ -86,7 +90,7 @@
 | `ASSUMPTIONS_UPDATED` | 설정 › 가정값·단가 | 가정값 변경 → 처음부터 다시 계산 (payload: changes[]) |
 | `EFFECT_CONFIRMED` | 런타임(효과 계산) | 반입 한 건의 효과 확정 — 두 방식 모두 하차를 시작했을 때 한 번 (payload: trip, rec_wait_min, fifo_wait_min, effect_min, won, source = 효과를 만든 것) |
 | `ALERT_IGNORED` | 알림 이력 [무시] | 담당자가 알림의 제안을 무시 (payload: alert_id, kind). 무시한 알림의 실제 효과도 알림 이력에 남는다 |
-| `APPROVAL_REQUESTED` | 순번·배정 [현장 담당자에게 승인 요청] | 아직 승인 안 된 순번을 현장 담당자 앱으로 보냄(가상, 모바일은 다음 라운드) (payload: n, vehicles = "차량#회차" 목록, to) |
+| `CALL_REQUEST` | 순번·배정 [현장 담당자에게 승인 요청] | 관제 → 현장 담당자 앱 승인 요청(가상 푸시) (payload: n, vehicles = "차량#회차", to) |
 | `APPROVAL_MODE` | 순번·배정 자동 승인 스위치 | 자동 승인 켜기/끄기 (payload: auto). 끄면 승인 전 호출은 `CALL_PENDING`으로 멈춘다 |
 
 R2에서 팀이 제안한 `order_approved` 등 소문자 이름은 기존 형식에 맞춰 대문자로 썼다. 변경 사유 코드는
@@ -168,9 +172,19 @@ R2에서 팀이 제안한 `order_approved` 등 소문자 이름은 기존 형식
 - 바꿔보기의 예측 하차시간은 `pred_override`로 고정할 수 있고, 설정 ①에서 [자동으로]를 누르면 풀린다.
 - 시연 시나리오: data/demo.json (시드 7, 08:40 호퍼 A 정지 → 08:55 긴급 반입 → 09:15 복구)을 하루 끝까지 돌린 고정 결과. `GET /api/analysis2?range=demo`.
 
-### 다음 라운드 예정 (아직 내지 않음)
+### 안전 경고 (R8)
 
-- 안전 경고: 적재함 상승 중 덤프 반경 5m 안 사람 → 이름은 SAFETY_ALERT 로 예정 (payload: sector_id, bay, distance_m, action = 앱 경고·하차 중지 요청). 표에 올리는 것은 시뮬레이터나 영상이 실제로 낼 때.
+- 반입마다 시드로 한 번 정한다: 적재함이 올라가 있는 시간 × `sectors.json` safety.per_raised_hour(가정 0.6회/시간). 같은 시드·같은 반입이면 같은 결과.
+- 열려 있는 동안 그 차의 하차 시간은 멈춘다(지연 배수에 안전 중지 시간이 들어가지 않음). 아무도 확인하지 않으면 6분 뒤 "자동 해제 · 미확인"으로 남는다.
+- 확인 뒤에도 30% 확률(가정)로 3분 뒤 같은 위험이 다시 감지된다(repeat=1). 오탐지는 다시 오지 않는다.
+- 안전 경고는 금액으로 계산하지 않는다. 시연 시나리오(data/demo.json)는 08:30 호퍼 A에 1건을 넣는다. 화면 상단 [안전 경고] 버튼으로도 만든다(`POST /api/events/safety?sector_id=`).
+- `GET /api/panel2`: 알림 패널 [순번 | 안전] — approvals(승인 대기) · checks(확인 필요, 같은 호퍼·종류 묶음) · safety_open · safety_done. `POST /api/safety/{id}/ack` · `/dismiss`.
+
+```json
+{"ts": "2026-11-09T08:30:00", "type": "SAFETY_ALERT", "source": "sim", "cam_id": "CAM-01", "sector_id": "A", "zone": "rear",
+ "track_id": 7, "vehicle_id": "82아 2341", "payload": {"id": "SA-1", "level": "L3", "rule": "덤프 반경 5m", "dist_m": 3.0, "bay": 1,
+ "dump_deg": 50, "repeat": 0, "action": "앱 경고 · 하차 중지 요청 (가상)", "stand_in": "cam"}}
+```
 
 ## 차량 상태
 
@@ -199,3 +213,30 @@ R2에서 팀이 제안한 `order_approved` 등 소문자 이름은 기존 형식
   "alerts": [ { "id": "AL-3", "ts": "15:02", "level": "crit", "kind": "혼잡", "text": "섹터 B 혼잡 85%↑ 5분", "action": "B 호출 보류, 대기 2대 → C", "ack": false } ]
 }
 ```
+
+## 영상 모드 — 실제 영상 결과로 대시보드 돌리기
+
+시뮬레이터는 차를 만들지 않고, **들어온 이벤트로만** 차가 움직인다. 배정 엔진·예측·알림·안전·효과(FIFO 비교)는 그대로 돈다.
+
+```bash
+py app/server.py --video                     # 영상 모드 서버 (GET /api/mode → {"mode": "video"})
+py vision/to_events.py 결과.json --start 2026-11-09T08:00:00 --out events.jsonl
+py tools/replay_events.py events.jsonl --speed 60
+```
+
+- `POST /api/ingest` — 이벤트 1건(객체) 또는 여러 건(배열). 응답 `{"results": [...], "mode": ...}`.
+  결과 코드: `ok` · `ignored`(이미 끝난 운행 등 반영할 것 없음) · `unknown_vehicle`(GATE_IN 없이 온 차) · `unknown_cargo`.
+- 빠진 키(`source`, `zone`, `payload` 등)는 기본값으로 채운다. `vehicle_id`가 없으면 `track_id`로 `T17`.
+- 이벤트 시각까지 시계를 돌린 뒤 반영한다(시각 순서로 보낼 것).
+
+| 이벤트 | 누가 | 대시보드에서 바뀌는 것 |
+|---|---|---|
+| `GATE_IN` (payload `cargo`, `load_t`, `due` 선택) | 계근대·기사 앱 | 도착 차량 생성 · FIFO 기준선 도착 |
+| `ZONE_ARRIVE` | CAM-04 대기장 | 대기장 대기 → 엔진이 베이·순번 추천, 호출(CALL) |
+| `ZONE_ENTER` zone=queue | CAM-01~03 대기선 | 대기선 |
+| `BAY_ENTER` / `BAY_EXIT` (payload `bay` 1~3) | CAM-01~03 하차장 | 하역 중 → 완료, 건별 작업 기록 1건 |
+| `SAFETY_ALERT` (payload `rule` 덤프 반경 5m · 후진 경로) | CAM | 안전 탭 · 베이 안전 중지 · 이후 호출 보류 |
+| `YARD_DOWN` / `YARD_UP` | 현장 | 하역장 정지·복구 |
+
+`vision/to_events.py` 판정 규칙: 박스 아래 중심점(접지점)이 `data/rois.json` 구역 안에 3초 이상 → 진입, 3초 이상 밖·화면에서 사라짐 → 이탈.
+사람이 REAR-n(덤프 반경)에 들어오고 그 베이 트럭 박스가 세로/가로 ≥ 0.6(적재함 상승) → 덤프 반경 경고, BACK-n(후진 경로)에 진입 30초 안 → 후진 경로 경고.

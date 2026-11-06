@@ -3,10 +3,10 @@
 덤프트럭 한 대가 하루에 여러 번 왔다 갔다 한다:
   원료야드 상차 → 계근대(입) → 차량 대기장 → (호출) → 하차 호퍼 → 적재함 상승·하차 → 계근대(출) → 공차 복귀 → 재상차 …
 영상(YOLO)과 기사 앱이 붙기 전까지, 둘이 낼 이벤트를 docs/events.md 형식 그대로 대신 낸다.
-- source "iot": 기사 앱 신호(GATE_IN, BEACON_NEAR, CALL_ACK)
-- source "sim": 영상·설비 신호 대체(ZONE_ENTER/EXIT, VEHICLE_STOPPED, CRANE_START/DONE) — payload.stand_in 에 원래 출처
-  (소결 호퍼에서는 CRANE_START/DONE = 덤프 하차 시작/완료로 쓴다)
-- source "engine": 배정 엔진(CALL, ALERT) / "ui": 화면 버튼(SECTOR_DOWN/UP)
+- source "iot": 기사 앱 신호(GATE_IN, ZONE_ARRIVE, BEACON_NEAR, CALL_ACK)
+- source "sim": 영상 신호 대체(ZONE_ENTER/EXIT, VEHICLE_STOPPED, BAY_ENTER/EXIT, SAFETY_ALERT) — payload.stand_in 에 원래 출처
+- source "engine": 배정 엔진(CALL, ALERT) / "ui": 시연 버튼(YARD_DOWN/UP, URGENT_IN)
+이벤트 이름은 워크플로우 ⑤ 데이터·이벤트 구조와 같다(docs/events.md).
 시간 단위는 분. 고정 간격(STEP)으로 진행해 같은 시드면 항상 같은 결과가 나온다.
 """
 import json
@@ -99,8 +99,12 @@ def apply_assumptions(settings: dict, std_items: list, a: dict):
 
 
 class Sim:
-    def __init__(self, seed: int = 7, on_event=None, mode: str = "recommend", assumptions: dict | None = None):
+    def __init__(self, seed: int = 7, on_event=None, mode: str = "recommend", assumptions: dict | None = None,
+                 driven: bool = False):
         self.seed = seed
+        # driven=True (영상 모드): 차량의 실제 움직임(도착 · 대기장 · 베이 진입/이탈 · 안전)은 ingest()로 들어온 이벤트로만 바뀐다.
+        # 엔진(순번 · 호출) · 알림 · 예측값 · 효과 · 화면은 시뮬레이션 모드와 똑같이 돈다.
+        self.driven = driven
         self.on_event = on_event
         self.mode = mode                     # "recommend" = 추천 배정, "fifo" = 기준선(도착순·고정 호퍼)
         self.cfg = load("sectors.json")
@@ -131,6 +135,8 @@ class Sim:
         self.alerts = []            # 최근 80건 (화면용)
         self.alerts_all = []        # 전체 기록 (알림 이력)
         self.overrides = {}         # 담당자가 바꾼 호퍼 {차량: 호퍼}
+        self.safety = []            # 안전 경고 (덤프 반경 안 작업자) — 열림/확인/오탐지/자동 해제
+        self.safety_seq = 0
         self.series = []            # 10분마다 대기 차량 수
         self.busy_min = 0.0         # 하차구가 실제로 쓰인 시간(하차구·분)
         self.cap_min = 0.0          # 가동 중인 하차구 시간(하차구·분)
@@ -143,8 +149,10 @@ class Sim:
         self.pending = set()            # 호출 시각이 됐지만 승인을 기다리는 "차량#회차"
         self.fleet = make_fleet(self.seed, self.fc)
         self.truck = {f["plate"]: f for f in self.fleet}
-        self.pending_arrivals = sorted((trip(self.seed, f, 1, f["first_t"], self.fc) for f in self.fleet),
-                                       key=lambda a: (a["arr_t"], a["id"]))
+        self.pending_arrivals = [] if self.driven else sorted((trip(self.seed, f, 1, f["first_t"], self.fc) for f in self.fleet),
+                                                              key=lambda a: (a["arr_t"], a["id"]))
+        if self.driven:
+            self.truck = {}
         self.vehicles = {}
         self.pred = {it["cargo"]: float(it["minutes"]) for it in self.base_items}   # 예측 하차시간 (자동)
         self.pred_log = []          # 예측값이 1분 이상 바뀐 기록 (설정 › 변경 이력의 "자동 계산")
@@ -289,19 +297,196 @@ class Sim:
         return f >= 1.0
 
     # ---------- user / demo actions ----------
+    # ---------- 안전 경고 (덤프 하차 반경 안 작업자 · L3 자동 실행) ----------
+    def safety_cfg(self):
+        return self.cfg.get("safety", {})
+
+    def safety_open_for(self, v):
+        return any(x["status"] == "open" and x["key"] == self.key(v) for x in self.safety)
+
+    def safety_rule_for(self, v):
+        x = next((x for x in self.safety if x["status"] == "open" and x["key"] == self.key(v)), None)
+        return x.get("rule_text") if x else None
+
+    def safety_plan(self, v):
+        """반입마다 한 번 정한다(같은 시드·같은 반입이면 같은 결과): 이번 하차 중 작업자가 들어오는지, 언제, 계속 감지되는지."""
+        if "safety_plan" in v:
+            return v["safety_plan"]
+        if self.driven:                    # 영상 모드: 안전 경고는 영상(SAFETY_ALERT)으로만
+            v["safety_plan"] = None
+            return None
+        c = self.safety_cfg()
+        rnd = random.Random(f"{self.seed}|safety|{self.key(v)}")
+        raised_min = v["base"] * v["work_factor"] * 0.55                  # 적재함이 올라가 있는 시간(약 55%)
+        p = c.get("per_raised_hour", 0) / 60 * raised_min
+        plan = None
+        if rnd.random() < p:
+            rev = rnd.random() < c.get("reverse_share", 0.3)          # 후진 진입 중 후진 경로 침입 / 적재함 상승 중 덤프 반경 침입
+            plan = {"at": 0.25 if rev else v["base"] * v["work_factor"] * rnd.uniform(0.3, 0.7), "dist": round(rnd.uniform(2.2, 4.6), 1),
+                    "persist": rnd.random() < c.get("persist_prob", 0), "rule": "reverse" if rev else "dump"}
+        v["safety_plan"] = plan
+        return plan
+
+    def safety_raise(self, v, dist=None, repeat=0, prev=None, rule="dump"):
+        sid = v["sector"]
+        self.safety_seq += 1
+        sec_off = int(round((self.t * 60) % 60)) if False else random.Random(f"{self.seed}|s|{self.safety_seq}").randint(0, 59)
+        x = {"id": f"SA-{self.safety_seq}", "t": self.t, "ts": self.hhmm(self.t) + f":{sec_off:02d}", "sector_id": sid,
+             "bay": v["bay"], "vehicle_id": v["id"], "key": self.key(v), "cargo": v["cargo"], "cam_id": self.sec_cfg[sid]["cam_id"],
+             "dist_m": dist or 3.0, "radius_m": self.safety_cfg().get("radius_m", 5), "status": "open", "repeat": repeat,
+             "resolved_t": None, "resolved_at": None, "ack_sec": None, "how": None, "persist": False, "prev": prev,
+             "rule": rule, "rule_text": "후진 경로" if rule == "reverse" else "덤프 반경"}
+        self.safety.append(x)
+        self.emit("SAFETY_ALERT", "sim", vehicle=v, sector_id=sid, zone="back" if rule == "reverse" else "rear", cam_id=x["cam_id"],
+                  payload={"id": x["id"], "level": "L3", "rule": "후진 경로" if rule == "reverse" else f"덤프 반경 {x['radius_m']}m", "dist_m": x["dist_m"],
+                           "bay": v["bay"] + 1, "dump_deg": self.dump_angle(v), "repeat": repeat,
+                           "action": "앱 경고 · 하차 중지 요청 (가상)", "stand_in": "cam"})
+        return x
+
+    def safety_tick(self, v, held):
+        c = self.safety_cfg()
+        if not c:
+            return
+        k = self.key(v)
+        mine = [x for x in self.safety if x["key"] == k]
+        if not mine:
+            plan = self.safety_plan(v)
+            if plan and v["work_elapsed"] >= plan["at"] and (plan.get("rule") == "reverse" or self.dump_angle(v) >= 15):
+                x = self.safety_raise(v, plan["dist"], rule=plan.get("rule", "dump"))
+                x["persist"] = plan["persist"]
+            return
+        last = mine[-1]
+        if last["status"] == "open" and self.t - last["t"] >= c.get("auto_clear_min", 6):
+            self.safety_resolve(last["id"], "auto")                     # 아무도 확인 안 하면 자동 해제(미확인으로 남김)
+        elif last["status"] == "ack" and last["persist"] and last["repeat"] < 1 and \
+                self.t - last["resolved_t"] >= c.get("repeat_min", 3) and self.dump_angle(v) >= 15:
+            self.safety_raise(v, last["dist_m"], repeat=last["repeat"] + 1, prev=last["id"])   # 같은 위험이 계속 감지됨
+
+    # ---------- 반입 한 건 끝 (건별 작업 기록) ----------
+    def finish_trip(self, v):
+        t = self.t
+        v["gone"] = True
+        v["xy"] = None
+        self.done_trips.append({"id": v["id"], "trip": v["trip"], "cargo": v["cargo"], "load_t": v["load_t"],
+                                "sector": v["sector"], "bay": v.get("bay"), "wait_min": v["wait_min"] or 0.0, "done_t": t,
+                                "wait_total": round(v["work_start"] - v["yard_t"], 2),
+                                "unload_min": round(v["work_elapsed"], 2), "std": v["target"], "pred": v["std"],
+                                "under_unload": v["work_elapsed"] > v["target"] + 1e-9,
+                                "delayed": "delay" in v["flags"], "late": v["work_start"] > v["due_t"],
+                                "yard_t": v["yard_t"], "call_t": v["call_t"], "work_start": v["work_start"],
+                                "unload_end": v.get("done_t"), "urgent": v["urgent"], "approval": v.get("approval")})
+
+    # ---------- 영상 모드: 이벤트로 상태 바꾸기 ----------
+    def _sector_of_bay(self, sid, bay):
+        return sid if sid in self.sec_cfg else None
+
+    def ingest(self, ev):
+        """영상·현장 신호 이벤트 하나를 상태에 반영한다(워크플로우 ② 감지 구조). 시각은 호출하는 쪽이 맞춘다.
+        차량ID가 없는 영상 이벤트는 추적ID(track_id)를 차량ID로 쓴다."""
+        typ, p = ev.get("type"), ev.get("payload") or {}
+        vid = ev.get("vehicle_id") or (f"T{ev['track_id']}" if ev.get("track_id") is not None else None)
+        sid = ev.get("sector_id")
+        v = self.vehicles.get(vid) if vid else None
+        t = self.t
+        if typ == "GATE_IN" and vid:
+            cargo = p.get("cargo")
+            if cargo not in self.pred:
+                return "unknown_cargo"
+            trip_n = (v["trip"] + 1) if v else 1
+            due = p.get("due")
+            due_t = (datetime.fromisoformat(due) - self.start).total_seconds() / 60 if due else t + 60
+            nv = {"id": vid, "trip": trip_n, "type": p.get("vehicle_type", VEHICLE), "cargo": cargo, "arr_t": t, "due_t": due_t,
+                  "urgent": bool(p.get("urgent")), "load_t": p.get("load_t", 20.0), "work_factor": 1.0,
+                  "state": "arrived", "sector": None, "std": self.pred_of(cargo), "base": self.base_of(cargo),
+                  "target": self.std_of(VEHICLE, cargo), "xy": center(self.zone["GATE"]["poly"]), "yard_t": None,
+                  "track_id": ev.get("track_id"), "path": None, "work_elapsed": 0.0, "flags": set(), "rerouted": False,
+                  "gone": False, "call_t": None, "wait_min": None, "safety_plan": None}
+            self.vehicles[vid] = nv
+            self.truck.setdefault(vid, {"plate": vid, "cargo": cargo, "first_t": t, "extra": True})
+            self.events.append(ev)
+            return "ok"
+        if typ == "URGENT_IN":
+            self.events.append(ev)
+            return "ok"
+        if typ in ("YARD_DOWN", "YARD_UP") and sid in self.sec_cfg:
+            (self.sector_down if typ == "YARD_DOWN" else self.sector_up)(sid)
+            return "ok"
+        if not v:
+            return "unknown_vehicle"
+        if v["gone"]:
+            return "ignored"            # 이미 끝난 운행의 뒤늦은 신호(ZONE_EXIT 등)
+        self.events.append(ev)
+        if typ in ("ZONE_ARRIVE",) or (typ == "ZONE_ENTER" and ev.get("zone") == "yard"):
+            if v["state"] == "arrived":
+                self.track_seq += 1
+                v.update(state="yard", yard_t=t, xy=self.yard_xy(v), track_id=v.get("track_id") or self.track_seq)
+            return "ok"
+        if typ in ("ZONE_ENTER", "BEACON_NEAR") and ev.get("zone") == "queue" and sid in self.sec_cfg:
+            if v["state"] in ("moving", "yard"):
+                if v["state"] == "yard":
+                    self.yard_slots.pop(v["id"], None)
+                    v.update(call_t=v.get("call_t") or t)
+                q_idx = sum(1 for o in self.vehicles.values() if o["state"] == "queue" and o["sector"] == sid)
+                v.update(state="queue", sector=sid, queue_idx=q_idx, xy=self.queue_xy(sid, q_idx))
+            return "ok"
+        if typ == "BAY_ENTER" and sid in self.sec_cfg:
+            b = int(p.get("bay", 1)) - 1
+            if v["state"] == "yard":
+                self.yard_slots.pop(v["id"], None)
+            v.pop("queue_idx", None)
+            v.update(state="working", sector=sid, bay=b, work_start=t, work_elapsed=0.0, call_t=v.get("call_t") or t,
+                     xy=self.bay_xy(sid, b))
+            if v.get("wait_min") is None and v["yard_t"] is not None:
+                v["wait_min"] = round(t - v["yard_t"], 1)
+            if v["yard_t"] is None:
+                v["yard_t"] = v["arr_t"]
+            return "ok"
+        if typ == "BAY_EXIT":
+            if v["state"] == "working":
+                if p.get("unload_min") is not None:
+                    v["work_elapsed"] = float(p["unload_min"])
+                v.update(state="done", done_t=t)
+                self.finish_trip(v)
+            return "ok"
+        if typ == "SAFETY_ALERT":
+            if v["state"] == "working" and not self.safety_open_for(v):
+                x = self.safety_raise(v, p.get("dist_m", 3.0), rule="reverse" if "후진" in str(p.get("rule", "")) else "dump")
+                x["persist"] = False
+            return "ok"
+        return "ignored"
+
+    def force_safety(self, sid):
+        """시연용: 그 호퍼에서 하차 중인 차 한 대에 지금 안전 경고를 만든다."""
+        ws = [v for v in self.vehicles.values() if v["state"] == "working" and v["sector"] == sid and not self.safety_open_for(v)]
+        if not ws:
+            return None
+        v = sorted(ws, key=lambda v: v["bay"])[0]
+        v["safety_plan"] = None
+        x = self.safety_raise(v, 3.0)
+        x["persist"] = False
+        return x
+
+    def safety_resolve(self, sid_, how, ack_sec=None):
+        x = next((x for x in self.safety if x["id"] == sid_), None)
+        if not x or x["status"] != "open":
+            return x
+        x.update(status={"ack": "ack", "dismiss": "dismissed", "auto": "auto"}[how], how=how, resolved_t=self.t,
+                 resolved_at=self.hhmm(self.t), ack_sec=ack_sec)
+        return x
+
     def sector_down(self, sid):
         s = self.sectors[sid]
         if not s["up"]:
             return
         s["up"] = False
         name = self.sec_cfg[sid]["name"]
-        self.emit("SECTOR_DOWN", "ui", sector_id=sid)
+        self.emit("YARD_DOWN", "ui", sector_id=sid)
         moved = []
         for v in self.vehicles.values():
             if v["sector"] == sid and v["state"] in ("moving", "queue"):
                 # 이동 중·대기 중인 차량은 다시 배정 대상으로 (그 자리에서 다른 호퍼로 출발)
                 v.pop("queue_idx", None)
-                v.update(state="yard", sector=None, rerouted=True, path=None)
+                v.update(state="yard", sector=None, bay=None, rerouted=True, path=None)
                 moved.append(self.key(v))
         self.replan()
         self.alert("crit", "호퍼 이상", f"{name} 정지", f"영향 차량 {len(moved)}대 재배정, 하차 중 차량은 일시 중지",
@@ -312,7 +497,7 @@ class Sim:
         if s["up"]:
             return
         s["up"] = True
-        self.emit("SECTOR_UP", "ui", sector_id=sid)
+        self.emit("YARD_UP", "ui", sector_id=sid)
         self.alert("info", "호퍼 이상", f"{self.sec_cfg[sid]['name']} 복구", "순번 재계산", sector_id=sid, related=[])
 
     def add_urgent(self):
@@ -328,6 +513,7 @@ class Sim:
         a = trip(self.seed, t, 1, self.t, self.fc, urgent=True)
         a["due_t"] = self.t + 30
         self.pending_arrivals.insert(0, a)
+        self.emit("URGENT_IN", "ui", vehicle={"id": plate, "track_id": None}, payload={"cargo": cargo, "reason": "소결 배합 재고 부족(가정)"})
         return plate
 
     def ack_alert(self, aid, ack_sec=None):
@@ -361,8 +547,22 @@ class Sim:
                     pend.append((0.0, v["std"]))
                 elif v["state"] == "moving":
                     pend.append((max(v["path_t0"] + v["path_dur"] - t, 0.0), v["std"]))
+            bf = [0.0] * sc["bays"]
+            hold = self.safety_cfg().get("auto_clear_min", 6)
+            for v in working:
+                if v.get("bay") is not None:
+                    extra = hold if self.safety_open_for(v) else 0.0          # 안전 중지 → 그 베이 후속 호출 보류
+                    bf[v["bay"]] = max(bf[v["bay"]], engine.remain_min(v["work_elapsed"], v["std"]) + extra)
+            for v in sorted((v for v in self.vehicles.values() if v["sector"] == sid and v["state"] in ("queue", "moving")),
+                            key=lambda v: (0.0 if v["state"] == "queue" else v["path_t0"] + v["path_dur"] - t, v.get("queue_idx", 0))):
+                b = v.get("bay")
+                if b is None:
+                    b = min(range(sc["bays"]), key=lambda i: bf[i])
+                eta = 0.0 if v["state"] == "queue" else max(v["path_t0"] + v["path_dur"] - t, 0.0)
+                bf[b] = max(bf[b], eta) + v["std"]
             secs.append({"id": sid, "name": sc["name"], "up": self.sectors[sid]["up"], "bays": sc["bays"],
-                         "travel_min": self.travel("YARD", sid), "cargo": sc["cargo"],
+                         "travel_min": self.travel("YARD", sid), "cargo": sc["cargo"], "bay_cargo": sc.get("bay_cargo"),
+                         "bay_free": bf,
                          "working_remain": [engine.remain_min(v["work_elapsed"], v["std"]) for v in working],
                          "pending_eta": pend})
         return secs
@@ -398,15 +598,15 @@ class Sim:
 
         for v in self.vehicles.values():
             s_id = v["sector"]
-            if v["state"] == "arrived" and t - v["arr_t"] >= GATE_HOLD:
+            if v["state"] == "arrived" and t - v["arr_t"] >= GATE_HOLD and not self.driven:
                 # 2) 대기장 진입: 비콘(신원) + 대기장 카메라(위치)
                 self.track_seq += 1
                 v.update(state="yard", yard_t=t, track_id=self.track_seq, xy=self.yard_xy(v))
-                self.emit("BEACON_NEAR", "iot", vehicle=v, zone="yard")
+                self.emit("ZONE_ARRIVE", "iot", vehicle=v, zone="yard", payload={"stand_in": "app"})
                 self.emit("ZONE_ENTER", "sim", vehicle=v, zone="yard", cam_id=self.zone["YARD"]["cam_id"],
                           payload={"stand_in": "cam"})
             elif v["state"] == "moving":
-                if self.walk(v):
+                if self.walk(v) and not self.driven:
                     q_idx = sum(1 for o in self.vehicles.values() if o["state"] == "queue" and o["sector"] == s_id)
                     v.update(state="queue", queue_idx=q_idx, xy=self.queue_xy(s_id, q_idx))
                     cam = self.sec_cfg[s_id]["cam_id"]
@@ -414,34 +614,28 @@ class Sim:
                     self.emit("ZONE_ENTER", "sim", vehicle=v, sector_id=s_id, zone="queue", cam_id=cam,
                               payload={"stand_in": "cam"})
             elif v["state"] == "working":
-                if self.sectors[s_id]["up"]:
+                held = self.safety_open_for(v)
+                if self.sectors[s_id]["up"] and not held:
                     v["work_elapsed"] += STEP
+                self.safety_tick(v, held)
                 if v["work_elapsed"] > v["target"] * st["delay"]["factor"] and "delay" not in v["flags"]:
                     v["flags"].add("delay")
                     self.alert("warn", "하차 지연",
                                f"{v['id']} {v['cargo']} 하차 {int(v['work_elapsed'])}분 (목표 {v['target']:g}분의 {st['delay']['factor']}배 초과)",
                                f"{self.sec_cfg[s_id]['name']} 다음 호출 보류, 적재함 들러붙음·호퍼 막힘 확인",
                                sector_id=s_id, vehicle=v, related=self.planned_keys(s_id, 1))
-                if v["work_elapsed"] >= v["base"] * v["work_factor"]:
+                if v["work_elapsed"] >= v["base"] * v["work_factor"] and not self.driven:
                     cam = self.sec_cfg[s_id]["cam_id"]
-                    self.emit("CRANE_DONE", "sim", vehicle=v, sector_id=s_id,
-                              payload={"stand_in": "dump", "load_t": v["load_t"]})
+                    self.emit("BAY_EXIT", "sim", vehicle=v, sector_id=s_id,
+                              payload={"stand_in": "cam", "bay": v["bay"] + 1, "load_t": v["load_t"],
+                                       "unload_min": round(v["work_elapsed"], 2)})
                     self.emit("ZONE_EXIT", "sim", vehicle=v, sector_id=s_id, zone="bay", cam_id=cam,
                               payload={"stand_in": "cam"})
                     v.update(state="done", done_t=t)
                     self.start_path(v, [v["xy"]] + self.routes[(s_id, "EXIT")]["points"][1:], (s_id, "EXIT"))
             elif v["state"] == "done" and not v["gone"]:
                 if self.walk(v):
-                    v["gone"] = True
-                    v["xy"] = None
-                    self.done_trips.append({"id": v["id"], "trip": v["trip"], "cargo": v["cargo"], "load_t": v["load_t"],
-                                            "sector": s_id, "wait_min": v["wait_min"] or 0.0, "done_t": t,
-                                            "wait_total": round(v["work_start"] - v["yard_t"], 2),
-                                            "unload_min": round(v["work_elapsed"], 2), "std": v["target"], "pred": v["std"],
-                                            "under_unload": v["work_elapsed"] > v["target"] + 1e-9,
-                                            "delayed": "delay" in v["flags"], "late": v["work_start"] > v["due_t"],
-                                            "yard_t": v["yard_t"], "call_t": v["call_t"], "work_start": v["work_start"],
-                                            "unload_end": v.get("done_t"), "urgent": v["urgent"], "approval": v.get("approval")})
+                    self.finish_trip(v)
                     # 공차 복귀 → 원료야드 재상차 → 다음 회차 (근무 시간 안에서만)
                     if not self.truck[v["id"]].get("extra"):
                         # 계근대(출) → 원료야드(공차, 제한속도) → 상차 대기·상차(가정) → 계근대(입)(적재, 제한속도)
@@ -468,10 +662,12 @@ class Sim:
             if not working and not queue:
                 self.sectors[sid]["idle_min"] += STEP
             for v in queue:
-                free = [b for b in range(sc["bays"]) if b not in used]
-                if not free:
-                    break
-                b = free[0]
+                b = v.get("bay")
+                if b is None or b in used:
+                    free = [i for i in range(sc["bays"]) if i not in used and (sc.get("bay_cargo") is None or sc["bay_cargo"][i] == v["cargo"])]
+                    if b is not None or not free:
+                        continue                                   # 자기 베이가 아직 차 있음 → 대기선에서 기다림
+                    b = free[0]
                 used.add(b)
                 v.pop("queue_idx", None)
                 v.update(state="working", bay=b, work_start=t, xy=self.bay_xy(sid, b))
@@ -479,7 +675,7 @@ class Sim:
                           payload={"stand_in": "cam"})
                 self.emit("VEHICLE_STOPPED", "sim", vehicle=v, sector_id=sid, zone="bay", cam_id=sc["cam_id"],
                           payload={"stand_in": "cam"})
-                self.emit("CRANE_START", "sim", vehicle=v, sector_id=sid, payload={"stand_in": "dump"})
+                self.emit("BAY_ENTER", "sim", vehicle=v, sector_id=sid, payload={"stand_in": "cam", "bay": b + 1, "cargo": v["cargo"]})
             rest = sorted((v for v in self.vehicles.values() if v["state"] == "queue" and v["sector"] == sid),
                           key=lambda v: v["queue_idx"])
             for i, v in enumerate(rest):
@@ -488,6 +684,11 @@ class Sim:
 
         # 4) 순번 계산과 호출
         self.replan()
+        if not self.require_approval:
+            self.pending.clear()
+        else:                                   # 순번에서 빠졌거나 호출 시각이 다시 미뤄진 차는 '승인 기다림'에서 뺀다
+            due = {self.key(self.vehicles[p["vehicle_id"]]) for p in self.plan if p["call_t"] is not None and p["call_t"] <= t + 1e-9}
+            self.pending &= due
         for p in self.plan:
             if p["sector_id"] and p["call_t"] is not None and p["call_t"] <= t + 1e-9:
                 v = self.vehicles[p["vehicle_id"]]
@@ -542,13 +743,14 @@ class Sim:
         how = "changed" if v["id"] in self.overrides else ("approved" if k in self.approved else "auto")
         self.pending.discard(k)
         self.overrides.pop(v["id"], None)
-        v.update(state="moving", sector=sid, call_t=self.t, wait_min=round(self.t - v["yard_t"], 1), rerouted=False, approval=how)
+        v.update(state="moving", sector=sid, bay=p.get("bay"), call_t=self.t, wait_min=round(self.t - v["yard_t"], 1), rerouted=False, approval=how)
         self.start_path(v, pts, ("YARD", sid))
         self.emit("CALL", "engine", vehicle=v, sector_id=sid, payload={
-            "rank": p["rank"], "reason": p["reason"], "route_m": v["path_m"], "travel_min": round(v["path_dur"], 1),
+            "rank": p["rank"], "reason": p["reason"], "bay": (p["bay"] + 1) if p.get("bay") is not None else None,
+            "route_m": v["path_m"], "travel_min": round(v["path_dur"], 1),
             "speed_limit_kmh": self.settings["road"]["speed_limit_kmh"], "approval": how})
         self.emit("CALL_ACK", "iot", vehicle=v, sector_id=sid)     # 기사 '출발' (모바일 화면 전까지는 자동 응답)
-        self.alert("info", "호출", f"{v['id']} {v['cargo']} → {sc['name']}", "기사 앱으로 호출 전송(가상)", sector_id=sid, vehicle=v)
+        self.alert("info", "호출", f"{v['id']} {v['cargo']} → {sc['name']}" + (f" {p['bay'] + 1}번 베이" if p.get("bay") is not None else ""), "기사 앱으로 호출 전송(가상)", sector_id=sid, vehicle=v)
 
     def replan(self):
         secs, yard = self.sector_inputs(), self.yard_inputs()
@@ -617,6 +819,7 @@ class Sim:
                          "remain_min": round(engine.remain_min(v["work_elapsed"], v["std"]), 1),
                          "dump_deg": self.dump_angle(v), "track_id": v["track_id"],
                          "judge": self.cam_judge(v)[0],
+                         "safety": self.safety_open_for(v), "safety_rule": self.safety_rule_for(v), "delay_x": round(v["work_elapsed"] / v["target"], 1) if v["target"] else None,
                          "delayed": "delay" in v["flags"]} for v in sorted(working, key=lambda v: v["bay"])],
             "queue": [v["id"] for v in sorted(queue, key=lambda v: v["queue_idx"])],
             "queue_info": [{"vehicle_id": v["id"], "cargo": v["cargo"], "track_id": v["track_id"],
@@ -690,7 +893,9 @@ class Sim:
                        "state": v["state"], "sector_id": v["sector"] or (p and p["sector_id"]), "rank": p and p["rank"],
                        "wait_min": round(t - v["yard_t"], 1) if v["state"] == "yard" and v["yard_t"] is not None else v.get("wait_min"),
                        "urgent": v["urgent"], "due": self.clock(v["due_t"]).isoformat(timespec="seconds"),
-                       "track_id": v["track_id"], "judge": judge, "dump_deg": ang,
+                       "track_id": v["track_id"], "judge": judge, "dump_deg": ang, "bay": v.get("bay"),
+                       "eta_min": round(max(v["path_t0"] + v["path_dur"] - t, 0), 1) if v["state"] == "moving" and v.get("path") else None,
+                       "safety": v["state"] == "working" and self.safety_open_for(v),
                        "xy": [round(c, 1) for c in v["xy"]] if v["xy"] else None})
         yard = [v for v in self.vehicles.values() if v["state"] == "yard"]
         up_bays = sum(sc["bays"] for sid, sc in self.sec_cfg.items() if self.sectors[sid]["up"])
@@ -724,6 +929,7 @@ class Sim:
                     "levels": {lv: sum(1 for s in sviews if s["status"] == "up" and s["level"] == lv) for lv in ("ok", "warn", "crit")},
                     "up": sum(1 for s in sviews if s["status"] == "up"), "late": sum(d["late"] for d in self.done_trips)},
             "alerts": self.alerts[:40],
+            "safety_open": [x for x in self.safety if x["status"] == "open"],
             "road": self.road_trucks(),
             "road_cfg": self.settings["road"],
             "routes": self.routes_view(),
