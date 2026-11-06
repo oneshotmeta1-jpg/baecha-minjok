@@ -363,7 +363,11 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="하역관제 서버")
     ap.add_argument("--lan", action="store_true", help="같은 와이파이의 다른 기기도 접속하게 연다 (0.0.0.0)")
     ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--check", action="store_true",
+                    help="확인용 서버: 이벤트 DB·가정값 파일을 건드리지 않고 메모리에서만 돈다 (켜 둔 공유 서버와 같이 써도 됨)")
     args = ap.parse_args()
+    if args.check:
+        rt = Runtime(seed=7)          # 핸들러들은 모듈 전역 rt를 쓰므로 여기서 바꿔 끼우면 된다
     try:
         sys.stdout.reconfigure(encoding="utf-8")   # 실행 창·로그에서 한글이 깨지지 않게
     except (AttributeError, ValueError):
