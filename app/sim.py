@@ -74,7 +74,8 @@ def default_assumptions() -> dict:
             "target_wait_min": st["wait"]["target_min"], "call_margin_min": st["call"]["margin_min"],
             "delay_factor": st["delay"]["factor"],
             "speed_limit_kmh": st["road"]["speed_limit_kmh"], "slow_factor": st["road"]["slow_factor"],
-            "wait_won_per_hour": st["cost"]["wait_won_per_hour"], "idle_won_per_hour": st["cost"]["sector_idle_won_per_hour"]}
+            "wait_won_per_hour": st["cost"]["wait_won_per_hour"], "idle_won_per_hour": st["cost"]["sector_idle_won_per_hour"],
+            "idle_in_cost": False, "cost_note": "차량 대기 ₩30,000/시간 = ₩500/분 (팀 결정 전 가정)"}
 
 
 def apply_assumptions(settings: dict, std_items: list, a: dict):
@@ -402,7 +403,9 @@ class Sim:
                                             "sector": s_id, "wait_min": v["wait_min"] or 0.0, "done_t": t,
                                             "wait_total": round(v["work_start"] - v["yard_t"], 2),
                                             "unload_min": round(v["work_elapsed"], 2), "std": v["std"],
-                                            "delayed": "delay" in v["flags"], "late": v["work_start"] > v["due_t"]})
+                                            "delayed": "delay" in v["flags"], "late": v["work_start"] > v["due_t"],
+                                            "yard_t": v["yard_t"], "call_t": v["call_t"], "work_start": v["work_start"],
+                                            "unload_end": v.get("done_t"), "urgent": v["urgent"], "approval": v.get("approval")})
                     # 공차 복귀 → 원료야드 재상차 → 다음 회차 (근무 시간 안에서만)
                     if not self.truck[v["id"]].get("extra"):
                         # 계근대(출) → 원료야드(공차, 제한속도) → 상차 대기·상차(가정) → 계근대(입)(적재, 제한속도)

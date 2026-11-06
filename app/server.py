@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect  # noqa: E402
-from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
+from fastapi.responses import FileResponse, JSONResponse, Response  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 from app.runtime import REASONS, Runtime  # noqa: E402
@@ -26,7 +26,7 @@ from app.sim import STEP, load  # noqa: E402
 
 DATA = ROOT / "data"
 WEB = ROOT / "web"
-VERSION = "v5"
+VERSION = "v6"
 TICK = 0.1  # 실제 초
 
 rt = Runtime(seed=7, db_path=DATA / "events.db", assumptions_path=DATA / "assumptions.json")
@@ -62,6 +62,8 @@ async def broadcast():
 
 @asynccontextmanager
 async def lifespan(_app):
+    import threading
+    threading.Thread(target=rt.week_days, daemon=True).start()     # 최근 7일(시뮬레이션)을 미리 계산해 둔다 (약 5초)
     task = asyncio.create_task(ticker())
     yield
     task.cancel()
@@ -173,6 +175,65 @@ async def approval(auto: bool):
 @app.get("/api/schedule")
 async def schedule():
     return rt.schedule()
+
+
+@app.get("/api/analysis2")
+async def analysis2(range: str = "today"):
+    """운영 분석 (성과·비용 · 건별 기록). range=week 는 시드를 바꾼 시뮬레이션 6일 + 오늘."""
+    return rt.analysis_range("week" if range == "week" else "today")
+
+
+@app.get("/api/alerts/history")
+async def alerts_history(range: str = "today"):
+    return rt.alerts_range("week" if range == "week" else "today")
+
+
+@app.post("/api/alerts/{aid}/ignore")
+async def alert_ignore(aid: str):
+    a = rt.ignore_alert(aid)
+    if not a:
+        raise HTTPException(404, "없는 알림입니다")
+    return {"ok": True}
+
+
+@app.post("/api/preview")
+async def preview(body: dict = Body(...)):
+    """바꿔보기: 저장하지 않고 같은 행동 기록으로 다시 돌려 차이만 돌려준다."""
+    try:
+        return rt.preview(body)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "숫자를 넣어 주세요")
+
+
+@app.get("/api/settings")
+async def settings_view():
+    return {"values": rt.assumptions, "history": rt.history[:8], "cargo_actual": rt.cargo_actual(),
+            "suggestions": rt.feedback()["suggestions"], "congestion_hold_min": rt.rec.settings["congestion"]["crit_hold_min"]}
+
+
+@app.get("/api/rois")
+async def rois():
+    return load("rois.json")
+
+
+def csv_response(text, name):
+    return Response(content=text.encode("utf-8"), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@app.get("/api/export/report.csv")
+async def export_report(range: str = "today"):
+    return csv_response(rt.csv_report("week" if range == "week" else "today"), f"report_{range}.csv")
+
+
+@app.get("/api/export/trips.csv")
+async def export_trips(range: str = "today"):
+    return csv_response(rt.csv_trips("week" if range == "week" else "today"), f"trips_{range}.csv")
+
+
+@app.get("/api/export/alerts.csv")
+async def export_alerts(range: str = "today"):
+    return csv_response(rt.csv_alerts("week" if range == "week" else "today"), f"alerts_{range}.csv")
 
 
 @app.get("/api/panel")
