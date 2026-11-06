@@ -205,7 +205,77 @@ dialog::backdrop{background:rgba(20,20,20,.55)}
 .cap{font-size:12px;color:var(--muted);line-height:1.5}
 .chs{display:flex;gap:6px;flex-wrap:wrap}
 
+/* R4: 관제 화면 간단 보기 */
+.mon-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.mon-bar h1{font-size:16px;margin:0}
+.seg{display:inline-flex;background:var(--card);border-radius:999px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;border-radius:999px;padding:6px 14px;font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+main .side{display:none}
+main.simple{grid-template-columns:340px minmax(0,1fr) 340px;grid-template-rows:minmax(0,1fr)}
+main.simple .side{display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto}
+main.simple>section.c-cam,main.simple>section.c-work,main.simple>section.c-alert{display:none}
+main.simple>section.c-map{grid-column:2;grid-row:1}
+main.simple #sideL{grid-column:1;grid-row:1} main.simple #sideR{grid-column:3;grid-row:1}
+#view-monitor.simple .kpis{display:none}
+.side .hp{background:var(--card);border:0;border-radius:20px;padding:14px 16px}
+.side .hp .pct{font-size:28px}
+.nextcalls{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.nextcalls .r{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.nextcalls .r:last-child{border-bottom:0}
+.mapsum{display:flex;gap:6px;flex-wrap:wrap}
+.mapsum .chip b{font-weight:700;color:var(--ink)}
+/* 종 아이콘 · 알림 패널 */
+.bell{position:relative;width:40px;height:40px;border-radius:50%;border:1px solid var(--line-2);background:var(--card);display:inline-flex;align-items:center;justify-content:center}
+.bell:hover{border-color:var(--ink)}
+.bell .cnt{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+.bell .cnt[hidden]{display:none}
+.panel{position:fixed;top:14px;right:20px;bottom:14px;width:470px;max-width:calc(100vw - 32px);background:var(--card);border-radius:24px;box-shadow:0 18px 50px rgba(20,20,20,.22);z-index:50;display:flex;flex-direction:column;overflow:hidden}
+.panel[hidden]{display:none}
+.panel .ph{display:flex;align-items:center;gap:8px;padding:16px 18px 8px}
+.panel .ph h2{margin:0;font-size:16px}
+.panel .pf{display:flex;gap:6px;padding:0 18px 10px;flex-wrap:wrap}
+.panel .pb{flex:1;min-height:0;overflow:auto;padding:0 14px 10px;display:flex;flex-direction:column;gap:10px}
+.panel .pt{border-top:1px solid var(--line);padding:12px 18px 14px;display:flex;flex-direction:column;gap:2px}
+.panel .pt .v{font-size:24px;font-weight:700}
+.acard{border:1px solid var(--line);border-radius:16px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;font-size:13px}
+.acard.crit{border-left:4px solid var(--red)} .acard.warn{border-left:4px solid var(--orange)} .acard.info{border-left:4px solid var(--blue)}
+.acard.done{opacity:.6}
+.acard .top{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.acard .top .t{margin-left:auto;color:var(--muted);font-size:12px}
+.acard .ln{display:grid;grid-template-columns:62px minmax(0,1fr);gap:6px}
+.acard .ln>span:first-child{color:var(--muted);font-size:12px;font-weight:600}
+.acard .eff{font-weight:700}
+.acard .btns{display:flex;gap:6px;justify-content:flex-end}
+.st.need{background:var(--orange-bg);color:var(--orange)} .st.done{background:var(--green-bg);color:var(--green)} .st.look{background:var(--blue-bg);color:var(--blue)}
+/* 순번·배정 */
+.dock2{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 380px;grid-template-rows:auto minmax(0,1fr);gap:12px}
+.dock2>section.c-sched{grid-column:1/-1}
+#schedSvg{width:100%;display:block}
+.dock-side{display:flex;flex-direction:column;gap:12px;min-height:0}
+.lg2{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--ink-2)}
+.lg2 i{display:inline-block;width:16px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px;border:1.5px solid}
+.switch{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer}
+.switch input{appearance:none;width:38px;height:22px;border-radius:11px;background:var(--line-2);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.switch input::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s}
+.switch input:checked{background:var(--green)}
+.switch input:checked::after{left:19px}
+.eff-c b{font-weight:700} .eff-c .cap{display:block}
+.base{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.base .r{display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px}
+.base .r>span:first-child{color:var(--muted)}
+.st.late{background:var(--orange-bg);color:var(--orange)}
+/* 설정 */
+.set-grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:12px}
+/* 하역장 상세 (CAM) */
+.cam-grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.65fr) minmax(360px,1fr);gap:12px}
+#bigCam{width:100%;max-height:calc(100vh - 260px);object-fit:contain;border-radius:14px;background:#1b1d1f;display:block}
+.cam-side{display:flex;flex-direction:column;gap:12px;min-height:0}
+.cam-side .ref img{width:100%;max-height:30vh;object-fit:contain;background:var(--soft);border-radius:12px;display:block}
+.chs{display:flex;gap:6px;flex-wrap:wrap}
 @media (max-width:1280px){
+  main.simple{grid-template-columns:minmax(0,1fr);grid-template-rows:auto} main.simple>section.c-map,main.simple #sideL,main.simple #sideR{grid-column:auto;grid-row:auto}
+  .dock2,.set-grid,.cam-grid{grid-template-columns:minmax(0,1fr)}
   html,body{height:auto} main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
   #mapBd{height:56vw} .cams{height:auto} .cam canvas{aspect-ratio:16/9} .hoppers{grid-template-columns:minmax(0,1fr)} .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
   .dlg{grid-template-columns:minmax(0,1fr)}
@@ -219,7 +289,7 @@ dialog::backdrop{background:rgba(20,20,20,.55)}
     <div class="logo" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16h10V9H3z"/><path d="M13 12h4l3 3v1h-7z"/><path d="M5 9l4-5 6 2-2 3"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="16.5" cy="17.5" r="1.8"/></svg></div>
     <div><b>하역관제</b><small id="siteName">포항제철소 소결공장 · 시뮬레이션</small></div>
   </div>
-  <nav aria-label="주 메뉴"><a href="#monitor" data-view="monitor">관제 화면</a><a href="#dock" data-view="dock">통합하역작업</a><a href="#analysis" data-view="analysis">운영 분석</a><a href="#alerts" data-view="alerts">알림 이력<span class="cnt num" id="navAlert" hidden></span></a></nav>
+  <nav aria-label="주 메뉴"><a href="#monitor" data-view="monitor">관제 화면</a><a href="#dock" data-view="dock">순번·배정</a><a href="#analysis" data-view="analysis">운영 분석</a><a href="#alerts" data-view="alerts">알림 이력<span class="cnt num" id="navAlert" hidden></span></a><a href="#settings" data-view="settings">설정</a></nav>
   <span class="sp"></span>
   <div class="grp" aria-label="시뮬레이션">
     <span class="conn" id="conn" title="연결 중"></span>
@@ -234,9 +304,20 @@ dialog::backdrop{background:rgba(20,20,20,.55)}
     <button class="pill-btn danger" id="downBtn">호퍼 정지</button>
     <button class="pill-btn" id="urgentBtn">긴급 반입 넣기</button>
   </div>
+  <button class="bell" id="bellBtn" aria-label="알림 패널 열기" aria-expanded="false" aria-controls="panel"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="cnt num" id="bellCnt" hidden></span></button>
 </header>
 
+<aside class="panel" id="panel" hidden aria-label="알림 패널">
+  <div class="ph"><h2>알림</h2><span class="sub cap">무슨 일 → 제안 → 효과</span><span class="sp"></span><button class="pill-btn" id="panelClose">닫기</button></div>
+  <div class="pf" id="panelFilter"><button class="mini dark" data-pf="all">전체</button><button class="mini" data-pf="need">승인 대기</button><button class="mini" data-pf="look">확인 필요</button><span class="sp"></span><span class="cap" id="panelCount"></span></div>
+  <div class="pb" id="panelBody"><div class="empty">아직 알림이 없습니다.</div></div>
+  <div class="pt"><span class="cap">오늘 대기 절감 · 차량별 효과(FIFO였을 때 대기 − 추천 대기)의 합</span><span class="v num" id="panelTotal">₩0</span><span class="cap" id="panelTotalS">—</span>
+    <a href="#alerts" class="cap" id="panelAll" style="margin-top:4px">알림 이력 전체 보기 →</a></div>
+</aside>
+
 <div class="view" id="view-monitor">
+<div class="mon-bar"><h1>원료 하역장 현황</h1><span class="simnote" id="monNote">시뮬레이션 값</span><span class="sp"></span>
+  <div class="seg" role="group" aria-label="보기 방식"><button data-mode="simple" aria-pressed="true">간단 보기</button><button data-mode="detail" aria-pressed="false">상세 보기</button></div></div>
 <section class="kpis" aria-label="요약">
   <div class="kpi"><span class="k">대기장 대기 차량</span><span class="v num" id="kWait">0<small>대</small></span><span class="s" id="kWaitS">—</span></div>
   <div class="kpi"><span class="k">평균 대기시간 (호출까지)</span><span class="v num" id="kAvg">0<small>분</small></span><span class="s" id="kAvgS">—</span></div>
@@ -244,9 +325,10 @@ dialog::backdrop{background:rgba(20,20,20,.55)}
   <div class="kpi"><span class="k">오늘 반입 실적</span><span class="v num" id="kTrips">0<small>회</small></span><span class="s" id="kTripsS">—</span></div>
 </section>
 
-<main>
-  <section class="card" aria-label="시나리오 좌표 맵">
-    <div class="hd"><h2>① 시나리오 좌표 맵</h2><span class="sub">포항제철소 원료·소결 지구 · 호퍼를 누르면 CAM, 경로를 누르면 거리·시간</span><span class="sp"></span>
+<main id="monMain">
+  <div class="side" id="sideL" aria-label="호퍼 A · B"></div>
+  <section class="card c-map" aria-label="시나리오 좌표 맵">
+    <div class="hd"><h2>① 시나리오 맵</h2><span class="mapsum" id="mapSum"></span><span class="sub">호퍼를 누르면 하역장 상세, 경로를 누르면 거리·시간</span><span class="sp"></span>
       <span class="chip" title="배경 지도와 경로 거리는 OpenStreetMap 실제 데이터, 원료야드·계근대·대기장·호퍼 위치는 가정">OSM 실제 지도 · 시설 위치 가정</span></div>
     <div class="bd" id="mapBd">
       <svg id="mapSvg" role="img" aria-label="소결공장 원료 반입 배치도와 덤프트럭 위치" preserveAspectRatio="xMidYMid meet"></svg>
@@ -259,13 +341,14 @@ dialog::backdrop{background:rgba(20,20,20,.55)}
     </div>
   </section>
 
-  <section class="card" aria-label="CAM 4채널">
+  <div class="side" id="sideR" aria-label="호퍼 C · 다음 호출"></div>
+  <section class="card c-cam" aria-label="CAM 4채널">
     <div class="hd"><h2>③ CAM 4채널</h2><span class="sub">호퍼 A·B·C 측면 + 대기장 · 박스·추적 ID·구역 선·적재함 판정</span><span class="sp"></span><span class="chip blue">추론 재생 (시뮬레이션)</span></div>
     <div class="bd"><div class="cams" id="cams"></div></div>
   </section>
 
-  <section class="card" aria-label="통합하역작업">
-    <div class="hd"><h2>② 통합하역작업</h2><span class="sub" id="tabSub">호퍼별 혼잡도·하차 진척도</span>
+  <section class="card c-work" aria-label="통합하역작업">
+    <div class="hd"><h2>② 하역 현황</h2><span class="sub" id="tabSub">호퍼별 혼잡도·하차 진척도</span>
       <div class="tabs" role="tablist">
         <button role="tab" aria-selected="true" data-tab="hoppers">호퍼 현황</button>
         <button role="tab" aria-selected="false" data-tab="queue">호출 순번 <span id="qCount" class="num"></span></button>
@@ -277,7 +360,7 @@ dialog::backdrop{background:rgba(20,20,20,.55)}
     <div class="bd" id="tab-assume" hidden></div>
   </section>
 
-  <section class="card" aria-label="Alert">
+  <section class="card c-alert" aria-label="Alert">
     <div class="hd"><h2>④ Alert</h2><span class="sub" id="alertCount"></span><span class="sp"></span>
       <label class="chip"><input type="checkbox" id="showCalls"> 호출 알림 보기</label></div>
     <div class="bd"><div class="alerts" id="alerts"><div class="empty">아직 알림이 없습니다. 시작을 누르면 덤프트럭이 들어옵니다.</div></div></div>
@@ -285,25 +368,45 @@ dialog::backdrop{background:rgba(20,20,20,.55)}
 </main>
 </div>
 
-<!-- 통합하역작업 -->
+<!-- 순번·배정 -->
 <div class="view" id="view-dock" hidden>
-  <div class="dock-grid">
-    <div class="hoppers" id="dockHoppers"></div>
+  <div class="dock2">
+    <section class="card c-sched" aria-label="하차구 비는 시각">
+      <div class="hd"><h2>① 하차구(베이) 비는 시각</h2><span class="sub">언제 비고 누가 들어가나 · 호퍼 상태는 관제 화면에서</span><span class="sp"></span>
+        <span class="lg2"><span><i style="background:#DDF0E5;border-color:#1F7A4F"></i>하차 중</span><span><i style="background:#FBDDE1;border-color:#D7263D"></i>하차 지연</span><span><i style="background:#E6EDFF;border-color:#1D47B8"></i>호출돼 오는 중</span><span><i style="background:#fff;border-color:#141414;border-style:dashed"></i>호출 예약</span><span><i style="background:#FFE9DD;border-color:#B8420A;border-style:dashed"></i>승인 대기</span><span><i style="background:#FBD5DA;border-color:#D7263D"></i>호퍼 정지</span></span></div>
+      <div class="bd"><svg id="schedSvg" role="img" aria-label="호퍼·하차구별 하차 중·호출 예약·지연 시간표"></svg></div>
+    </section>
     <section class="card" aria-label="호출 순번표">
-      <div class="hd"><h2>호출 순번표</h2><span class="sub">투입 기한이 급한 차량부터, 가장 빨리 비는 호퍼로 추천 · 시간이 되면 자동 호출</span><span class="sp"></span>
-        <span class="simnote" id="editNote" hidden>편집 중에는 표가 멈춰 있어요</span><button class="pill-btn dark" id="approveAll">전체 승인</button></div>
+      <div class="hd"><h2>② 호출 순번표</h2><span class="sub">AI 추천 → 현장 담당자 승인 → 호출 · 효과 = FIFO였을 때 대기 − 추천 대기</span><span class="sp"></span>
+        <span class="simnote" id="editNote" hidden>편집 중에는 표가 멈춰 있어요</span>
+        <label class="switch" title="끄면 현장 담당자가 승인해야 호출됩니다 (L2)"><input type="checkbox" id="autoSw" checked><span id="autoTxt">자동 승인 켜짐</span></label>
+        <button class="pill-btn dark" id="approveAll">전체 승인</button></div>
       <div class="bd"><div id="dockMsg"></div><div id="orderTable"></div></div>
     </section>
-    <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
+    <div class="dock-side">
       <section class="card" aria-label="KPI 비교">
         <div class="hd"><h2>KPI 비교</h2><span class="sub">같은 도착 데이터 · 기존 FIFO vs 추천</span></div>
         <div class="bd" id="dockKpi"></div>
       </section>
-      <section class="card" aria-label="가정값 설정" style="flex:1">
-        <div class="hd"><h2>가정값 설정</h2><span class="sub">바꾸면 처음부터 다시 계산</span><span class="sp"></span><button class="pill-btn dark" id="recalc">재계산</button></div>
-        <div class="bd"><form class="form" id="assumeForm" onsubmit="return false"></form><p class="cap" id="assumeHist" style="margin:8px 0 0"></p></div>
+      <section class="card" aria-label="현재 기준" style="flex:1">
+        <div class="hd"><h2>현재 기준</h2><span class="sub">읽기 전용</span><span class="sp"></span><a class="mini" href="#settings">설정에서 바꾸기</a></div>
+        <div class="bd"><div class="base" id="dockBase"></div></div>
       </section>
     </div>
+  </div>
+</div>
+
+<!-- 설정 -->
+<div class="view" id="view-settings" hidden>
+  <div class="set-grid">
+    <section class="card" aria-label="가정값 설정">
+      <div class="hd"><h2>설정 · 가정값·단가</h2><span class="sub">바꾸면 순번표와 FIFO 비교를 처음부터 다시 계산</span><span class="sp"></span><button class="pill-btn dark" id="recalc">저장하고 다시 계산</button></div>
+      <div class="bd"><div id="setMsg"></div><form class="form" id="assumeForm" onsubmit="return false"></form><p class="cap" id="assumeHist" style="margin:8px 0 0"></p></div>
+    </section>
+    <section class="card" aria-label="계산 방식">
+      <div class="hd"><h2>호출 승인 · 효과 계산</h2></div>
+      <div class="bd" id="setInfo"></div>
+    </section>
   </div>
 </div>
 
@@ -317,7 +420,7 @@ dialog::backdrop{background:rgba(20,20,20,.55)}
       <div class="bd" style="display:flex;flex-direction:column"><div class="chart-wrap"><svg id="chart" role="img" aria-label="시간대별 대기 차량 수, 기존 FIFO와 추천 방식 비교"></svg><div class="tip" id="tip" hidden></div></div></div>
     </section>
     <section class="card" aria-label="비용 계산 근거">
-      <div class="hd"><h2>비용 계산 근거</h2><span class="assumed">가정 단가 · 근거 확인 필요</span></div>
+      <div class="hd"><h2>절감 계산 근거</h2><span class="assumed">가정 단가 · 근거 확인 필요</span></div>
       <div class="bd" id="costBox"></div>
     </section>
     <section class="card" aria-label="원료별 성과">
@@ -346,20 +449,28 @@ dialog::backdrop{background:rgba(20,20,20,.55)}
   </section>
 </div>
 
-<dialog id="camDlg" aria-label="CAM 크게 보기">
-  <div class="dlg">
-    <div class="hd"><h3 id="dlgTitle">CAM</h3><span class="chip blue">추론 재생 (시뮬레이션)</span><span class="chips chs" id="dlgChs"></span><span class="sp"></span><button class="pill-btn" id="dlgClose">닫기</button></div>
-    <div><canvas id="bigCam" width="960" height="540"></canvas>
-      <p class="cap">판정 규칙: 박스 아래 중심점이 하차구·대기선 구역 안에 3초 이상 있으면 진입으로 본다. 덤프트럭 전체 박스의 세로/가로 비율이 0.6 이상이면 적재함 상승(하차 중)으로 판정한다. 지금 화면의 차량·각도는 시뮬레이터가 만든 값이다.</p></div>
-    <div class="side">
-      <div><b style="font-size:14px">탐지 목록</b> <span class="cap" id="dlgCount"></span>
-        <table><thead><tr><th>ID</th><th>차량</th><th>구역</th><th class="r">체류</th><th class="r">적재함</th><th>판정</th></tr></thead><tbody id="dlgRows"></tbody></table></div>
-      <div class="ref"><b style="font-size:14px">실제 사진 판정 예시</b>
-        <img src="/web/assets/dump_sample.jpg" alt="덤프트럭이 적재함을 들어 올린 사진에 YOLO 박스와 '하차 중 · 적재함 상승' 판정이 표시됨">
-        <p class="cap" id="refCap">팀 제공 사진 · YOLO11n 사전학습(COCO truck) 그대로 실행한 결과</p></div>
+<!-- 하역장 상세 -->
+<div class="view" id="view-cam" hidden>
+  <div class="mon-bar"><a class="pill-btn" href="#monitor">← 관제 화면</a><h1 id="camTitle">하역장 상세</h1><span id="camStat" class="mapsum"></span><span class="sp"></span><span class="chs" id="camChs" role="group" aria-label="카메라 전환"></span></div>
+  <div class="cam-grid">
+    <section class="card" aria-label="CAM 크게 보기">
+      <div class="hd"><h2 id="camName">CAM</h2><span class="chip blue">추론 결과 재생 (시뮬레이션)</span><span class="sp"></span><span class="cap">박스 · 추적 ID · 구역 선 · 적재함 판정</span></div>
+      <div class="bd"><canvas id="bigCam" width="1280" height="720"></canvas>
+        <p class="cap">판정 규칙: 박스 아래 중심점이 하차구·대기선 구역 안에 3초 이상 있으면 진입으로 본다. 덤프트럭 전체 박스의 세로/가로 비율이 0.6 이상이면 적재함 상승(하차 중)으로 판정한다. 지금 화면의 차량·각도는 시뮬레이터가 만든 합성 화면이다(실제 영상 연결 전).</p></div>
+    </section>
+    <div class="cam-side">
+      <section class="card" aria-label="탐지 목록" style="flex:1">
+        <div class="hd"><h2>탐지 목록</h2><span class="cap" id="dlgCount"></span></div>
+        <div class="bd"><table><thead><tr><th>ID</th><th>차량</th><th>구역</th><th class="r">체류</th><th class="r">적재함</th><th>판정</th></tr></thead><tbody id="dlgRows"></tbody></table></div>
+      </section>
+      <section class="card ref" aria-label="실제 사진 판정 예시">
+        <div class="hd"><h2>실제 사진 판정 예시</h2></div>
+        <div class="bd"><img src="/web/assets/dump_sample.jpg" alt="덤프트럭이 적재함을 들어 올린 사진에 YOLO 박스와 '하차 중 · 적재함 상승' 판정이 표시됨">
+          <p class="cap" id="refCap">팀 제공 사진 · YOLO11n 사전학습(COCO truck) 그대로 실행한 결과</p></div>
+      </section>
     </div>
   </div>
-</dialog>
+</div>
 
 <script>
 (async function(){
@@ -623,19 +734,24 @@ function drawCams(st){
     else renderYardCam(cv,c,st,clock);
     box.querySelector('.jd').textContent='판정 · '+camSummary(c,st);
   });
-  if(dlgCam && $('#camDlg').open) drawBig(st);
 }
-let dlgCam=null;
-function openCam(id){ dlgCam=id; $('#dlgChs').innerHTML=S.cams.map(c=>'<button class="pill-btn'+(c.id===id?' dark':'')+'" data-cam="'+c.id+'">'+esc(c.id+' · '+c.name)+'</button>').join(''); if(!$('#camDlg').open) $('#camDlg').showModal(); if(last) drawBig(last); }
+let camId=null;
+function openCam(id){ location.hash='#cam/'+id; }
 function drawBig(st){
-  const c=camOf[dlgCam], cv=$('#bigCam'), byId=Object.fromEntries(st.vehicles.map(v=>[v.id,v]));
-  $('#dlgTitle').textContent=c.id+' · '+c.name+' 크게 보기';
-  const det=c.sector_id?renderHopperCam(cv,c,st.sectors.find(x=>x.id===c.sector_id),byId,hhmm(st.clock)):renderYardCam(cv,c,st,hhmm(st.clock));
+  const c=camOf[camId]; if(!c) return;
+  const cv=$('#bigCam'), byId=Object.fromEntries(st.vehicles.map(v=>[v.id,v]));
+  const sec=c.sector_id?st.sectors.find(x=>x.id===c.sector_id):null;
+  $('#camTitle').textContent=(sec?sec.name+' 하역장 상세':'대기장 상세');
+  $('#camName').textContent=c.id+' · '+c.name+(sec?' 측면':'');
+  $('#camChs').innerHTML=S.cams.map(x=>'<button class="pill-btn'+(x.id===camId?' dark':'')+'" data-cam="'+x.id+'" aria-pressed="'+(x.id===camId)+'">'+esc(x.id+' · '+x.name)+'</button>').join('');
+  if(sec){ const lv=sec.status==='down'?'down':sec.level;
+    $('#camStat').innerHTML='<span class="chip '+lv+'">'+LV_TEXT[lv]+' '+sec.congestion_pct+'%</span><span class="chip">하차 중 <b class="num">'+sec.working.length+'/'+sec.bays+'</b></span><span class="chip">호퍼 대기 <b class="num">'+sec.queue.length+'</b></span><span class="chip">호출 이동 <b class="num">'+sec.moving.length+'</b></span>'; }
+  else $('#camStat').innerHTML='<span class="chip">대기장 <b class="num">'+st.counts.yard+'대</b></span><span class="chip">호출 이동 <b class="num">'+st.counts.moving+'대</b></span>';
+  const det=sec?renderHopperCam(cv,c,sec,byId,hhmm(st.clock)):renderYardCam(cv,c,st,hhmm(st.clock));
   $('#dlgCount').textContent='이 프레임 · '+det.length+'대';
   $('#dlgRows').innerHTML=det.length?det.map(d=>'<tr><td class="num">#'+esc(d.id)+'</td><td class="plate">'+esc(d.veh)+'</td><td>'+esc(d.zone)+'</td><td class="r num">'+Math.floor(d.stay)+'분</td><td class="r num">'+(d.deg?d.deg+'°':'—')+'</td><td>'+esc(d.judge)+'</td></tr>').join(''):'<tr><td colspan="6" class="empty">이 채널에 잡힌 차량이 없습니다.</td></tr>';
 }
-$('#dlgChs').addEventListener('click',e=>{const b=e.target.closest('[data-cam]'); if(b) openCam(b.dataset.cam);});
-$('#dlgClose').addEventListener('click',()=>$('#camDlg').close());
+$('#camChs').addEventListener('click',e=>{const b=e.target.closest('[data-cam]'); if(b) openCam(b.dataset.cam);});
 
 /* ---------- 가정값 탭 ---------- */
 const st0=cfg.settings, fl=st0.fleet;
@@ -679,9 +795,14 @@ function render(s){
   });
   const openN=s.alerts.filter(a=>!a.ack&&a.kind!=='호출').length;
   $('#navAlert').hidden=!openN; $('#navAlert').textContent=openN;
+  $('#bellCnt').hidden=!s.panel_open; $('#bellCnt').textContent=s.panel_open;
   if(view==='dock') renderOrders(s);
+  if(view==='cam'){ drawBig(s); return; }
   if(view!=='monitor'){ renderAlerts(); return; }
   drawVehicles(s.vehicles,s.road); drawRoutes(s);
+  $('#mapSum').innerHTML='<span class="chip">대기장 <b class="num">'+c.yard+'대</b></span><span class="chip">호출 이동 <b class="num">'+c.moving+'대</b></span><span class="chip">평균 대기 <b class="num">'+k.yard_avg_wait+'분</b></span>';
+  $('#monNote').textContent='시뮬레이션 '+hhmm(s.clock)+' · 숫자는 시뮬레이션 값';
+  if(monMode==='simple'){ renderSides(s); renderAlerts(); return; }
   drawCams(s);
 
   $('#hoppers').innerHTML=s.sectors.map(x=>{
@@ -707,6 +828,75 @@ function render(s){
     :'<div class="empty">대기장에서 순번을 기다리는 덤프트럭이 없습니다.</div>';
   renderAlerts();
 }
+let monMode='simple';
+try{ monMode=localStorage.getItem('monMode')||'simple'; }catch(e){}
+function setMonMode(m){
+  monMode=m; try{ localStorage.setItem('monMode',m); }catch(e){}
+  $('#view-monitor').classList.toggle('simple',m==='simple'); $('#monMain').classList.toggle('simple',m==='simple');
+  document.querySelectorAll('.seg [data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===m)));
+  if(last) render(last);
+}
+document.querySelectorAll('.seg [data-mode]').forEach(b=>b.addEventListener('click',()=>setMonMode(b.dataset.mode)));
+function sideCard(x){
+  return hopperCard(x).replace('<div class="hp','<div data-cam="'+x.cam_id+'" tabindex="0" role="button" aria-label="'+esc(x.name)+' 하역장 상세" class="hp');
+}
+function renderSides(s){
+  const secs=s.sectors, half=Math.ceil(secs.length/2);
+  $('#sideL').innerHTML=secs.slice(0,half).map(sideCard).join('');
+  const nc=s.queue.slice(0,6);
+  $('#sideR').innerHTML=secs.slice(half).map(sideCard).join('')+
+    '<section class="card" aria-label="다음 호출"><div class="hd"><h2>다음 호출</h2><span class="sub">순번 '+s.queue.length+'대</span><span class="sp"></span><a class="mini" href="#dock">순번·배정</a></div><div class="bd"><div class="nextcalls">'+
+    (nc.length?nc.map(q=>'<div class="r"><span class="rank">'+q.rank+'</span><span><span class="plate">'+esc(q.vehicle_id)+'</span>'+(q.urgent?'<span class="badge">긴급</span>':'')+'<span class="cap" style="display:block">'+esc(q.cargo)+' '+q.load_t+'t → '+esc(sname(q.sector_id))+'</span></span>'+
+      '<span style="text-align:right"><b class="num">'+esc(q.call_at||'—')+'</b><span class="st '+(STATUS_CLS[q.status]||'wait')+'" style="display:block;margin-top:2px">'+esc(q.status)+'</span></span></div>').join(''):'<div class="empty">대기장에서 기다리는 차량이 없습니다.</div>')+'</div></div></section>';
+}
+['#sideL','#sideR'].forEach(id=>{
+  $(id).addEventListener('click',e=>{const h=e.target.closest('[data-cam]'); if(h) openCam(h.dataset.cam);});
+  $(id).addEventListener('keydown',e=>{const h=e.target.closest('[data-cam]'); if(h&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openCam(h.dataset.cam);}});
+});
+
+/* ---------- 알림 패널 (종 아이콘) ---------- */
+let panelOpen=false, panelFilter='all', panelData=null;
+const PST={'승인 대기':'need','확인 필요':'look','실행됨':'done','확인함':'wait'};
+function togglePanel(on){
+  panelOpen=on==null?!panelOpen:on; $('#panel').hidden=!panelOpen; $('#bellBtn').setAttribute('aria-expanded',String(panelOpen));
+  if(panelOpen) loadPanel(); else $('#bellBtn').focus();
+}
+$('#bellBtn').addEventListener('click',()=>togglePanel());
+$('#panelClose').addEventListener('click',()=>togglePanel(false));
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&panelOpen) togglePanel(false); });
+$('#panelAll').addEventListener('click',()=>togglePanel(false));
+$('#panelFilter').addEventListener('click',e=>{ const b=e.target.closest('[data-pf]'); if(!b) return; panelFilter=b.dataset.pf;
+  document.querySelectorAll('#panelFilter [data-pf]').forEach(x=>x.classList.toggle('dark',x===b)); if(panelData) renderPanel(panelData); });
+async function loadPanel(){ try{ renderPanel(await getJ('/api/panel')); }catch(e){} }
+setInterval(()=>{ if(panelOpen) loadPanel(); },1000);
+function effTxt(e){
+  if(!e) return '<span class="cap">관련 차량이 하차를 시작하면 계산돼요</span>';
+  const m=e.min, cls=m<-0.05?'good':m>0.05?'bad':'';
+  return '<span class="eff '+cls+'">'+(Math.abs(m)<0.05?'0분':sgn(m,'분'))+' · '+(m>0.05?'+':'')+won(Math.abs(e.won))+(m<-0.05?' 절감':m>0.05?' 늘어남':'')+'</span>'+
+    ' <span class="cap">FIFO '+(e.fifo_lower?'≥':'')+e.fifo+'분 → 추천 '+e.rec+'분'+(e.n>1?' · '+e.n+'대':'')+(e.confirmed?' · 확정':' · 예상')+'</span>';
+}
+function renderPanel(d){
+  panelData=d;
+  const cards=d.cards.filter(c=>panelFilter==='all'||PST[c.status]===panelFilter);
+  $('#panelCount').textContent='전체 '+d.counts.all+' · 처리할 것 '+d.counts.open;
+  $('#panelBody').innerHTML=cards.length?cards.map(c=>'<div class="acard '+c.level+(c.status==='확인함'?' done':'')+'">'+
+    '<div class="top"><span class="lvl '+c.level+'">'+esc(c.kind)+'</span>'+(c.ranks&&c.ranks.length?'<span class="cap">순번 '+c.ranks.join('·')+'</span>':'')+'<span class="st '+(PST[c.status]||'wait')+'">'+esc(c.status)+'</span><span class="t num">'+esc(c.ts)+'</span></div>'+
+    '<div class="ln"><span>무슨 일</span><span>'+esc(c.text)+'</span></div>'+
+    '<div class="ln"><span>→ 제안</span><span>'+esc(c.action)+'</span></div>'+
+    '<div class="ln"><span>→ 효과</span><span>'+effTxt(c.effect)+'</span></div>'+
+    (c.status==='확인함'?'':'<div class="btns">'+(c.approve_vid?'<button class="mini dark" data-papprove="'+esc(c.approve_vid)+'">'+esc(c.approve_vid)+' 승인</button>':'')+'<button class="mini" data-pack="'+esc(c.id)+'">확인</button></div>')+
+    '</div>').join(''):'<div class="empty">'+(d.cards.length?'이 조건의 알림이 없습니다.':'아직 알림이 없습니다. 시작을 누르면 덤프트럭이 들어옵니다.')+'</div>';
+  const t=d.total;
+  $('#panelTotal').textContent=won(Math.max(0,-t.won))+(t.won>0?' (늘어남 '+won(t.won)+')':'');
+  $('#panelTotalS').textContent=t.vehicles?('하차를 시작한 '+t.vehicles+'대 · 줄어든 '+t.saved_min+'분 − 늘어난 '+t.added_min+'분 = '+sgn(t.min,'분')+' × ₩'+t.won_per_min+'/분 (가정 단가)'):'아직 두 방식 모두 하차를 시작한 차량이 없습니다';
+}
+$('#panelBody').addEventListener('click',async e=>{
+  const a=e.target.closest('[data-papprove]'), k=e.target.closest('[data-pack]');
+  try{ if(a) await postJ('/api/order/approve?vehicle_id='+encodeURIComponent(a.dataset.papprove));
+       else if(k) await postJ('/api/alerts/'+encodeURIComponent(k.dataset.pack)+'/ack'); }catch(err){}
+  loadPanel(); refresh();
+});
+
 function renderAlerts(){
   if(!last) return;
   const show=$('#showCalls').checked;
@@ -727,7 +917,7 @@ const post=u=>fetch(u,{method:'POST'}).then(r=>{ if(!r.ok) throw new Error(r.sta
 const refresh=()=>fetch('/api/state').then(r=>r.json()).then(render).catch(()=>{});
 $('#runBtn').addEventListener('click',()=>post(last&&last.running?'/api/sim/pause':'/api/sim/start').then(refresh));
 $('#speedSel').addEventListener('change',e=>post('/api/sim/speed?value='+e.target.value).then(refresh));
-$('#resetBtn').addEventListener('click',()=>post('/api/sim/reset').then(()=>{ Object.keys(vehNodes).forEach(id=>{vehNodes[id].remove();delete vehNodes[id];}); refresh(); }));
+$('#resetBtn').addEventListener('click',()=>post('/api/sim/reset').then(()=>{ dockMsg=''; Object.keys(vehNodes).forEach(id=>{vehNodes[id].remove();delete vehNodes[id];}); refresh(); }));
 $('#downSel').addEventListener('change',()=>last&&render(last));
 $('#downBtn').addEventListener('click',()=>{ const id=$('#downSel').value, x=last&&last.sectors.find(y=>y.id===id);
   post('/api/events/'+(x&&x.status==='down'?'sector_up':'sector_down')+'?sector_id='+encodeURIComponent(id)).then(refresh); });
@@ -735,16 +925,19 @@ $('#urgentBtn').addEventListener('click',()=>post('/api/events/urgent').then(ref
 $('#alerts').addEventListener('click',e=>{ const b=e.target.closest('[data-ack]'); if(b) post('/api/alerts/'+encodeURIComponent(b.dataset.ack)+'/ack').then(refresh); });
 
 /* ================= 탭 (#monitor · #dock · #analysis · #alerts) ================= */
-const VIEWS=['monitor','dock','analysis','alerts'];
+const VIEWS=['monitor','dock','analysis','alerts','settings','cam'];
 let view='monitor';
 const won=n=>'₩'+Math.round(n).toLocaleString();
 const sgn=(n,u)=>(n>0?'+':n<0?'−':'')+Math.abs(Math.round(n*10)/10)+u;
 function route(){
   const h=location.hash.replace('#','');
-  view=VIEWS.includes(h)?h:'monitor';
+  if(h.startsWith('cam/')&&camOf[h.slice(4)]){ view='cam'; camId=h.slice(4); }
+  else view=VIEWS.includes(h)&&h!=='cam'?h:'monitor';
   VIEWS.forEach(v=>$('#view-'+v).hidden=(v!==view));
-  document.querySelectorAll('nav a').forEach(a=>{ if(a.dataset.view===view) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
-  if($('#camDlg').open && view!=='monitor') $('#camDlg').close();
+  const navv=view==='cam'?'monitor':view;
+  document.querySelectorAll('nav a').forEach(a=>{ if(a.dataset.view===navv) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
+  if(view==='settings') formBuilt=false;
+  if(last) render(last);
   pollView(true);
 }
 window.addEventListener('hashchange',route);
@@ -755,6 +948,7 @@ async function pollView(force){
   if(polling&&!force) return; polling=true;
   try{
     if(view==='dock') renderDock(await getJ('/api/dock'));
+    else if(view==='settings') renderSettings(await getJ('/api/assumptions'));
     else if(view==='analysis') renderAnalysis(await getJ('/api/analysis'));
     else if(view==='alerts') renderAlertHistory(await getJ('/api/alerts?'+alertQuery()));
   }catch(e){} finally{ polling=false; }
@@ -784,17 +978,26 @@ function hopperCard(x){
     (x.status==='down'?'<div class="hold">호퍼 정지 · 배정 차량은 다른 호퍼로</div>':'')+
     '<div class="work">'+work+'</div></div>';
 }
-const STATUS_CLS={'승인 대기':'wait','승인됨':'ok','변경됨':'chg','이동 중':'mv'};
+const STATUS_CLS={'승인 대기':'wait','승인됨':'ok','변경됨':'chg','이동 중':'mv','승인 대기 · 호출 시각 지남':'late'};
+let lastSched=null;
+const bayOf=vid=>{ if(!lastSched) return null; for(const r of lastSched.rows) for(const g of r.segs) if(g.vehicle_id===vid) return r.bay; return null; };
+function effCell(e){
+  if(!e) return '<span class="cap">—</span>';
+  const m=e.effect, cls=m<-0.05?'good':m>0.05?'bad':'';
+  return '<span class="eff-c"><b class="num '+cls+'">'+(Math.abs(m)<0.05?'0분':sgn(m,'분'))+'</b><span class="cap num">FIFO '+(e.fifo_lower?'≥':'')+e.fifo+' → '+e.rec+'분'+(e.confirmed?'':' · 예상')+'</span></span>';
+}
 function renderOrders(s){
   if(editing){ $('#editNote').hidden=false; return; }
   $('#editNote').hidden=true;
   if(!s.queue.length){ $('#orderTable').innerHTML='<div class="empty">대기장에서 순번을 기다리는 덤프트럭이 없습니다. 관제 화면에서 시작을 누르면 들어옵니다.</div>'; return; }
-  $('#orderTable').innerHTML='<table><thead><tr><th>순번</th><th>차량</th><th>원료 · 투입 기한</th><th class="r">대기</th><th>보낼 호퍼</th><th class="r">예상 호출</th><th>추천 이유</th><th>상태</th><th></th></tr></thead><tbody>'+
-    s.queue.map(q=>'<tr><td><span class="rank">'+q.rank+'</span></td><td><span class="plate">'+esc(q.vehicle_id)+'</span>'+(q.urgent?'<span class="badge">긴급</span>':'')+'</td>'+
-      '<td>'+esc(q.cargo)+' '+q.load_t+'t<div class="cap">기한 '+esc(q.due)+'</div></td><td class="r num">'+Math.floor(q.wait_min)+'분</td><td><b>'+esc(sname(q.sector_id))+'</b></td>'+
-      '<td class="r num">'+esc(q.call_at||'—')+'</td><td>'+esc(q.reason)+'</td><td><span class="st '+(STATUS_CLS[q.status]||'wait')+'">'+esc(q.status)+'</span></td>'+
-      '<td style="white-space:nowrap">'+(q.status==='승인 대기'&&q.sector_id?'<button class="mini dark" data-approve="'+esc(q.vehicle_id)+'">승인</button> ':'')+
-      (fitSectors(q.cargo).length>1?'<button class="mini" data-edit="'+esc(q.vehicle_id)+'">변경</button>':'<span class="cap" title="받을 수 있는 호퍼가 하나뿐">전용</span>')+'</td></tr>').join('')+'</tbody></table>';
+  $('#orderTable').innerHTML='<table><thead><tr><th>순번</th><th>차량</th><th class="r">대기</th><th>호퍼 · 하차구</th><th class="r">호출</th><th>추천 이유</th><th>만든 알림</th><th>효과</th><th>상태</th><th></th></tr></thead><tbody>'+
+    s.queue.map(q=>{ const bay=bayOf(q.vehicle_id); return '<tr><td><span class="rank">'+q.rank+'</span></td><td><span class="plate">'+esc(q.vehicle_id)+'</span>'+(q.urgent?'<span class="badge">긴급</span>':'')+'<div class="cap">'+esc(q.cargo)+' '+q.load_t+'t · 기한 '+esc(q.due)+'</div></td>'+
+      '<td class="r num">'+Math.floor(q.wait_min)+'분</td><td><b>'+esc(sname(q.sector_id))+'</b>'+(bay?'<div class="cap">하차구 '+bay+'</div>':'')+'</td>'+
+      '<td class="r num"><b>'+esc(q.call_at||'—')+'</b>'+(q.start_at?'<div class="cap">하차 '+esc(q.start_at)+'</div>':'')+'</td><td>'+esc(q.reason)+'</td>'+
+      '<td>'+(q.alert?'<span class="cap">'+esc(q.alert.kind)+' '+esc(q.alert.ts)+'</span>':'<span class="cap">—</span>')+'</td><td>'+effCell(q.effect)+'</td>'+
+      '<td><span class="st '+(STATUS_CLS[q.status]||'wait')+'">'+esc(q.status)+'</span></td>'+
+      '<td style="white-space:nowrap">'+(q.status.startsWith('승인 대기')&&q.sector_id?'<button class="mini dark" data-approve="'+esc(q.vehicle_id)+'">승인</button> ':'')+
+      (fitSectors(q.cargo).length>1?'<button class="mini" data-edit="'+esc(q.vehicle_id)+'">변경</button>':'<span class="cap" title="받을 수 있는 호퍼가 하나뿐">전용</span>')+'</td></tr>'; }).join('')+'</tbody></table>';
 }
 const fitSectors=cargo=>S.sectors.filter(s=>s.cargo.includes(cargo));
 function openEdit(vid){
@@ -806,7 +1009,7 @@ function openEdit(vid){
   if(!tr) return;
   tr.classList.add('editing');
   const ed=document.createElement('tr'); ed.className='editing'; ed.id='editRow';
-  ed.innerHTML='<td></td><td colspan="8"><div class="edit">'+
+  ed.innerHTML='<td></td><td colspan="9"><div class="edit">'+
     '<div class="row"><b>'+esc(vid)+'</b> · '+esc(q.cargo)+' · '+esc(sname(q.sector_id))+' → <select id="edSector" aria-label="보낼 호퍼">'+opts.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('')+'</select><span class="impact" id="edImpact">영향 계산 중…</span></div>'+
     '<div class="row" role="radiogroup" aria-label="변경 사유">'+cfg.reasons.map((r,i)=>'<label class="rs"><input type="radio" name="edReason" value="'+esc(r)+'">'+esc(r)+'</label>').join('')+'</div>'+
     '<div class="row"><input type="text" id="edMemo" placeholder="메모 (선택) 예: 기사 휴게 중, 5분 뒤 출발 가능" maxlength="200"><button class="mini dark" id="edSave">저장</button><button class="mini" id="edCancel">취소</button><span class="cap" id="edErr"></span></div></div></td>';
@@ -849,25 +1052,77 @@ function buildForm(a){
     Object.keys(a.std_times).map(c=>'<label for="as-std-'+esc(c)+'">'+esc(c)+'</label><input id="as-std-'+esc(c)+'" data-std="'+esc(c)+'" inputmode="decimal" value="'+a.std_times[c]+'">').join('');
   formBuilt=true;
 }
+let setMsg='';
 $('#recalc').addEventListener('click',async()=>{
   const body={std_times:{}}; let bad=false;
   document.querySelectorAll('#assumeForm input').forEach(i=>{ const v=Number(i.value); if(!isFinite(v)||v<0){bad=true;i.style.borderColor='var(--red)';} else i.style.borderColor=''; if(i.dataset.std) body.std_times[i.dataset.std]=v; else body[i.dataset.k]=v; });
-  if(bad){ dockMsg='숫자가 아닌 칸이 있습니다. 빨간 칸을 고쳐 주세요.'; return; }
-  try{ const r=await postJ('/api/assumptions',body); dockMsg=r.changed.length?'재계산했습니다 · '+r.changed.join(' · '):'바뀐 값이 없습니다.'; formBuilt=false;
-    try{ cfg.settings=(await getJ('/api/config')).settings; }catch(e){} await refresh(); pollView(true); }catch(e){ dockMsg='재계산하지 못했습니다: '+e.message; }
+  if(bad){ setMsg='숫자가 아닌 칸이 있습니다. 빨간 칸을 고쳐 주세요.'; pollView(true); return; }
+  try{ const r=await postJ('/api/assumptions',body); setMsg=r.changed.length?'다시 계산했습니다 · '+r.changed.join(' · '):'바뀐 값이 없습니다.'; formBuilt=false;
+    try{ cfg.settings=(await getJ('/api/config')).settings; }catch(e){} await refresh(); pollView(true); }catch(e){ setMsg='다시 계산하지 못했습니다: '+e.message; pollView(true); }
 });
+function renderSettings(d){
+  $('#setMsg').innerHTML=setMsg?'<div class="notice" style="margin-bottom:8px">'+esc(setMsg)+'</div>':'';
+  if(!formBuilt) buildForm(d.values);
+  $('#assumeHist').textContent=d.history.length?'최근 변경 · '+d.history[0].text+' ('+d.history[0].at+')':'아직 바꾼 가정값이 없습니다. 모든 값은 가정값입니다.';
+  const a=d.values, auto=last?last.auto_approve:true;
+  $('#setInfo').innerHTML='<div class="base">'+
+    '<div class="r"><span>호출 승인</span><span><b>'+(auto?'자동 승인 켜짐':'현장 담당자 승인 (L2)')+'</b><span class="cap" style="display:block">끄면 호출 시각이 돼도 승인 전에는 출발하지 않아요. 순번·배정 화면의 스위치로 바꿉니다.</span></span></div>'+
+    '<div class="r"><span>효과(분)</span><span>차량 1대마다 <b>FIFO였을 때 대기 − 추천 대기</b><span class="cap" style="display:block">같은 도착 데이터로 기존 방식(도착순·원료별 고정 호퍼)을 함께 돌린 값. 같은 차·같은 회차끼리 비교, 두 방식 모두 하차를 시작하면 확정</span></span></div>'+
+    '<div class="r"><span>금액(₩)</span><span>효과(분) × ₩'+Math.round(a.wait_won_per_hour/60).toLocaleString()+'/분 <span class="assumed">가정 단가</span><span class="cap" style="display:block">차량 대기 단가 ₩'+Number(a.wait_won_per_hour).toLocaleString()+'/시간을 분으로 나눈 값</span></span></div>'+
+    '<div class="r"><span>호퍼 유휴</span><span>금액에 넣지 않고 시간(분)으로만 봐요<span class="cap" style="display:block">유휴 단가(₩'+Number(a.idle_won_per_hour).toLocaleString()+'/시간)는 참고값 · 인력비는 유휴여도 나가서 두 번 세기 쉬움</span></span></div>'+
+    '<div class="r"><span>이동시간</span><span>경로 거리 ÷ 제한속도 '+a.speed_limit_kmh+'km/h × 감속 '+a.slow_factor+'</span></div></div>';
+}
+$('#autoSw').addEventListener('change',async e=>{
+  try{ const r=await postJ('/api/approval?auto='+e.target.checked); dockMsg=r.auto_approve?'자동 승인을 켰어요 · 호출 시각이 되면 바로 호출합니다.':'자동 승인을 껐어요 · 현장 담당자가 승인해야 호출됩니다 (L2).'; await refresh(); pollView(true); }catch(err){ e.target.checked=!e.target.checked; }
+});
+const SEG={work:['#DDF0E5','#1F7A4F',''],late:['#FBDDE1','#D7263D',''],coming:['#E6EDFF','#1D47B8',''],reserved:['#FFFFFF','#141414','5 3'],pending:['#FFE9DD','#B8420A','5 3'],stop:['url(#schHatch)','#D7263D','']};
+function drawSchedule(sc){
+  lastSched=sc;
+  const svgS=$('#schedSvg'), W=svgS.clientWidth||1200, LW=190, top=30, rh=38, H=top+sc.rows.length*rh+8;
+  svgS.setAttribute('viewBox','0 0 '+W+' '+H); svgS.setAttribute('height',H);
+  const x=t=>LW+(t-sc.t0)/(sc.t1-sc.t0)*(W-LW-12);
+  let g='<defs><pattern id="schHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#FBD5DA"/><rect width="4" height="10" fill="#D7263D" opacity=".55"/></pattern><clipPath id="schClip"><rect x="'+LW+'" y="0" width="'+(W-LW)+'" height="'+H+'"/></clipPath></defs>';
+  sc.ticks.forEach(k=>{ g+='<line x1="'+x(k.t)+'" x2="'+x(k.t)+'" y1="'+(top-6)+'" y2="'+(H-6)+'" stroke="'+(k.major?'#DADAD6':'#EFEFEC')+'"/>';
+    if(k.major||sc.ticks.length<=10) g+='<text x="'+x(k.t)+'" y="'+(top-12)+'" text-anchor="middle" font-size="12" fill="#5F6368">'+k.hhmm+'</text>'; });
+  let prev=null;
+  sc.rows.forEach((r,i)=>{
+    const y=top+i*rh;
+    if(r.sector_id!==prev){ if(i) g+='<line x1="0" x2="'+W+'" y1="'+y+'" y2="'+y+'" stroke="#DADAD6"/>';
+      const lv=r.up?r.level:'down', col={ok:'#1F7A4F',warn:'#B8420A',crit:'#D7263D',down:'#D7263D'}[lv];
+      g+='<text x="4" y="'+(y+16)+'" font-size="14" font-weight="700" fill="#141414">'+esc(r.name)+'</text><text x="4" y="'+(y+31)+'" font-size="11.5" font-weight="600" fill="'+col+'">'+(r.up?LV_TEXT[lv]+' '+r.pct+'%':'정지')+'</text>'; prev=r.sector_id; }
+    g+='<text x="78" y="'+(y+23)+'" font-size="12" fill="#3C4043">하차구 '+r.bay+'</text>';
+    g+='<text x="'+(LW-8)+'" y="'+(y+23)+'" font-size="11.5" text-anchor="end" font-weight="600" fill="'+(r.free_now?'#1F7A4F':'#5F6368')+'">'+(r.up?(r.free_now?'지금 빔':r.free_at+' 빔'):'—')+'</text>';
+    g+='<g clip-path="url(#schClip)">';
+    r.segs.forEach(sg=>{ const c=SEG[sg.kind]||SEG.work, x0=x(sg.t0), x1=Math.max(x(sg.t1),x0+4), w=x1-x0;
+      g+='<g><title>'+esc(sg.label+' · '+sg.at0+'~'+sg.at1)+'</title><rect x="'+(x0+1)+'" y="'+(y+5)+'" width="'+(w-2)+'" height="'+(rh-10)+'" rx="6" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.5"'+(c[2]?' stroke-dasharray="'+c[2]+'"':'')+'/>'+
+        (w>70?'<text x="'+(x0+8)+'" y="'+(y+23)+'" font-size="12" font-weight="600" fill="#141414">'+esc(w>170?sg.label:sg.label.split(' · ')[0])+'</text>':'')+'</g>'; });
+    g+='</g>';
+  });
+  const nx=x(sc.now);
+  g+='<line x1="'+nx+'" x2="'+nx+'" y1="'+(top-4)+'" y2="'+(H-4)+'" stroke="#141414" stroke-width="2" stroke-dasharray="4 3"/><rect x="'+(nx-34)+'" y="0" width="68" height="18" rx="9" fill="#141414"/><text x="'+nx+'" y="13" text-anchor="middle" font-size="11.5" font-weight="700" fill="#fff">지금 '+sc.now_hhmm+'</text>';
+  svgS.innerHTML=g;
+}
+window.addEventListener('resize',()=>{ if(view==='dock'&&lastSched) drawSchedule(lastSched); });
 function renderDock(d){
-  $('#dockHoppers').innerHTML=d.sectors.map(hopperCard).join('');
+  drawSchedule(d.schedule);
+  $('#autoSw').checked=d.auto_approve; $('#autoTxt').textContent=d.auto_approve?'자동 승인 켜짐':'자동 승인 꺼짐 · 승인해야 호출';
   $('#dockMsg').innerHTML=dockMsg?'<div class="notice" style="margin-bottom:8px">'+esc(dockMsg)+'</div>':'';
   if(last) renderOrders(last);
   const c=d.compare, f=c.fifo, r=c.rec;
   const row=(k,a,b,u,better)=>{ const dv=b-a; const good=better==='low'?dv<0:dv>0; return '<span>'+k+'</span><span class="f num">'+a+u+'</span><span class="r num">'+b+u+'</span><span class="d num '+(Math.abs(dv)<0.05?'':good?'good':'bad')+'">'+(a?sgn(dv,u):'—')+'</span>'; };
   $('#dockKpi').innerHTML='<div class="cmp"><span class="h">지표</span><span class="h">기존 FIFO</span><span class="h">추천</span><span class="h" style="text-align:right">차이</span>'+
     row('평균 대기',f.avg_wait,r.avg_wait,'분','low')+row('최대 대기',f.max_wait,r.max_wait,'분','low')+row('호퍼 유휴',Math.round(f.idle_min),Math.round(r.idle_min),'분','low')+row('반입 완료',f.trips_done,r.trips_done,'회','high')+row('투입 기한 초과',f.late,r.late,'건','low')+'</div>'+
-    '<p style="margin:10px 0 0;font-size:13px">평균 대기 <b class="'+(c.reduction_pct>0?'good':'bad')+'">'+(c.reduction_pct>0?'−':'+')+Math.abs(c.reduction_pct)+'%</b> · 추정 비용 절감 <b>'+won(c.cost.total)+'</b> <span class="simnote">(시뮬레이션 값 · 가정 단가)</span></p>'+
+    '<p style="margin:10px 0 0;font-size:13px">평균 대기 <b class="'+(c.reduction_pct>0?'good':'bad')+'">'+(c.reduction_pct>0?'−':'+')+Math.abs(c.reduction_pct)+'%</b> · 오늘 대기 절감 <b>'+won(c.cost.total)+'</b></p>'+
+    '<p class="simnote" style="margin:4px 0 0">차량별 효과 합 '+sgn(c.effect.min,'분')+' × ₩'+c.effect.won_per_min+'/분 · '+c.effect.vehicles+'대 확정 · 호퍼 유휴는 금액 제외 (가정 단가)</p>'+
     '<p class="simnote" style="margin:4px 0 0">추천 일치율 '+(c.match_pct==null?'— (아직 결정 없음)':c.match_pct+'% · 승인 '+c.decisions.approved+' / 변경 '+c.decisions.changed)+'</p>';
-  if(!formBuilt) buildForm(d.assumptions);
-  $('#assumeHist').textContent=d.history.length?'최근 변경 · '+d.history[0].text+' ('+d.history[0].at+')':'아직 바꾼 가정값이 없습니다. 모든 값은 가정값입니다.';
+  const a=d.assumptions, std=Object.entries(a.std_times).map(([k,v])=>k+' '+v).join(' · ');
+  $('#dockBase').innerHTML='<div class="r"><span>하차 표준시간</span><span class="num">'+esc(std)+'분</span></div>'+
+    '<div class="r"><span>혼잡 기준</span><span class="num">주의 '+a.warn_pct+'% · 혼잡 '+a.crit_pct+'%</span></div>'+
+    '<div class="r"><span>목표 대기 · 호출 여유</span><span class="num">'+a.target_wait_min+'분 · '+a.call_margin_min+'분</span></div>'+
+    '<div class="r"><span>구내 운행</span><span class="num">'+a.speed_limit_kmh+'km/h · 감속 ×'+a.slow_factor+'</span></div>'+
+    '<div class="r"><span>대기 단가</span><span class="num">₩'+Math.round(a.wait_won_per_hour/60).toLocaleString()+'/분 <span class="assumed">가정</span></span></div>'+
+    '<div class="r"><span>최근 변경</span><span>'+(d.history.length?esc(d.history[0].text)+' ('+esc(d.history[0].at)+')':'없음')+'</span></div>'+
+    '<p class="cap" style="margin:4px 0 0">추천 순서: ① 긴급 반입 → 투입 기한 → 오래 기다린 순 ② 가장 빨리 비는 하차구로(원래 호퍼 우선, 4분 이상 빠를 때만 전환) ③ 남은 하차 시간 ≤ 이동시간 + 여유일 때 호출 ④ 자동 승인을 끄면 현장 담당자가 승인해야 출발</p>';
 }
 
 /* ---------- 운영 분석 ---------- */
@@ -877,16 +1132,20 @@ function renderAnalysis(a){
   const redTxt=(c.reduction_pct>0?'−':c.reduction_pct<0?'+':'')+Math.abs(c.reduction_pct);
   $('#anaTiles').innerHTML=
     t('평균 대기시간 감소율',redTxt,'%','평균 '+f.avg_wait+'분 → '+r.avg_wait+'분 · 차량 '+r.vehicles+'대 기준',true)+
-    t('추정 비용 절감 · 오늘',won(c.cost.total),'','가정 단가 기준 · 아래 계산 근거')+
+    t('오늘 대기 절감',won(c.cost.total),'',sgn(c.effect.min,'분')+' × ₩'+c.effect.won_per_min+'/분 · 차량별 효과 합')+
     t('하차구 가동률',r.util_pct,'%','기존 '+f.util_pct+'% → '+sgn(r.util_pct-f.util_pct,'%p'))+
     t('하차 지연 건수',r.delays,'건','기존 '+f.delays+'건 · 표준 ×'+cfg.settings.delay.factor+' 초과')+
     t('반입 완료',r.trips_done,'회','기존 '+f.trips_done+'회 · '+sgn(r.trips_done-f.trips_done,'회'))+
     t('추천 일치율',c.match_pct==null?'—':c.match_pct,c.match_pct==null?'':'%',c.decisions.approved+c.decisions.changed?'승인 '+c.decisions.approved+' · 변경 '+c.decisions.changed:'아직 결정 없음');
   drawChart(a.series);
   const cc=c.cost;
-  $('#costBox').innerHTML='<div class="formula"><span>차량 대기 비용</span><b class="num">'+won(cc.wait)+'</b><span class="eq">줄어든 대기 '+c.saved_wait_min+'분 = '+(c.saved_wait_min/60).toFixed(2)+'시간 × '+won(cc.wait_rate)+'/시간</span>'+
-    '<span>호퍼 유휴 비용</span><b class="num">'+won(cc.idle)+'</b><span class="eq">줄어든 유휴 '+c.saved_idle_min+'분 = '+(c.saved_idle_min/60).toFixed(2)+'시간 × '+won(cc.idle_rate)+'/시간 (설비·인력)</span>'+
-    '<span class="tot">합계 · 오늘</span><b class="tot num">'+won(cc.total)+'</b></div><p class="cap" style="margin:8px 0 0">줄어든 시간 = 같은 도착 데이터로 돌린 기존 FIFO − 추천. 단가는 통합하역작업 탭의 가정값에서 바꿉니다. 모든 값은 시뮬레이션 값입니다.</p>';
+  const ef=c.effect;
+  $('#costBox').innerHTML='<div class="formula"><span>줄어든 대기 (추천이 FIFO보다 빨랐던 차량)</span><b class="num good">−'+ef.saved_min+'분</b>'+
+    '<span>늘어난 대기 (추천이 더 늦었던 차량 · 담당자 변경 포함)</span><b class="num bad">+'+ef.added_min+'분</b>'+
+    '<span class="eq">차량 1대마다 FIFO였을 때 대기 − 추천 대기 · 두 방식 모두 하차를 시작한 '+ef.vehicles+'대</span>'+
+    '<span class="tot">오늘 대기 절감 = '+(-ef.min)+'분 × ₩'+ef.won_per_min+'/분</span><b class="tot num">'+won(cc.total)+'</b>'+
+    '<span>호퍼 유휴 (시간 지표 · 금액 미포함)</span><b class="num">'+Math.round(f.idle_min)+' → '+Math.round(r.idle_min)+'분</b></div>'+
+    '<p class="cap" style="margin:8px 0 0">유휴는 인력비가 유휴여도 나가서 두 번 세기 쉬워 금액에 넣지 않아요(팀 결정 전 가정). 단가는 설정에서 바꿉니다. 모든 값은 시뮬레이션 값입니다.</p>';
   $('#cargoTable').innerHTML=a.cargo.length?'<table><thead><tr><th>원료</th><th class="r">처리</th><th class="r">반입량</th><th class="r">평균 하차</th><th class="r">평균 대기</th><th class="r">지연</th><th>메모</th></tr></thead><tbody>'+
     a.cargo.map(x=>'<tr><td><b>'+esc(x.cargo)+'</b></td><td class="r num">'+x.trips+'대</td><td class="r num">'+x.tons.toLocaleString()+'t</td><td class="r num">'+x.avg_unload+'분</td><td class="r num">'+x.avg_wait+'분</td><td class="r num">'+x.delays+'건</td><td class="cap">'+esc(x.note)+'</td></tr>').join('')+'</tbody></table>'
     :'<div class="empty">끝난 반입이 아직 없습니다.</div>';
@@ -966,7 +1225,7 @@ function connect(){
   ws.onmessage=e=>render(JSON.parse(e.data));
   ws.onclose=()=>{ $('#conn').classList.remove('on'); $('#conn').title='재연결 중'; if(!poll) poll=setInterval(refresh,1000); setTimeout(connect,2000); };
 }
-route(); refresh(); connect();
+setMonMode(monMode); route(); refresh(); connect();
 })();
 </script>
 </body>

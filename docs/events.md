@@ -74,15 +74,17 @@
 | `BEACON_NEAR` | 기사 앱(가정) → 시뮬레이터 | 차량이 어느 구역 근처인지. 영상 이벤트에 vehicle_id를 붙이는 데 씀 |
 | `ZONE_ENTER` / `ZONE_EXIT` | 영상 | 구역(`yard`·`queue`·`bay`) 진입·이탈, 3초 이상 유지 시에만 |
 | `VEHICLE_STOPPED` | 영상 | 구역 안에서 멈춤 → 대기 또는 작업 시작 |
-| `CALL` | 배정 엔진 | 차량 호출 (payload: rank, reason, route_m, travel_min, speed_limit_kmh) → 기사 화면 알림 |
+| `CALL` | 배정 엔진 | 차량 호출 (payload: rank, reason, route_m, travel_min, speed_limit_kmh, approval = auto · approved · changed) → 기사 화면 알림 |
+| `CALL_PENDING` | 배정 엔진 | 호출 시각이 됐지만 현장 담당자 승인을 기다림 (자동 승인 꺼짐 · L2). payload: rank, reason, since |
 | `CALL_ACK` | 기사 모바일 화면 | 기사가 ‘출발’을 누름 |
 | `CRANE_START` / `CRANE_DONE` | 설비 신호(가정) 또는 담당자 화면 버튼 | 크레인 상하역 시작·완료 (DONE이면 진척도 100% 확정) |
 | `SECTOR_DOWN` / `SECTOR_UP` | 돌발 이벤트 버튼 | 섹터 정지·복구 → 재배정 |
-| `ALERT` | 배정 엔진 | 알림 발생 (payload: level, kind, text, action) |
+| `ALERT` | 배정 엔진 | 알림 발생 (payload: level, kind, text, action, related = 제안이 영향을 주는 반입 "차량#회차" 목록) |
 | `ORDER_APPROVED` | 통합하역작업 탭 | 담당자가 추천 순번 승인 (payload: rank, reason) |
 | `ORDER_CHANGED` | 통합하역작업 탭 | 담당자가 보낼 호퍼 변경 (payload: from, to, reason, memo, delta_min, cost_won) |
 | `ALERT_ACK` | 관제 화면 · 알림 이력 탭 | 알림 확인 (payload: alert_id, ack_sec = 뜬 뒤 확인까지 실제 초) |
-| `ASSUMPTIONS_UPDATED` | 통합하역작업 탭 가정값 | 가정값 변경 → 처음부터 다시 계산 (payload: changes[]) |
+| `ASSUMPTIONS_UPDATED` | 설정 › 가정값·단가 | 가정값 변경 → 처음부터 다시 계산 (payload: changes[]) |
+| `APPROVAL_MODE` | 순번·배정 자동 승인 스위치 | 자동 승인 켜기/끄기 (payload: auto). 끄면 승인 전 호출은 `CALL_PENDING`으로 멈춘다 |
 
 R2에서 팀이 제안한 `order_approved` 등 소문자 이름은 기존 형식에 맞춰 대문자로 썼다. 변경 사유 코드는
 `기사·차량 사정 / 현장 우선순위 / 영상 판정 오류 / 호퍼·설비 사정 / 긴급 반입 끼어듦 / 기타` 여섯 가지(app/runtime.py 의 REASONS 목록).
@@ -111,6 +113,29 @@ R2에서 팀이 제안한 `order_approved` 등 소문자 이름은 기존 형식
 | `GET /api/analysis` | 배정 방식 성과, 시간대별 대기 차량(두 방식), 원료별 성과, 추천 피드백·제안 |
 | `POST /api/suggestion/apply?key=` · `ignore?key=` | 가정값 조정 제안 적용·무시 |
 | `GET /api/alerts?level=&kind=&sector_id=&unacked=` | 알림 이력 + 요약(오늘 건수·미확인·평균 확인 시간), SQLite `alerts`에도 저장 |
+
+### 알림 패널 · 효과 · 승인 (R4)
+
+- **효과(분)** = 반입 한 건("차량#회차")마다 `FIFO였을 때 대기 − 추천 대기`. 같은 도착 데이터로 기존 방식(도착순 · 원료별 고정 호퍼)을 함께 돌린 값이고, 두 방식 모두 하차를 시작하면 **확정**, 아니면 **예상**(추천은 순번표의 예상 하차 시작, FIFO는 지금까지 대기 = 하한).
+- **금액** = 효과(분) × ₩500/분(= 대기 단가 ₩30,000/시간, 가정). 호퍼 유휴는 금액에 넣지 않고 시간(분)으로만 본다.
+- 알림 카드의 효과 = `ALERT.payload.related`에 있는 반입들의 효과 합. 상태: 승인 대기(관련 차량이 승인을 기다림) · 실행됨(호퍼 이상·대기 초과는 엔진이 바로 재배정·우선 배정) · 확인 필요 · 확인함.
+
+| 주소 | 하는 일 |
+|---|---|
+| `GET /api/panel` | 알림 카드(무슨 일·제안·효과·상태·관련 순번) + 오늘 대기 절감 합계 |
+| `POST /api/approval?auto=true\|false` | 자동 승인 스위치 (`APPROVAL_MODE`) |
+| `GET /api/schedule` | 호퍼 × 하차구 줄별 구간(하차 중 · 지연 · 호출돼 오는 중 · 호출 예약 · 승인 대기 · 정지), 지금 −5분 ~ +40분 |
+
+```json
+{"ts": "2026-11-09T09:05:00", "type": "CALL_PENDING", "source": "engine", "cam_id": null, "sector_id": "A", "zone": null,
+ "track_id": 14, "vehicle_id": "82자 2321", "payload": {"rank": 1, "reason": "투입 기한 순(41분 남음) · 호퍼 A 전용 원료", "since": "09:05"}}
+{"ts": "2026-11-09T09:04:00", "type": "APPROVAL_MODE", "source": "ui", "cam_id": null, "sector_id": null, "zone": null,
+ "track_id": null, "vehicle_id": null, "payload": {"auto": false}}
+```
+
+### 다음 라운드 예정 (아직 내지 않음)
+
+- 안전 경고: 적재함 상승 중 덤프 반경 5m 안 사람 → 이름은 SAFETY_ALERT 로 예정 (payload: sector_id, bay, distance_m, action = 앱 경고·하차 중지 요청). 표에 올리는 것은 시뮬레이터나 영상이 실제로 낼 때.
 
 ## 차량 상태
 

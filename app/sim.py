@@ -128,6 +128,9 @@ class Sim:
         self.track_seq = 0
         self.urgent_seq = 0
         self.plan = []
+        self.require_approval = False   # True면 현장 담당자 승인(L2) 뒤에만 호출 (자동 승인 스위치 끔)
+        self.approved = set()           # 승인된 "차량#회차"
+        self.pending = set()            # 호출 시각이 됐지만 승인을 기다리는 "차량#회차"
         self.fleet = make_fleet(self.seed, self.fc)
         self.truck = {f["plate"]: f for f in self.fleet}
         self.pending_arrivals = sorted((trip(self.seed, f, 1, f["first_t"], self.fc) for f in self.fleet),
@@ -169,16 +172,30 @@ class Sim:
             self.on_event(ev)
         return ev
 
-    def alert(self, level, kind, text, action, sector_id=None, vehicle=None):
+    @staticmethod
+    def key(v):
+        """반입 한 건을 가리키는 키: 같은 차가 하루 여러 번 오므로 '차량#회차'."""
+        return f"{v['id']}#{v['trip']}"
+
+    def alert(self, level, kind, text, action, sector_id=None, vehicle=None, related=None):
+        """related: 이 알림의 제안이 영향을 주는 반입("차량#회차") — 알림 패널의 효과(분)를 이 차량들로 계산한다."""
         self.alert_seq += 1
+        rel = list(dict.fromkeys(related if related is not None else ([self.key(vehicle)] if vehicle else [])))
         a = {"id": f"AL-{self.alert_seq}", "ts": self.hhmm(self.t), "t": self.t, "level": level, "kind": kind,
              "text": text, "action": action, "sector_id": sector_id, "vehicle_id": vehicle["id"] if vehicle else None,
-             "ack": False, "ack_at": None, "ack_sec": None}
+             "related": rel, "ack": False, "ack_at": None, "ack_sec": None}
         self.alerts_all.append(a)
         self.alerts.insert(0, a)
         del self.alerts[80:]
         self.emit("ALERT", "engine", vehicle=vehicle, sector_id=sector_id,
-                  payload={k: a[k] for k in ("id", "level", "kind", "text", "action")})
+                  payload={k: a[k] for k in ("id", "level", "kind", "text", "action", "related")})
+
+    def planned_keys_any(self):
+        return [self.key(self.vehicles[p["vehicle_id"]]) for p in self.plan if p["sector_id"]]
+
+    def planned_keys(self, sid, n=2):
+        """그 호퍼로 순번이 잡힌 대기장 차량 (앞에서 n대)."""
+        return [self.key(self.vehicles[p["vehicle_id"]]) for p in self.plan if p["sector_id"] == sid][:n]
 
     # ---------- geometry ----------
     def yard_xy(self, v):
@@ -244,15 +261,16 @@ class Sim:
         s["up"] = False
         name = self.sec_cfg[sid]["name"]
         self.emit("SECTOR_DOWN", "ui", sector_id=sid)
-        moved = 0
+        moved = []
         for v in self.vehicles.values():
             if v["sector"] == sid and v["state"] in ("moving", "queue"):
                 # 이동 중·대기 중인 차량은 다시 배정 대상으로 (그 자리에서 다른 호퍼로 출발)
                 v.pop("queue_idx", None)
                 v.update(state="yard", sector=None, rerouted=True, path=None)
-                moved += 1
-        self.alert("crit", "호퍼 이상", f"{name} 정지", f"영향 차량 {moved}대 재배정, 하차 중 차량은 일시 중지",
-                   sector_id=sid)
+                moved.append(self.key(v))
+        self.replan()
+        self.alert("crit", "호퍼 이상", f"{name} 정지", f"영향 차량 {len(moved)}대 재배정, 하차 중 차량은 일시 중지",
+                   sector_id=sid, related=moved + [k for k in self.planned_keys_any() if k not in moved][:3])
 
     def sector_up(self, sid):
         s = self.sectors[sid]
@@ -260,7 +278,7 @@ class Sim:
             return
         s["up"] = True
         self.emit("SECTOR_UP", "ui", sector_id=sid)
-        self.alert("info", "호퍼 이상", f"{self.sec_cfg[sid]['name']} 복구", "순번 재계산", sector_id=sid)
+        self.alert("info", "호퍼 이상", f"{self.sec_cfg[sid]['name']} 복구", "순번 재계산", sector_id=sid, related=[])
 
     def add_urgent(self):
         """긴급 반입: 소결 배합에 바로 필요한 원료(예: 분코크스 부족)를 실은 트럭 한 대."""
@@ -367,7 +385,7 @@ class Sim:
                     self.alert("warn", "하차 지연",
                                f"{v['id']} {v['cargo']} 하차 {int(v['work_elapsed'])}분 (표준 {v['std']}분의 {st['delay']['factor']}배 초과)",
                                f"{self.sec_cfg[s_id]['name']} 다음 호출 보류, 적재함 들러붙음·호퍼 막힘 확인",
-                               sector_id=s_id, vehicle=v)
+                               sector_id=s_id, vehicle=v, related=self.planned_keys(s_id, 1))
                 if v["work_elapsed"] >= v["std"] * v["work_factor"]:
                     cam = self.sec_cfg[s_id]["cam_id"]
                     self.emit("CRANE_DONE", "sim", vehicle=v, sector_id=s_id,
@@ -433,7 +451,16 @@ class Sim:
         self.replan()
         for p in self.plan:
             if p["sector_id"] and p["call_t"] is not None and p["call_t"] <= t + 1e-9:
-                self.call(self.vehicles[p["vehicle_id"]], p)
+                v = self.vehicles[p["vehicle_id"]]
+                k = self.key(v)
+                if self.require_approval and k not in self.approved and v["id"] not in self.overrides:
+                    # L2: 호출 시각이 됐어도 현장 담당자가 승인해야 출발 (자동 승인 스위치를 끈 경우)
+                    if k not in self.pending:
+                        self.pending.add(k)
+                        self.emit("CALL_PENDING", "engine", vehicle=v, sector_id=p["sector_id"],
+                                  payload={"rank": p["rank"], "reason": p["reason"], "since": self.hhmm(t)})
+                    continue
+                self.call(v, p)
         self.replan()
 
         # 10분마다 대기 차량 수 (대기장 + 호출 이동 + 호퍼 대기 = 아직 하차를 시작 못 한 차)
@@ -454,7 +481,8 @@ class Sim:
                 if t - s["crit_since"] >= st["congestion"]["crit_hold_min"] and not s["alerted"]:
                     s["alerted"] = True
                     self.alert("crit", "혼잡", f"{self.sec_cfg[sid]['name']} 혼잡 {pct}% {st['congestion']['crit_hold_min']}분 지속",
-                               f"{self.sec_cfg[sid]['name']} 호출 보류, 공용 호퍼로 분산", sector_id=sid)
+                               f"{self.sec_cfg[sid]['name']} 호출 보류, 공용 호퍼로 분산", sector_id=sid,
+                               related=self.planned_keys(sid))
             else:
                 s["crit_since"], s["alerted"] = None, False
 
@@ -462,16 +490,19 @@ class Sim:
         sid = p["sector_id"]
         sc = self.sec_cfg[sid]
         self.yard_slots.pop(v["id"], None)
-        self.overrides.pop(v["id"], None)
         q = self.queue_xy(sid, 0)
         road = self.routes[("YARD", sid)]["points"]
         # 정지된 호퍼로 가다 되돌아온 차는 대기장 입구로 돌아간 뒤 새 호퍼 경로를 탄다
         pts = ([v["xy"]] + road[1:-1] + [q]) if not v.get("rerouted") else ([v["xy"], road[1]] + road[1:-1] + [q])
-        v.update(state="moving", sector=sid, call_t=self.t, wait_min=round(self.t - v["yard_t"], 1), rerouted=False)
+        k = self.key(v)
+        how = "changed" if v["id"] in self.overrides else ("approved" if k in self.approved else "auto")
+        self.pending.discard(k)
+        self.overrides.pop(v["id"], None)
+        v.update(state="moving", sector=sid, call_t=self.t, wait_min=round(self.t - v["yard_t"], 1), rerouted=False, approval=how)
         self.start_path(v, pts, ("YARD", sid))
         self.emit("CALL", "engine", vehicle=v, sector_id=sid, payload={
             "rank": p["rank"], "reason": p["reason"], "route_m": v["path_m"], "travel_min": round(v["path_dur"], 1),
-            "speed_limit_kmh": self.settings["road"]["speed_limit_kmh"]})
+            "speed_limit_kmh": self.settings["road"]["speed_limit_kmh"], "approval": how})
         self.emit("CALL_ACK", "iot", vehicle=v, sector_id=sid)     # 기사 '출발' (모바일 화면 전까지는 자동 응답)
         self.alert("info", "호출", f"{v['id']} {v['cargo']} → {sc['name']}", "기사 앱으로 호출 전송(가상)", sector_id=sid, vehicle=v)
 
@@ -635,7 +666,8 @@ class Sim:
                        "call_at": self.hhmm(p["call_t"]) if p["call_t"] is not None else None,
                        "due": self.hhmm(self.vehicles[p["vehicle_id"]]["due_t"]),
                        "wait_min": round(t - self.vehicles[p["vehicle_id"]]["yard_t"], 1),
-                       "reason": p["reason"]} for p in self.plan],
+                       "reason": p["reason"], "start_at": self.hhmm(p["start_t"]) if p.get("start_t") is not None else None,
+                       "awaiting": self.key(self.vehicles[p["vehicle_id"]]) in self.pending} for p in self.plan],
             "counts": {"fleet": len(self.fleet), "on_site": sum(not v["gone"] for v in self.vehicles.values()),
                        "yard": len(yard), "moving": sum(v["state"] == "moving" for v in self.vehicles.values()),
                        "trips_done": len(self.done_trips),
