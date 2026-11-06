@@ -46,25 +46,36 @@ def reason_head(v: dict, now: float, settings: dict) -> str:
     return head
 
 
-def plan(yard: list, sectors: list, now: float, settings: dict) -> list:
-    """대기장 차량의 하역 순번(순서·섹터·호출 시각)을 만든다.
+def _bay_free(s):
+    """호퍼의 베이별 비는 시각(지금부터 분). 새 형식은 s["bay_free"], 옛 형식(베이 구분 없음)은 남은 작업·도착 예정으로 계산."""
+    if "bay_free" in s:
+        return list(s["bay_free"])
+    h = sorted(s["working_remain"])[: s["bays"]]
+    h += [0.0] * (s["bays"] - len(h))
+    heapq.heapify(h)
+    for eta, std in sorted(s["pending_eta"]):          # 이미 호출된 차량이 베이를 먼저 차지
+        t = heapq.heappop(h)
+        heapq.heappush(h, max(t, eta) + std)
+    return sorted(h)
 
-    yard: 대기장 차량 [{id, cargo, std, urgent, due_t, yard_t, arr_t}]
-    sectors: [{id, name, up, bays, travel_min, cargo, working_remain:[분], pending_eta:[(도착까지 분, std)]}]
-    반환: [{rank, vehicle_id, sector_id, call_t, start_t, reason}] — call_t <= now 이면 지금 호출.
+
+def plan(yard: list, sectors: list, now: float, settings: dict) -> list:
+    """대기장 차량의 하역 순번(순서·호퍼·베이·호출 시각)을 만든다.
+
+    yard: 대기장 차량 [{id, cargo, std, urgent, due_t, yard_t, arr_t, forced?}]
+    sectors: [{id, name, up, bays, travel_min, cargo, bay_cargo?[베이별 원료 1종], bay_free?[분] | working_remain, pending_eta}]
+    반환: [{rank, vehicle_id, sector_id, bay, call_t, start_t, reason}] — call_t <= now 이면 지금 호출.
+    적합성 필터 = 원료 → 받을 수 있는 베이(베이 1개 = 원료 1종). 가장 빨리 비는 적합 베이로 배정한다.
     """
     margin = settings["call"]["margin_min"]
-    heaps = {}
+    free = {}
     for s in sectors:
-        if not s["up"]:
-            continue
-        h = sorted(s["working_remain"])[: s["bays"]]
-        h += [0.0] * (s["bays"] - len(h))
-        heapq.heapify(h)
-        for eta, std in sorted(s["pending_eta"]):          # 이미 호출된 차량이 베이를 먼저 차지
-            t = heapq.heappop(h)
-            heapq.heappush(h, max(t, eta) + std)
-        heaps[s["id"]] = h
+        if s["up"]:
+            free[s["id"]] = _bay_free(s)
+
+    def ok(s, b, cargo):
+        bc = s.get("bay_cargo")
+        return bc is None or bc[b] == cargo
 
     out = []
     for v in sorted(yard, key=lambda v: priority_key(v, now)):
@@ -73,36 +84,39 @@ def plan(yard: list, sectors: list, now: float, settings: dict) -> list:
             fits = [s for s in fits if s["id"] == v["forced"]] or fits
         cand = []
         for s in fits:
-            if s["id"] not in heaps:
+            if s["id"] not in free:
                 continue
-            start = max(heaps[s["id"]][0], s["travel_min"])  # 이동 전에는 도착할 수 없음
-            cand.append((start, s["id"], s))
+            for b in range(s["bays"]):
+                if ok(s, b, v["cargo"]):
+                    start = max(free[s["id"]][b], s["travel_min"])   # 이동 전에는 도착할 수 없음
+                    cand.append((start, s["id"], b, s))
         head = reason_head(v, now, settings)
         if not cand:
-            down = "·".join(s["name"] for s in fits) or "적합 섹터 없음"
-            out.append({"vehicle_id": v["id"], "sector_id": None, "call_t": None, "start_t": None,
+            down = "·".join(s["name"] for s in fits) or "적합 베이 없음"
+            out.append({"vehicle_id": v["id"], "sector_id": None, "bay": None, "call_t": None, "start_t": None,
                         "reason": f"{head} · 배정 보류({down} 정지)"})
             continue
-        cand.sort(key=lambda c: (c[0], c[1]))
+        cand.sort(key=lambda c: (c[0], c[1], c[2]))
         # 원래 받는 호퍼(목록 첫 번째)를 우선한다. 다른 호퍼가 '확실히' 빠를 때만 돌린다 —
-        # 조금 빠르다고 공용 호퍼로 보내면 그 호퍼 전용 원료(연료)가 밀린다.
+        # 조금 빠르다고 공용 베이로 보내면 그 베이 전용 원료(연료)가 밀린다.
         gain = settings["call"].get("switch_gain_min", 0)
         home = next((c for c in cand if fits and c[1] == fits[0]["id"]), None)
         if home and not v.get("forced") and home[0] - cand[0][0] < gain:
             cand.remove(home)
             cand.insert(0, home)
-        start, sid, s = cand[0]
-        heapq.heapreplace(heaps[sid], start + v["std"])
+        start, sid, b, s = cand[0]
+        free[sid][b] = start + v["std"]
         call_t = now + max(0.0, start - s["travel_min"] - margin)
+        bayname = f"{s['name']} {b + 1}번 베이" if s.get("bay_cargo") else s["name"]
         if v.get("forced"):
-            tail = f"담당자 변경 → {s['name']}"
-        elif len(fits) == 1:
-            tail = f"{s['name']} 전용 원료"
+            tail = f"담당자 변경 → {bayname}"
+        elif len(cand) == 1:
+            tail = f"{bayname} 전용 원료"
         else:
-            other = [c for c in cand[1:] if c[1] != sid]
+            other = [c for c in cand[1:] if (c[1], c[2]) != (sid, b)]
             gap = f" ({int(other[0][0] - start)}분 먼저)" if other and other[0][0] - start >= 1 else ""
-            tail = f"{s['name']}가 가장 빨리 빔{gap}"
-        out.append({"vehicle_id": v["id"], "sector_id": sid, "call_t": call_t, "start_t": now + start,
+            tail = f"{bayname}가 가장 빨리 빔{gap}"
+        out.append({"vehicle_id": v["id"], "sector_id": sid, "bay": b, "call_t": call_t, "start_t": now + start,
                     "reason": f"{head} · {tail}"})
     for i, p in enumerate(out, 1):
         p["rank"] = i
@@ -110,14 +124,18 @@ def plan(yard: list, sectors: list, now: float, settings: dict) -> list:
 
 
 def plan_fifo(yard: list, sectors: list, now: float) -> list:
-    """기준선(기존 방식 가정): 도착순으로, 원료마다 정해진 호퍼(목록의 첫 호퍼) 앞에 바로 가서 줄을 선다.
+    """기준선(기존 방식 가정): 도착순으로, 원료마다 정해진 호퍼·베이(목록의 첫 적합 베이) 앞에 바로 가서 줄을 선다.
     정해진 호퍼가 서 있으면 다음 적합 호퍼로. 미리 부르지 않고 도착하면 바로 보낸다."""
     out = []
     for i, v in enumerate(sorted(yard, key=lambda v: (v["arr_t"], v["id"])), 1):
         fits = [s for s in sectors if v["cargo"] in s["cargo"] and s["up"]]
-        sid = fits[0]["id"] if fits else None
-        out.append({"vehicle_id": v["id"], "sector_id": sid, "call_t": now if sid else None, "start_t": None,
-                    "reason": "도착순 · 정해진 호퍼" if sid else "도착순 · 호퍼 정지로 보류", "rank": i})
+        s = fits[0] if fits else None
+        b = None
+        if s:
+            bc = s.get("bay_cargo")
+            b = bc.index(v["cargo"]) if bc else 0
+        out.append({"vehicle_id": v["id"], "sector_id": s["id"] if s else None, "bay": b, "call_t": now if s else None,
+                    "start_t": None, "reason": "도착순 · 정해진 베이" if s else "도착순 · 하역장 정지로 보류", "rank": i})
     return out
 
 

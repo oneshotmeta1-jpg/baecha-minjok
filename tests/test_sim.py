@@ -394,7 +394,9 @@ r6.advance(150)
 sv6 = r6.settings_view()
 pmap = {x["cargo"]: x for x in sv6["preds"]}
 ok_pred = all((abs(x["pred"] - x["actual"]) < 0.11) if x["auto"] else x["pred"] == x["base"] for x in sv6["preds"] if not x["fixed"])
-check("예측 하차시간 = 실측 평균 (3건 미만이면 기본값)", ok_pred and any(x["auto"] for x in sv6["preds"]) and any(not x["auto"] for x in sv6["preds"]),
+early = Runtime(7); early.advance(25)
+fb_ = [x for x in early.settings_view()["preds"] if not x["auto"] and not x["fixed"]]
+check("예측 하차시간 = 실측 평균 (3건 미만이면 기본값)", ok_pred and any(x["auto"] for x in sv6["preds"]) and fb_ and all(x["pred"] == x["base"] for x in fb_),
       " · ".join(f"{c} {x['pred']}({x['n']}건)" for c, x in list(pmap.items())[:4]))
 plan0 = [(p["vehicle_id"], p["sector_id"], round(p["call_t"] or 0, 2)) for p in r6.rec.plan]
 j0 = r6.judge_counts()
@@ -404,7 +406,10 @@ j1 = r6.judge_counts()
 check("목표만 바꾸면 순번 그대로, 기준미달 판정만 바뀜 + 영향 문구", plan0 == plan1 and (j1["unload"] < j0["unload"] or j1["wait"] < j0["wait"])
       and r6.history[0]["impact"] == "기준미달 판정만 바뀜 · 순번 그대로",
       f"하차 기준미달 {j0['unload']} → {j1['unload']} · 대기 {j0['wait']} → {j1['wait']}")
-pv6 = r6.preview({"pred": {"석회석": pmap["석회석"]["pred"] + 5}})
+while not [p for p in r6.rec.plan if p["sector_id"]] and r6.rec.t < 230:
+    r6.step()
+c6 = r6.rec.vehicles[next(p for p in r6.rec.plan if p["sector_id"])["vehicle_id"]]["cargo"]
+pv6 = r6.preview({"pred": {c6: round(r6.rec.pred_of(c6) + 8, 1)}})
 check("바꿔보기에서 예측값을 바꾸면 순번이 바뀜", not pv6["judge_only"] and pv6["changed_n"] > 0, f"{pv6['changed_n']}대")
 r6.set_assumptions({"call_margin_min": 5})
 check("호출 정책을 바꾸면 순번 다시 계산 · 영향 문구", r6.history[0]["impact"].startswith("순번 ") or r6.history[0]["impact"].startswith("지금 순번"),

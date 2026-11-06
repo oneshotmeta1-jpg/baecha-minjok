@@ -378,7 +378,7 @@ class Sim:
             if v["sector"] == sid and v["state"] in ("moving", "queue"):
                 # 이동 중·대기 중인 차량은 다시 배정 대상으로 (그 자리에서 다른 호퍼로 출발)
                 v.pop("queue_idx", None)
-                v.update(state="yard", sector=None, rerouted=True, path=None)
+                v.update(state="yard", sector=None, bay=None, rerouted=True, path=None)
                 moved.append(self.key(v))
         self.replan()
         self.alert("crit", "호퍼 이상", f"{name} 정지", f"영향 차량 {len(moved)}대 재배정, 하차 중 차량은 일시 중지",
@@ -438,8 +438,20 @@ class Sim:
                     pend.append((0.0, v["std"]))
                 elif v["state"] == "moving":
                     pend.append((max(v["path_t0"] + v["path_dur"] - t, 0.0), v["std"]))
+            bf = [0.0] * sc["bays"]
+            for v in working:
+                if v.get("bay") is not None:
+                    bf[v["bay"]] = max(bf[v["bay"]], engine.remain_min(v["work_elapsed"], v["std"]))
+            for v in sorted((v for v in self.vehicles.values() if v["sector"] == sid and v["state"] in ("queue", "moving")),
+                            key=lambda v: (0.0 if v["state"] == "queue" else v["path_t0"] + v["path_dur"] - t, v.get("queue_idx", 0))):
+                b = v.get("bay")
+                if b is None:
+                    b = min(range(sc["bays"]), key=lambda i: bf[i])
+                eta = 0.0 if v["state"] == "queue" else max(v["path_t0"] + v["path_dur"] - t, 0.0)
+                bf[b] = max(bf[b], eta) + v["std"]
             secs.append({"id": sid, "name": sc["name"], "up": self.sectors[sid]["up"], "bays": sc["bays"],
-                         "travel_min": self.travel("YARD", sid), "cargo": sc["cargo"],
+                         "travel_min": self.travel("YARD", sid), "cargo": sc["cargo"], "bay_cargo": sc.get("bay_cargo"),
+                         "bay_free": bf,
                          "working_remain": [engine.remain_min(v["work_elapsed"], v["std"]) for v in working],
                          "pending_eta": pend})
         return secs
@@ -547,10 +559,12 @@ class Sim:
             if not working and not queue:
                 self.sectors[sid]["idle_min"] += STEP
             for v in queue:
-                free = [b for b in range(sc["bays"]) if b not in used]
-                if not free:
-                    break
-                b = free[0]
+                b = v.get("bay")
+                if b is None or b in used:
+                    free = [i for i in range(sc["bays"]) if i not in used and (sc.get("bay_cargo") is None or sc["bay_cargo"][i] == v["cargo"])]
+                    if b is not None or not free:
+                        continue                                   # 자기 베이가 아직 차 있음 → 대기선에서 기다림
+                    b = free[0]
                 used.add(b)
                 v.pop("queue_idx", None)
                 v.update(state="working", bay=b, work_start=t, xy=self.bay_xy(sid, b))
@@ -567,6 +581,11 @@ class Sim:
 
         # 4) 순번 계산과 호출
         self.replan()
+        if not self.require_approval:
+            self.pending.clear()
+        else:                                   # 순번에서 빠졌거나 호출 시각이 다시 미뤄진 차는 '승인 기다림'에서 뺀다
+            due = {self.key(self.vehicles[p["vehicle_id"]]) for p in self.plan if p["call_t"] is not None and p["call_t"] <= t + 1e-9}
+            self.pending &= due
         for p in self.plan:
             if p["sector_id"] and p["call_t"] is not None and p["call_t"] <= t + 1e-9:
                 v = self.vehicles[p["vehicle_id"]]
@@ -621,13 +640,14 @@ class Sim:
         how = "changed" if v["id"] in self.overrides else ("approved" if k in self.approved else "auto")
         self.pending.discard(k)
         self.overrides.pop(v["id"], None)
-        v.update(state="moving", sector=sid, call_t=self.t, wait_min=round(self.t - v["yard_t"], 1), rerouted=False, approval=how)
+        v.update(state="moving", sector=sid, bay=p.get("bay"), call_t=self.t, wait_min=round(self.t - v["yard_t"], 1), rerouted=False, approval=how)
         self.start_path(v, pts, ("YARD", sid))
         self.emit("CALL", "engine", vehicle=v, sector_id=sid, payload={
-            "rank": p["rank"], "reason": p["reason"], "route_m": v["path_m"], "travel_min": round(v["path_dur"], 1),
+            "rank": p["rank"], "reason": p["reason"], "bay": (p["bay"] + 1) if p.get("bay") is not None else None,
+            "route_m": v["path_m"], "travel_min": round(v["path_dur"], 1),
             "speed_limit_kmh": self.settings["road"]["speed_limit_kmh"], "approval": how})
         self.emit("CALL_ACK", "iot", vehicle=v, sector_id=sid)     # 기사 '출발' (모바일 화면 전까지는 자동 응답)
-        self.alert("info", "호출", f"{v['id']} {v['cargo']} → {sc['name']}", "기사 앱으로 호출 전송(가상)", sector_id=sid, vehicle=v)
+        self.alert("info", "호출", f"{v['id']} {v['cargo']} → {sc['name']}" + (f" {p['bay'] + 1}번 베이" if p.get("bay") is not None else ""), "기사 앱으로 호출 전송(가상)", sector_id=sid, vehicle=v)
 
     def replan(self):
         secs, yard = self.sector_inputs(), self.yard_inputs()
