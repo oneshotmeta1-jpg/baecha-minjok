@@ -14,7 +14,9 @@ import time
 from datetime import timedelta
 from pathlib import Path
 
-from .sim import Sim, STEP, default_assumptions
+from datetime import datetime
+
+from .sim import Sim, STEP, default_assumptions, trip
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -62,8 +64,9 @@ class Store:
 
 
 class Runtime:
-    def __init__(self, seed=7, db_path=None, assumptions_path=None, clock=time.monotonic):
+    def __init__(self, seed=7, db_path=None, assumptions_path=None, clock=time.monotonic, video=False):
         self.seed = seed
+        self.video = video          # True: 영상 모드 — 실제 움직임은 POST /api/ingest 이벤트로만
         self.clock = clock
         self.store = Store(db_path or ":memory:")
         self.assumptions_path = Path(assumptions_path) if assumptions_path else None
@@ -82,8 +85,12 @@ class Runtime:
         self.expected = {}       # 알림 id → 제안할 때 계산한 예상 효과
         self.confirmed = set()   # 효과가 확정된 반입 (EFFECT_CONFIRMED를 이미 낸 것)
         self.fifo = None
-        self.rec = Sim(self.seed, on_event=self._on_event, mode="recommend", assumptions=self.assumptions)
+        self.rec = Sim(self.seed, on_event=self._on_event, mode="recommend", assumptions=self.assumptions, driven=self.video)
         self.fifo = Sim(self.seed, mode="fifo", assumptions=self.assumptions)
+        if self.video:                      # FIFO 기준선 = 같은 도착을 기존 방식으로 돌린 가상 결과 (도착은 GATE_IN에서 받음)
+            self.fifo.pending_arrivals = []
+            self.fifo.truck = {}
+            self.ingested = []
         if self.speed:
             self.rec.speed = self.speed
 
@@ -231,6 +238,45 @@ class Runtime:
         tmp.rec.t = self.rec.t          # rebuild()는 rec.t까지 돌린다
         tmp.rebuild()
         return tmp
+
+    # ---------- 영상 모드: 이벤트 받기 (워크플로우 ② "모든 이벤트는 한 형식으로") ----------
+    def ev_minutes(self, ev):
+        try:
+            return (datetime.fromisoformat(ev["ts"]) - self.rec.start).total_seconds() / 60
+        except (KeyError, ValueError, TypeError):
+            return self.rec.t
+
+    def ingest(self, events):
+        """영상·현장 신호 이벤트를 받는다. 이벤트 시각까지 시계를 돌린 뒤 상태에 반영한다.
+        FIFO 기준선에는 GATE_IN을 같은 시각의 도착으로 넣는다(가상 결과)."""
+        if isinstance(events, dict):
+            events = [events]
+        out = []
+        for ev in sorted(events, key=lambda e: e.get("ts", "")):
+            m = self.ev_minutes(ev)
+            while self.rec.t + 1e-9 < m:
+                self.step()
+            ev = {"source": "cam", "vehicle_id": None, "sector_id": None, "zone": None, "payload": {}, **ev,
+                  "ts": ev.get("ts") or self.rec.clock().isoformat(timespec="seconds")}
+            r = self.rec.ingest(ev)
+            if r == "ok":
+                self.store.event(ev)
+                if getattr(self, "ingested", None) is not None:
+                    self.ingested.append(ev)
+                if ev["type"] == "GATE_IN" and ev.get("vehicle_id"):
+                    v = self.rec.vehicles[ev["vehicle_id"]]
+                    a = {k: v[k] for k in ("id", "trip", "type", "cargo", "arr_t", "due_t", "urgent", "load_t")}
+                    a["work_factor"] = trip(self.seed, {"plate": v["id"], "cargo": v["cargo"]}, v["trip"], v["arr_t"], self.fifo.fc)["work_factor"]
+                    self.fifo.truck.setdefault(v["id"], {"plate": v["id"], "cargo": v["cargo"], "first_t": v["arr_t"], "extra": True})
+                    self.fifo.pending_arrivals.append(a)
+                    self.fifo.pending_arrivals.sort(key=lambda x: (x["arr_t"], x["id"]))
+                elif ev["type"] == "URGENT_IN":
+                    pass
+                elif ev["type"] in ("YARD_DOWN", "YARD_UP") and ev.get("sector_id") in self.fifo.sec_cfg:
+                    (self.fifo.sector_down if ev["type"] == "YARD_DOWN" else self.fifo.sector_up)(ev["sector_id"])
+            out.append(r)
+        self.store.commit()
+        return out
 
     # ---------- 시연 버튼 ----------
     def _record(self, kind, **kw):

@@ -235,6 +235,18 @@ async def export_alerts(range: str = "today"):
     return csv_response(rt.csv_alerts(range if range in ("week", "demo") else "today"), f"alerts_{range}.csv")
 
 
+@app.post("/api/ingest")
+async def ingest(body=Body(...)):
+    """영상(비전 결과)·현장 신호 이벤트 받기. 한 건(dict) 또는 여러 건(list). 형식은 docs/events.md.
+    영상 모드(--video)에서는 차량 움직임이 이 이벤트로만 바뀐다."""
+    return {"results": rt.ingest(body), "mode": "video" if rt.video else "sim"}
+
+
+@app.get("/api/mode")
+async def mode():
+    return {"mode": "video" if rt.video else "sim"}
+
+
 @app.get("/api/panel2")
 async def panel2():
     """알림 패널 [순번 | 안전] (시안 v4)."""
@@ -393,10 +405,13 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="하역관제 서버")
     ap.add_argument("--lan", action="store_true", help="같은 와이파이의 다른 기기도 접속하게 연다 (0.0.0.0)")
     ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--video", action="store_true", help="영상 모드: 차량 움직임은 /api/ingest 이벤트로만 (비전 결과 재생)")
     ap.add_argument("--check", action="store_true",
                     help="확인용 서버: 이벤트 DB·가정값 파일을 건드리지 않고 메모리에서만 돈다 (켜 둔 공유 서버와 같이 써도 됨)")
     args = ap.parse_args()
-    if args.check:
+    if args.video:
+        rt = Runtime(seed=7, video=True)    # 영상 모드: tools/replay_events.py 또는 비전 모듈이 /api/ingest로 이벤트를 보낸다
+    elif args.check:
         rt = Runtime(seed=7)          # 핸들러들은 모듈 전역 rt를 쓰므로 여기서 바꿔 끼우면 된다
     try:
         sys.stdout.reconfigure(encoding="utf-8")   # 실행 창·로그에서 한글이 깨지지 않게

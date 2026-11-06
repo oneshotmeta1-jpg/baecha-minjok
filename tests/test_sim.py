@@ -456,6 +456,33 @@ ds = [r for r in Runtime(7).alerts_range("demo")["rows"] if r["group"] == "안�
 check("시연 시나리오: 08:30 호퍼 A 안전 경고 1건 고정 · 같은 숫자", d8[0]["total"] == d8[1]["total"] and any(r["ts"] == "08:30" and r["sector_id"] == "A" for r in ds),
       " · ".join(r["ts"] + " " + r["handling"] for r in ds[:3]))
 
+# 10) 영상 모드: 비전·센서 이벤트만으로 대시보드가 돌아감 (/api/ingest)
+src = Runtime(7); src.advance(240)
+PHYS = {"GATE_IN", "ZONE_ARRIVE", "BAY_ENTER", "BAY_EXIT", "SAFETY_ALERT", "YARD_DOWN", "YARD_UP"}
+pe = [e for e in src.rec.events if e["type"] in PHYS]
+vid = Runtime(7, video=True); res = vid.ingest(pe); vid.advance(240 - vid.rec.t)
+check("영상 모드: 물리 이벤트 재생 전부 접수", res and all(r == "ok" for r in res), f"{len(res)}건")
+n1, n2 = len(src.rec.done_trips), len(vid.rec.done_trips)
+check("영상 모드: 재생 결과가 원본과 거의 같음 (완료 건수 ±5%)", abs(n1 - n2) <= max(2, n1 * 0.05), f"{n1} vs {n2}")
+check("영상 모드: 엔진이 스스로 호출·예측·FIFO 비교", any(e["type"] == "CALL" for e in vid.rec.events) and vid.rec.pred
+      and vid.compare()["effect"]["vehicles"] > 0)
+check("영상 모드: 영상 이벤트 없으면 차가 저절로 생기지 않음", not (lambda r: (r.advance(30), r.rec.vehicles)[1])(Runtime(7, video=True)))
+bad_ev = Runtime(7, video=True).ingest([{"ts": "2026-11-09T08:01:00", "type": "BAY_ENTER", "vehicle_id": "없는차", "sector_id": "A", "payload": {"bay": 1}}])
+check("영상 모드: 모르는 차 이벤트는 거르고 결과 코드로 알림", bad_ev == ["unknown_vehicle"], str(bad_ev))
+from to_events import convert  # noqa: E402
+def fr(t, cam, objs):
+    return {"t": t, "cam_id": cam, "objects": objs}
+TR = lambda b, tid=5: {"track_id": tid, "cls": "truck", "bbox": b, "vehicle_id": "82가 1234"}
+frames = [fr(t, "CAM-04", [TR([300, 500, 700, 800])]) for t in range(0, 5)]
+frames += [fr(10 + t, "CAM-01", [TR([500, 500, 850, 800])]) for t in range(0, 5)]                     # 1번 베이, 낮은 박스
+frames += [fr(15 + t, "CAM-01", [TR([500, 300, 850, 800]), {"track_id": 9, "cls": "person", "bbox": [880, 700, 900, 800]}]) for t in range(0, 5)]  # 상승 + 사람 REAR-1
+frames += [fr(20 + t, "CAM-01", []) for t in range(0, 5)]
+cv = convert({"size": [1920, 1080], "frames": frames}, "2026-11-09T08:00:00")
+ty = [e["type"] for e in cv]
+check("비전 변환: 대기장 도착 → 베이 진입 → 덤프 반경 경고 → 베이 이탈 (3초 규칙)",
+      ty.index("ZONE_ARRIVE") < ty.index("BAY_ENTER") < ty.index("SAFETY_ALERT") < ty.index("BAY_EXIT")
+      and next(e for e in cv if e["type"] == "BAY_ENTER")["payload"]["bay"] == 1, " → ".join(ty))
+
 if "--samples" in sys.argv:
     out = ROOT / "docs" / "sample_events.jsonl"
     out.write_text("\n".join(json.dumps(e, ensure_ascii=False) for e in s.events) + "\n", encoding="utf-8")

@@ -213,3 +213,30 @@ R2에서 팀이 제안한 `order_approved` 등 소문자 이름은 기존 형식
   "alerts": [ { "id": "AL-3", "ts": "15:02", "level": "crit", "kind": "혼잡", "text": "섹터 B 혼잡 85%↑ 5분", "action": "B 호출 보류, 대기 2대 → C", "ack": false } ]
 }
 ```
+
+## 영상 모드 — 실제 영상 결과로 대시보드 돌리기
+
+시뮬레이터는 차를 만들지 않고, **들어온 이벤트로만** 차가 움직인다. 배정 엔진·예측·알림·안전·효과(FIFO 비교)는 그대로 돈다.
+
+```bash
+py app/server.py --video                     # 영상 모드 서버 (GET /api/mode → {"mode": "video"})
+py vision/to_events.py 결과.json --start 2026-11-09T08:00:00 --out events.jsonl
+py tools/replay_events.py events.jsonl --speed 60
+```
+
+- `POST /api/ingest` — 이벤트 1건(객체) 또는 여러 건(배열). 응답 `{"results": [...], "mode": ...}`.
+  결과 코드: `ok` · `ignored`(이미 끝난 운행 등 반영할 것 없음) · `unknown_vehicle`(GATE_IN 없이 온 차) · `unknown_cargo`.
+- 빠진 키(`source`, `zone`, `payload` 등)는 기본값으로 채운다. `vehicle_id`가 없으면 `track_id`로 `T17`.
+- 이벤트 시각까지 시계를 돌린 뒤 반영한다(시각 순서로 보낼 것).
+
+| 이벤트 | 누가 | 대시보드에서 바뀌는 것 |
+|---|---|---|
+| `GATE_IN` (payload `cargo`, `load_t`, `due` 선택) | 계근대·기사 앱 | 도착 차량 생성 · FIFO 기준선 도착 |
+| `ZONE_ARRIVE` | CAM-04 대기장 | 대기장 대기 → 엔진이 베이·순번 추천, 호출(CALL) |
+| `ZONE_ENTER` zone=queue | CAM-01~03 대기선 | 대기선 |
+| `BAY_ENTER` / `BAY_EXIT` (payload `bay` 1~3) | CAM-01~03 하차장 | 하역 중 → 완료, 건별 작업 기록 1건 |
+| `SAFETY_ALERT` (payload `rule` 덤프 반경 5m · 후진 경로) | CAM | 안전 탭 · 베이 안전 중지 · 이후 호출 보류 |
+| `YARD_DOWN` / `YARD_UP` | 현장 | 하역장 정지·복구 |
+
+`vision/to_events.py` 판정 규칙: 박스 아래 중심점(접지점)이 `data/rois.json` 구역 안에 3초 이상 → 진입, 3초 이상 밖·화면에서 사라짐 → 이탈.
+사람이 REAR-n(덤프 반경)에 들어오고 그 베이 트럭 박스가 세로/가로 ≥ 0.6(적재함 상승) → 덤프 반경 경고, BACK-n(후진 경로)에 진입 30초 안 → 후진 경로 경고.
