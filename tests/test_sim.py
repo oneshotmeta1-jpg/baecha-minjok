@@ -296,6 +296,8 @@ ra.set_auto_approve(True)
 ra.advance(1)
 check("자동 승인 다시 켜면 밀린 호출이 풀림", not ra.rec.pending)
 ra.ignore_alert(next(a["id"] for a in ra.rec.alerts_all if a["kind"] != "호출"))
+ra.advance(0.25)
+ra.request_approval()
 types_r4 = {e["type"] for e in ra.rec.events}
 check("CALL_PENDING · APPROVAL_MODE 이벤트가 나옴", {"CALL_PENDING", "APPROVAL_MODE"} <= types_r4)
 check("이벤트 종류가 events.md 표와 일대일 (시뮬레이션 + 담당자 행동 + 승인 흐름)", (seen | types_after | types_r4) == types,
@@ -379,6 +381,36 @@ r7.WEEK_SEEDS = [1, 2]
 wk = r7.analysis_range("week")
 check("최근 7일(시뮬레이션): 날짜별 합 = 기간 합계", len(wk["days"]) == 3 and abs(sum(d["effect_min"] for d in wk["days"]) - wk["total"]["effect_min"]) < 0.1,
       f"{len(wk['days'])}일 · {wk['total']['effect_min']}분")
+
+# ---------- R6: 예측값(자동) · 목표 기준값(판정용) · 호출 정책 · 시연 시나리오 ----------
+r6 = Runtime(7)
+r6.advance(150)
+sv6 = r6.settings_view()
+pmap = {x["cargo"]: x for x in sv6["preds"]}
+ok_pred = all((abs(x["pred"] - x["actual"]) < 0.11) if x["auto"] else x["pred"] == x["base"] for x in sv6["preds"] if not x["fixed"])
+check("예측 하차시간 = 실측 평균 (3건 미만이면 기본값)", ok_pred and any(x["auto"] for x in sv6["preds"]) and any(not x["auto"] for x in sv6["preds"]),
+      " · ".join(f"{c} {x['pred']}({x['n']}건)" for c, x in list(pmap.items())[:4]))
+plan0 = [(p["vehicle_id"], p["sector_id"], round(p["call_t"] or 0, 2)) for p in r6.rec.plan]
+j0 = r6.judge_counts()
+r6.set_assumptions({"std_times": {"석회석": 20}, "target_wait_min": 30})
+plan1 = [(p["vehicle_id"], p["sector_id"], round(p["call_t"] or 0, 2)) for p in r6.rec.plan]
+j1 = r6.judge_counts()
+check("목표만 바꾸면 순번 그대로, 기준미달 판정만 바뀜 + 영향 문구", plan0 == plan1 and (j1["unload"] < j0["unload"] or j1["wait"] < j0["wait"])
+      and r6.history[0]["impact"] == "기준미달 판정만 바뀜 · 순번 그대로",
+      f"하차 기준미달 {j0['unload']} → {j1['unload']} · 대기 {j0['wait']} → {j1['wait']}")
+pv6 = r6.preview({"pred": {"석회석": pmap["석회석"]["pred"] + 5}})
+check("바꿔보기에서 예측값을 바꾸면 순번이 바뀜", not pv6["judge_only"] and pv6["changed_n"] > 0, f"{pv6['changed_n']}대")
+r6.set_assumptions({"call_margin_min": 5})
+check("호출 정책을 바꾸면 순번 다시 계산 · 영향 문구", r6.history[0]["impact"].startswith("순번 ") or r6.history[0]["impact"].startswith("지금 순번"),
+      r6.history[0]["impact"])
+r6.set_assumptions({"pred_override": {"석회석": 14}})
+check("예측값 고정 → 순번 계산에 그 값", abs(r6.rec.pred_of("석회석") - 14) < 1e-9 and r6.settings_view()["preds"][0]["fixed"])
+r6.set_assumptions({"pred_override": {"석회석": None}})
+check("[자동으로] → 고정 해제", "석회석" not in r6.assumptions["pred_override"])
+check("예측값이 바뀌면 변경 이력에 '자동 계산'", any(h["by"] == "자동 계산" for h in r6.settings_view()["history"]))
+demos = [Runtime(7).analysis_range("demo")["total"] for _ in range(3)]
+check("시연 시나리오: 3번 눌러도 같은 숫자", demos[0] == demos[1] == demos[2] and demos[0]["vehicles"] > 50,
+      f"₩{demos[0]['won']:,} · {demos[0]['effect_min']}분 · {demos[0]['vehicles']}대")
 
 if "--samples" in sys.argv:
     out = ROOT / "docs" / "sample_events.jsonl"

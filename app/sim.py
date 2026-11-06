@@ -17,6 +17,8 @@ from pathlib import Path
 from . import engine
 
 STEP = 0.25            # 시뮬레이션 한 걸음(분)
+PRED_MIN_N = 3         # 예측 하차시간을 실측 평균으로 바꾸는 최소 건수 (그 전에는 기본 표준시간)
+PRED_EVERY = 5         # 예측값 다시 계산 간격(분)
 GATE_HOLD = 1.0        # 계근·등록에 걸리는 시간(분)
 VEHICLE = "덤프 25.5t"
 PLATE_HEAD = ["80", "81", "82", "83", "85", "86", "87", "88"]
@@ -75,7 +77,8 @@ def default_assumptions() -> dict:
             "delay_factor": st["delay"]["factor"],
             "speed_limit_kmh": st["road"]["speed_limit_kmh"], "slow_factor": st["road"]["slow_factor"],
             "wait_won_per_hour": st["cost"]["wait_won_per_hour"], "idle_won_per_hour": st["cost"]["sector_idle_won_per_hour"],
-            "idle_in_cost": False, "cost_note": "차량 대기 ₩30,000/시간 = ₩500/분 (팀 결정 전 가정)"}
+            "idle_in_cost": False, "cost_note": "차량 대기 ₩30,000/시간 = ₩500/분 (팀 결정 전 가정)",
+            "pred_override": {}}
 
 
 def apply_assumptions(settings: dict, std_items: list, a: dict):
@@ -102,8 +105,14 @@ class Sim:
         self.mode = mode                     # "recommend" = 추천 배정, "fifo" = 기준선(도착순·고정 호퍼)
         self.cfg = load("sectors.json")
         self.settings = load("settings.json")
-        self.std_items = load("std_times.json")["items"]
+        # 세 가지 하차시간을 나눈다 (R6)
+        # - base:   시뮬레이터 안의 "실제" 하차시간 기준 (data/std_times.json 원본 × 차마다 흔들림). 화면에서 바꾸지 않는다.
+        # - 목표:   판정용 기준값(설정 › 목표 기준값). 넘으면 기준미달, ×지연 배수면 알림. 바꿔도 순번은 안 바뀐다.
+        # - 예측:   순번·호출 시각 계산에 쓰는 값 = 오늘 실측 평균(실측 PRED_MIN_N건 미만이면 기본값). 5분마다 다시 계산.
+        self.base_items = load("std_times.json")["items"]
+        self.std_items = load("std_times.json")["items"]          # 목표 기준값 (판정용)
         apply_assumptions(self.settings, self.std_items, assumptions)
+        self.pred_override = dict((assumptions or {}).get("pred_override") or {})   # 바꿔보기에서 고정한 예측값
         self.fc = self.settings["fleet"]
         self.start = datetime.fromisoformat(self.settings["sim"]["start"])
         self.speed = self.settings["sim"]["speed"]
@@ -137,10 +146,35 @@ class Sim:
         self.pending_arrivals = sorted((trip(self.seed, f, 1, f["first_t"], self.fc) for f in self.fleet),
                                        key=lambda a: (a["arr_t"], a["id"]))
         self.vehicles = {}
+        self.pred = {it["cargo"]: float(it["minutes"]) for it in self.base_items}   # 예측 하차시간 (자동)
+        self.pred_log = []          # 예측값이 1분 이상 바뀐 기록 (설정 › 변경 이력의 "자동 계산")
+        self.pred_at = 0.0
         self.yard_slots = {}
         self.done_trips = []          # 끝난 반입 기록 (KPI용)
         self.sectors = {sid: {"id": sid, "up": True, "crit_since": None, "alerted": False, "idle_min": 0.0}
                         for sid in self.sec_cfg}
+
+    def base_of(self, cargo):
+        return next((float(it["minutes"]) for it in self.base_items if it["cargo"] == cargo), 10.0)
+
+    def pred_of(self, cargo):
+        if cargo in self.pred_override:
+            return float(self.pred_override[cargo])
+        return self.pred.get(cargo, self.base_of(cargo))
+
+    def recompute_pred(self):
+        """예측 하차시간 = 오늘 실측 평균 (PRED_MIN_N건 이상일 때). 대기·이동 중 차량의 순번 계산에 바로 쓴다."""
+        for cargo in list(self.pred):
+            ds = [d["unload_min"] for d in self.done_trips if d["cargo"] == cargo]
+            new = round(sum(ds) / len(ds), 1) if len(ds) >= PRED_MIN_N else self.base_of(cargo)
+            old = self.pred[cargo]
+            if abs(round(new) - round(old)) >= 1:
+                self.pred_log.append({"t": self.t, "at": self.hhmm(self.t), "cargo": cargo, "old": round(old), "new": round(new), "n": len(ds)})
+            self.pred[cargo] = new
+        self.pred_at = self.t
+        for v in self.vehicles.values():
+            if not v["gone"]:
+                v["std"] = self.pred_of(v["cargo"])
 
     def std_of(self, vtype, cargo):
         for it in self.std_items:
@@ -353,7 +387,8 @@ class Sim:
         # 1) 계근대(입) 도착
         while self.pending_arrivals and self.pending_arrivals[0]["arr_t"] <= t:
             a = self.pending_arrivals.pop(0)
-            v = dict(a, state="arrived", sector=None, std=self.std_of(a["type"], a["cargo"]),
+            v = dict(a, state="arrived", sector=None, std=self.pred_of(a["cargo"]), base=self.base_of(a["cargo"]),
+                     target=self.std_of(a["type"], a["cargo"]),
                      xy=center(self.zone["GATE"]["poly"]), yard_t=None, track_id=None, path=None,
                      work_elapsed=0.0, flags=set(), rerouted=False, gone=False, call_t=None, wait_min=None)
             self.vehicles[v["id"]] = v
@@ -381,13 +416,13 @@ class Sim:
             elif v["state"] == "working":
                 if self.sectors[s_id]["up"]:
                     v["work_elapsed"] += STEP
-                if v["work_elapsed"] > v["std"] * st["delay"]["factor"] and "delay" not in v["flags"]:
+                if v["work_elapsed"] > v["target"] * st["delay"]["factor"] and "delay" not in v["flags"]:
                     v["flags"].add("delay")
                     self.alert("warn", "하차 지연",
-                               f"{v['id']} {v['cargo']} 하차 {int(v['work_elapsed'])}분 (표준 {v['std']}분의 {st['delay']['factor']}배 초과)",
+                               f"{v['id']} {v['cargo']} 하차 {int(v['work_elapsed'])}분 (목표 {v['target']:g}분의 {st['delay']['factor']}배 초과)",
                                f"{self.sec_cfg[s_id]['name']} 다음 호출 보류, 적재함 들러붙음·호퍼 막힘 확인",
                                sector_id=s_id, vehicle=v, related=self.planned_keys(s_id, 1))
-                if v["work_elapsed"] >= v["std"] * v["work_factor"]:
+                if v["work_elapsed"] >= v["base"] * v["work_factor"]:
                     cam = self.sec_cfg[s_id]["cam_id"]
                     self.emit("CRANE_DONE", "sim", vehicle=v, sector_id=s_id,
                               payload={"stand_in": "dump", "load_t": v["load_t"]})
@@ -402,7 +437,8 @@ class Sim:
                     self.done_trips.append({"id": v["id"], "trip": v["trip"], "cargo": v["cargo"], "load_t": v["load_t"],
                                             "sector": s_id, "wait_min": v["wait_min"] or 0.0, "done_t": t,
                                             "wait_total": round(v["work_start"] - v["yard_t"], 2),
-                                            "unload_min": round(v["work_elapsed"], 2), "std": v["std"],
+                                            "unload_min": round(v["work_elapsed"], 2), "std": v["target"], "pred": v["std"],
+                                            "under_unload": v["work_elapsed"] > v["target"] + 1e-9,
                                             "delayed": "delay" in v["flags"], "late": v["work_start"] > v["due_t"],
                                             "yard_t": v["yard_t"], "call_t": v["call_t"], "work_start": v["work_start"],
                                             "unload_end": v.get("done_t"), "urgent": v["urgent"], "approval": v.get("approval")})
@@ -466,10 +502,15 @@ class Sim:
                 self.call(v, p)
         self.replan()
 
-        # 10분마다 대기 차량 수 (대기장 + 호출 이동 + 호퍼 대기 = 아직 하차를 시작 못 한 차)
+        if abs(t / PRED_EVERY - round(t / PRED_EVERY)) < 1e-9:
+            self.recompute_pred()
+
+        # 10분마다 대기 차량 수 (대기장 + 호출 이동 + 호퍼 대기 = 아직 하차를 시작 못 한 차) + 누적 가동률·지연·처리
         if abs(t / 10 - round(t / 10)) < 1e-9:
             self.series.append({"t": t, "hhmm": self.hhmm(t),
-                                "waiting": sum(v["state"] in ("yard", "moving", "queue") for v in self.vehicles.values())})
+                                "waiting": sum(v["state"] in ("yard", "moving", "queue") for v in self.vehicles.values()),
+                                "util": round(self.busy_min / self.cap_min * 100) if self.cap_min else 0,
+                                "delays": sum(1 for d in self.done_trips if d["delayed"]), "trips": len(self.done_trips)})
 
         # 5) 알림: 대기 초과, 혼잡 지속
         for v in self.vehicles.values():
@@ -536,7 +577,7 @@ class Sim:
     # ---------- camera view (what the vision module would report) ----------
     def dump_angle(self, v):
         """적재함 각도(도). 실제 하차 시간 기준: 앞 25% 상승, 중간 유지, 끝 20% 내림. 지연이면 들린 채 유지."""
-        real = v["std"] * v["work_factor"]
+        real = v["base"] * v["work_factor"]
         f = v["work_elapsed"] / real if real else 1
         if f < 0.25:
             return round(50 * f / 0.25)
@@ -549,7 +590,7 @@ class Sim:
             ang = self.dump_angle(v)
             if ang >= 15:
                 return "하차 중 · 적재함 상승", ang
-            return ("하차 준비 · 정차" if v["work_elapsed"] < v["std"] * v["work_factor"] / 2 else "하차 마무리 · 적재함 내림"), ang
+            return ("하차 준비 · 정차" if v["work_elapsed"] < v["base"] * v["work_factor"] / 2 else "하차 마무리 · 적재함 내림"), ang
         if v["state"] == "queue":
             return "하차 대기 · 정지", 0
         if v["state"] == "moving":

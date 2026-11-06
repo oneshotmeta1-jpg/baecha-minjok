@@ -26,7 +26,7 @@ from app.sim import STEP, load  # noqa: E402
 
 DATA = ROOT / "data"
 WEB = ROOT / "web"
-VERSION = "v6"
+VERSION = "v7"
 TICK = 0.1  # 실제 초
 
 rt = Runtime(seed=7, db_path=DATA / "events.db", assumptions_path=DATA / "assumptions.json")
@@ -180,12 +180,12 @@ async def schedule():
 @app.get("/api/analysis2")
 async def analysis2(range: str = "today"):
     """운영 분석 (성과·비용 · 건별 기록). range=week 는 시드를 바꾼 시뮬레이션 6일 + 오늘."""
-    return rt.analysis_range("week" if range == "week" else "today")
+    return rt.analysis_range(range if range in ("week", "demo") else "today")
 
 
 @app.get("/api/alerts/history")
 async def alerts_history(range: str = "today"):
-    return rt.alerts_range("week" if range == "week" else "today")
+    return rt.alerts_range(range if range in ("week", "demo") else "today")
 
 
 @app.post("/api/alerts/{aid}/ignore")
@@ -207,8 +207,7 @@ async def preview(body: dict = Body(...)):
 
 @app.get("/api/settings")
 async def settings_view():
-    return {"values": rt.assumptions, "history": rt.history[:8], "cargo_actual": rt.cargo_actual(),
-            "suggestions": rt.feedback()["suggestions"], "congestion_hold_min": rt.rec.settings["congestion"]["crit_hold_min"]}
+    return rt.settings_view()
 
 
 @app.get("/api/rois")
@@ -223,23 +222,29 @@ def csv_response(text, name):
 
 @app.get("/api/export/report.csv")
 async def export_report(range: str = "today"):
-    return csv_response(rt.csv_report("week" if range == "week" else "today"), f"report_{range}.csv")
+    return csv_response(rt.csv_report(range if range in ("week", "demo") else "today"), f"report_{range}.csv")
 
 
 @app.get("/api/export/trips.csv")
 async def export_trips(range: str = "today"):
-    return csv_response(rt.csv_trips("week" if range == "week" else "today"), f"trips_{range}.csv")
+    return csv_response(rt.csv_trips(range if range in ("week", "demo") else "today"), f"trips_{range}.csv")
 
 
 @app.get("/api/export/alerts.csv")
 async def export_alerts(range: str = "today"):
-    return csv_response(rt.csv_alerts("week" if range == "week" else "today"), f"alerts_{range}.csv")
+    return csv_response(rt.csv_alerts(range if range in ("week", "demo") else "today"), f"alerts_{range}.csv")
 
 
 @app.get("/api/panel")
 async def panel():
     """알림 패널: 무슨 일 → 제안 → 효과(차량별 FIFO 대비) + 오늘 대기 절감 합계."""
     return rt.panel()
+
+
+@app.post("/api/order/request_approval")
+async def order_request_approval():
+    """[현장 담당자에게 승인 요청] — 현장 담당자 앱으로 보냄(가상)."""
+    return {"requested": rt.request_approval()}
 
 
 @app.post("/api/order/approve_all")

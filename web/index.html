@@ -314,6 +314,56 @@ textarea.sin{width:100%;text-align:left;min-height:54px;resize:vertical}
 .ana-rec{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:12px}
 .recfoot{padding:10px 16px;border-top:1px solid var(--line);font-size:13px;display:flex;gap:18px;flex-wrap:wrap}
 .src-tag{font-size:11.5px;font-weight:600;color:var(--ink-2);background:var(--soft);border-radius:999px;padding:2px 8px;white-space:nowrap}
+/* R6 운영 분석 › 성과·비용 */
+.ana3{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.45fr) minmax(0,1.1fr);grid-template-rows:minmax(0,1.08fr) minmax(0,1fr);gap:12px}
+.ana3[hidden]{display:none}
+.ana3>*{min-height:0;min-width:0}
+.a-tiles{display:flex;flex-direction:column;gap:12px;min-height:0}
+.a-tiles .tile4{flex:1;min-height:0;background:var(--card);border-radius:20px;padding:12px 16px;display:grid;grid-template-columns:minmax(0,1fr) 130px;align-items:center;gap:4px 10px}
+.tile4 .k{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
+.tile4 .v{font-size:15px;color:var(--muted)} .tile4 .v b{font-size:28px;color:var(--ink);margin:0 4px}
+.tile4 .bd2{display:inline-flex;font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 8px;background:var(--blue-bg);color:var(--blue);width:max-content}
+.tile4 .bd2.bad{background:var(--orange-bg);color:var(--orange)}
+.tile4 svg{grid-row:1/4;grid-column:2;width:130px;height:56px}
+.srcb{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) 62px 82px;gap:2px 12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+.srcb .nm b{display:block;font-size:13px} .srcb .nm span{font-size:11.5px;color:var(--muted)}
+.srcb .t{height:10px;background:var(--soft-2);border-radius:5px;overflow:hidden} .srcb .t i{display:block;height:100%;border-radius:5px;background:var(--blue)}
+.srcb .t i.add{background:#E8590C}
+.srcb .m,.srcb .w{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.srcb.tot{border-bottom:0;border-top:2px solid var(--ink);margin-top:2px}
+#tbarSvg{width:100%;height:100%;display:block}
+.donut{width:88px;height:88px;flex:none}
+/* R6 설정 3열 */
+.set3{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;gap:12px}
+.set3[hidden]{display:none}
+.set3>.s-hist{grid-column:1/-1}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+.prow b{font-size:14px} .prow .cap{display:block} .prow .pv{font-size:20px;font-weight:700;text-align:right}
+.tgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:6px 0}
+.tgrid label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.tgrid input{width:100%;text-align:right}
+.tgrid .sub2{font-size:11px;color:var(--muted)} .tgrid .sub2.sg{color:var(--orange);font-weight:700}
+.tsug{background:var(--blue-bg);border-radius:12px;padding:8px 10px;font-size:12.5px;display:flex;gap:8px;align-items:center;margin:6px 0}
+.tsug span{flex:1}
+.rl{padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;display:flex;flex-direction:column;gap:4px}
+.rl .h{display:flex;align-items:center;gap:8px} .rl .tag{font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;background:var(--orange-bg);color:var(--orange)}
+.rl .tag.crit{background:var(--red-bg);color:var(--red)} .rl .row2{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rl .sg{color:var(--blue);font-size:12.5px}
+.htab td{padding:7px 8px}
+/* R6 바꿔보기 패널 */
+.pvpanel{position:fixed;top:14px;right:20px;bottom:14px;width:520px;max-width:calc(100vw - 32px);background:var(--card);border-radius:24px;box-shadow:0 18px 50px rgba(20,20,20,.25);z-index:55;display:flex;flex-direction:column;overflow:hidden}
+.pvpanel[hidden]{display:none}
+.pvpanel .ph{display:flex;align-items:center;gap:8px;padding:16px 20px 6px}
+.pvpanel .ph h2{margin:0;font-size:17px}
+.pvpanel .pb{flex:1;min-height:0;overflow:auto;padding:4px 20px 10px;display:flex;flex-direction:column;gap:12px}
+.pvpanel .pt{border-top:1px solid var(--line);padding:12px 20px 16px}
+.pvpanel .pvrow{background:var(--soft);border-radius:14px;padding:10px 12px;margin:0}
+.pvpanel .pvh{font-size:14px}
+.pvpanel input[type=range]{height:22px}
+.pvpanel .pvv b{font-size:18px}
+.pvt td,.pvt th{padding:6px 6px;font-size:12.5px}
+.judge{font-size:12px;color:var(--muted)}
+.l2{font-size:11.5px;font-weight:700;background:var(--blue-bg);color:var(--blue);border-radius:999px;padding:2px 9px}
 /* 알림 이력 (시안) */
 .al-grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:12px}
 .fstep{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:2px 10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
@@ -363,6 +413,22 @@ textarea.sin{width:100%;text-align:left;min-height:54px;resize:vertical}
   </div>
   <button class="bell" id="bellBtn" aria-label="알림 패널 열기" aria-expanded="false" aria-controls="panel"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="cnt num" id="bellCnt" hidden></span></button>
 </header>
+
+<aside class="pvpanel" id="pvPanel" hidden aria-label="바꿔보기">
+  <div class="ph"><h2>⇄ 바꿔보기</h2><span class="chip blue">저장 안 됨 · 미리보기</span><span class="sp"></span><button class="pill-btn" id="pvClose">닫기</button></div>
+  <div class="pb">
+    <p class="cap" style="margin:0">값을 바꿔 보면 저장하지 않고 같은 기록으로 다시 계산해요. 왼쪽 순번표와 시간표에 바뀌는 차량이 파란 점선으로 보여요.</p>
+    <div class="pvrow"><div class="pvh"><span>예측 하차시간 · <select id="pvCargo" aria-label="원료"></select></span><span class="pvv"><span class="chg" id="pvStdChg" hidden></span><b class="num" id="pvStdV"></b></span></div>
+      <input type="range" id="pvStd" min="4" max="30" step="0.5" aria-label="예측 하차시간"><span class="judge" id="pvStdNote">지금은 실측 평균(자동) · 바꾸면 순번이 바뀌어요</span></div>
+    <div class="pvrow"><div class="pvh"><span>호출 여유시간</span><span class="pvv"><span class="chg" id="pvMgChg" hidden></span><b class="num" id="pvMgV"></b></span></div>
+      <input type="range" id="pvMg" min="0" max="10" step="1" aria-label="호출 여유시간"><span class="judge">호출 정책 · 바꾸면 순번이 바뀌어요</span></div>
+    <div class="pvrow"><div class="pvh"><span>목표 대기시간</span><span class="pvv"><span class="chg" id="pvTwChg" hidden></span><b class="num" id="pvTwV"></b></span></div>
+      <input type="range" id="pvTw" min="5" max="40" step="1" aria-label="목표 대기시간"><span class="judge">목표 기준값 · 순번은 그대로, 기준미달 판정만 바뀌어요</span></div>
+    <div id="pvRes"><b>바꾸면 이렇게 돼요</b><p class="cap">슬라이더를 움직여 보세요.</p></div>
+  </div>
+  <div class="pt"><div class="pvbtn" style="margin:0"><button class="pill-btn" id="pvOff">미리보기 끄기</button><button class="pill-btn dark" id="pvApply" disabled>✓ 설정에 반영</button></div>
+    <p class="cap" style="margin:6px 0 0">반영하면 설정 변경 이력에 영향과 함께 남고 모든 화면이 다시 계산돼요</p></div>
+</aside>
 
 <aside class="panel" id="panel" hidden aria-label="알림 패널">
   <div class="ph"><h2>알림</h2><span class="sub cap">무슨 일 → 제안 → 효과</span><span class="sp"></span><button class="pill-btn" id="panelClose">닫기</button></div>
@@ -429,32 +495,21 @@ textarea.sin{width:100%;text-align:left;min-height:54px;resize:vertical}
 <div class="view" id="view-dock" hidden>
   <div class="dock2">
     <section class="card c-sched" aria-label="하차구 비는 시각">
-      <div class="hd"><h2>① 하차구(베이) 비는 시각</h2><span class="sub">언제 비고 누가 들어가나 · 호퍼 상태는 관제 화면에서</span><span class="sp"></span>
+      <div class="hd"><h2>① 하차구(베이) 비는 시각</h2><span class="sub">언제 비고 누가 들어가나 · 막대 길이는 예측 하차시간(실측 평균)</span><button class="pill-btn dark" id="pvOpen" aria-controls="pvPanel" aria-expanded="false">⇄ 바꿔보기</button><span class="sp"></span>
         <span class="lg2"><span><i style="background:#DDF0E5;border-color:#1F7A4F"></i>하차 중</span><span><i style="background:#FBDDE1;border-color:#D7263D"></i>하차 지연</span><span><i style="background:#E6EDFF;border-color:#1D47B8"></i>호출돼 오는 중</span><span><i style="background:#fff;border-color:#141414;border-style:dashed"></i>호출 예약</span><span><i style="background:#FFE9DD;border-color:#B8420A;border-style:dashed"></i>승인 대기</span><span><i style="background:#FBD5DA;border-color:#D7263D"></i>호퍼 정지</span></span></div>
       <div class="bd"><svg id="schedSvg" role="img" aria-label="호퍼·하차구별 하차 중·호출 예약·지연 시간표"></svg></div>
     </section>
     <section class="card" aria-label="호출 순번표">
-      <div class="hd"><h2>② 호출 순번표</h2><span class="sub">AI 추천 → 현장 담당자 승인 → 호출 · 효과 = FIFO였을 때 대기 − 추천 대기</span><span class="sp"></span>
+      <div class="hd"><h2>② 호출 순번표</h2><span class="l2">L2 · AI 추천 → 현장 담당자 승인해야 호출</span><span class="sub">효과 = FIFO였을 때 대기 − 추천 대기 (분)</span><span class="sp"></span><span class="cap num" id="recUpd"></span>
         <span class="simnote" id="editNote" hidden>편집 중에는 표가 멈춰 있어요</span>
         <label class="switch" title="끄면 현장 담당자가 승인해야 호출됩니다 (L2)"><input type="checkbox" id="autoSw" checked><span id="autoTxt">자동 승인 켜짐</span></label>
-        <button class="pill-btn dark" id="approveAll">전체 승인</button></div>
+        <button class="pill-btn" id="approveAll">전체 승인</button><button class="pill-btn dark" id="reqApproval">현장 담당자에게 승인 요청</button></div>
       <div class="bd"><div id="dockMsg"></div><div id="orderTable"></div></div>
     </section>
     <div class="dock-side">
-      <section class="card" aria-label="현재 기준">
+      <section class="card" aria-label="현재 기준" style="flex:1">
         <div class="hd"><h2>현재 기준</h2><span class="sub">읽기 전용 · 고치는 곳은 설정 한 곳</span><span class="sp"></span><a class="mini" href="#settings">설정</a></div>
         <div class="bd"><div class="base" id="dockBase"></div></div>
-      </section>
-      <section class="card" aria-label="바꿔보기" style="flex:1">
-        <div class="hd"><h2>⇄ 바꿔보기</h2><span class="sp"></span><span class="chip blue">저장 안 됨 · 미리보기</span></div>
-        <div class="bd">
-          <div class="pvrow"><div class="pvh"><span>표준 하차시간 · <select id="pvCargo" aria-label="원료"></select></span><span class="pvv"><span class="chg" id="pvStdChg" hidden></span><b class="num" id="pvStdV"></b></span></div><input type="range" id="pvStd" min="4" max="30" step="1" aria-label="표준 하차시간"></div>
-          <div class="pvrow"><div class="pvh"><span>목표 대기시간</span><span class="pvv"><span class="chg" id="pvTwChg" hidden></span><b class="num" id="pvTwV"></b></span></div><input type="range" id="pvTw" min="5" max="40" step="1" aria-label="목표 대기시간"></div>
-          <div class="pvrow"><div class="pvh"><span>호출 여유시간</span><span class="pvv"><span class="chg" id="pvMgChg" hidden></span><b class="num" id="pvMgV"></b></span></div><input type="range" id="pvMg" min="0" max="10" step="1" aria-label="호출 여유시간"></div>
-          <div class="pvres" id="pvRes"><b>바꾸면 이렇게 돼요</b><span class="cap">슬라이더를 움직이면 저장하지 않고 같은 기록으로 다시 계산해 보여 줘요.</span></div>
-          <div class="pvbtn"><button class="pill-btn" id="pvOff">미리보기 끄기</button><button class="pill-btn dark" id="pvApply" disabled>✓ 설정에 반영</button></div>
-          <p class="cap" style="margin:6px 0 0">반영하면 설정 변경 이력에 남고 모든 화면이 다시 계산돼요</p>
-        </div>
       </section>
     </div>
   </div>
@@ -463,16 +518,16 @@ textarea.sin{width:100%;text-align:left;min-height:54px;resize:vertical}
 <!-- 설정 -->
 <div class="view" id="view-settings" hidden>
   <div class="mon-bar"><h1>설정</h1><span class="simnote">추천·알림·효과 계산에 쓰는 가정값을 한곳에서</span><span class="sp"></span>
-    <div class="seg" aria-label="설정 탭"><button data-stab="values" aria-pressed="true">가정값·단가</button><button data-stab="roi" aria-pressed="false">구역(ROI)</button></div></div>
-  <div class="set-grid" id="setValues">
-    <div class="set-col">
-      <section class="card" aria-label="순번 추천"><div class="hd"><h2>순번 추천</h2><span class="sub">바꾸면 순번표와 FIFO 비교를 다시 계산해요</span></div><div class="bd" id="setRec"></div></section>
-      <section class="card" aria-label="비용 단가"><div class="hd"><h2>비용 단가</h2><span class="sub">효과(분)를 ₩로 바꿀 때만 써요</span><span class="sp"></span><span class="assumed">팀 결정 전</span></div><div class="bd" id="setCost"></div></section>
-    </div>
-    <div class="set-col">
-      <section class="card" aria-label="알림 규칙"><div class="hd"><h2>알림 규칙</h2><span class="sub">알림이 켜지는 기준과 그때 나오는 제안</span></div><div class="bd" id="setRules"></div></section>
-      <section class="card" aria-label="저장" style="flex:1"><div class="hd"><h2>저장 · 변경 이력</h2><span class="sp"></span><button class="pill-btn dark" id="recalc">저장하고 다시 계산</button></div><div class="bd"><div id="setMsg"></div><div class="hist" id="setHist"></div></div></section>
-    </div>
+    <div class="seg" aria-label="설정 탭"><button data-stab="values" aria-pressed="true">기준값·단가</button><button data-stab="roi" aria-pressed="false">구역(ROI)</button></div></div>
+  <div class="set3" id="setValues">
+    <section class="card" aria-label="예측값 자동"><div class="hd"><h2>① 예측값 · 자동</h2><span class="sp"></span><span class="chip">읽기 전용</span></div>
+      <div class="bd"><p class="cap" style="margin:0 0 6px">실측으로 계산 · 순번과 호출 시각 계산에 써요 · 사람이 바꾸지 않아요</p><div id="setPred"></div></div></section>
+    <section class="card" aria-label="목표 기준값 알림 규칙"><div class="hd"><h2>② 목표 기준값 · 알림 규칙</h2></div>
+      <div class="bd"><p class="cap" style="margin:0 0 6px">현장을 통제하지 않아요 · 넘으면 기준미달로 기록하고, 알림과 제안을 띄워요 · 바꿔도 순번은 그대로</p><div id="setRules"></div></div></section>
+    <section class="card" aria-label="호출 정책 비용 단가"><div class="hd"><h2>③ 호출 정책 · 비용 단가</h2></div>
+      <div class="bd"><p class="cap" style="margin:0 0 6px">관제가 정하는 운영 방식 · 바꾸면 순번이 다시 계산돼요 · 실행은 항상 현장 담당자 승인 후</p><div id="setPolicy"></div></div></section>
+    <section class="card s-hist" aria-label="저장 변경 이력"><div class="hd"><h2>저장 · 변경 이력</h2><span class="sub">누가 · 무엇을 · 영향</span><span class="sp"></span><button class="pill-btn dark" id="recalc">저장하고 다시 계산</button></div>
+      <div class="bd"><div id="setMsg"></div><div id="setHist"></div></div></section>
   </div>
   <div class="roi-grid" id="setRoi" hidden>
     <section class="card" aria-label="구역 그림"><div class="hd"><h2 id="roiTitle">구역(ROI)</h2><span class="sub">카메라 첫 프레임 위 다각형 · 이번에는 보기 전용</span><span class="sp"></span><span class="chs" id="roiChs" role="group" aria-label="카메라"></span></div>
@@ -490,18 +545,20 @@ textarea.sin{width:100%;text-align:left;min-height:54px;resize:vertical}
 <div class="view" id="view-analysis" hidden>
   <div class="mon-bar"><h1>운영 분석</h1><span class="simnote" id="anaNote">같은 도착 데이터로 FIFO와 추천을 비교 · 숫자는 시뮬레이션 값</span><span class="sp"></span>
     <div class="seg" aria-label="분석 탭"><button data-atab="perf" aria-pressed="true">성과·비용</button><button data-atab="rec" aria-pressed="false">건별 기록</button></div>
-    <div class="seg" aria-label="기간"><button data-rng="today" aria-pressed="true">오늘</button><button data-rng="week" aria-pressed="false">최근 7일</button></div>
+    <div class="seg" aria-label="기간"><button data-rng="today" aria-pressed="true">오늘</button><button data-rng="week" aria-pressed="false">최근 7일</button><button data-rng="demo" aria-pressed="false">시연 시나리오</button></div>
     <a class="pill-btn dark" id="anaExport" href="/api/export/report.csv?range=today" download>보고서 내보내기</a></div>
-  <div class="ana2" id="anaPerf">
-    <section class="card hero2 a-hero" aria-label="대기 절감"><div class="bd" id="anaHero" style="padding:16px 18px"></div></section>
-    <section class="card a-src" aria-label="절감이 어디서 나왔나"><div class="hd"><h2>절감이 어디서 나왔나</h2><span class="sub">제안 종류별로 묶은 건별 효과</span><span class="sp"></span><button class="mini" data-atab="rec">건별 기록 →</button></div><div class="bd" id="anaSrc"></div></section>
-    <section class="card a-times" aria-label="시간 지표"><div class="hd"><h2>시간 지표</h2><span class="sub">같은 도착 데이터 · FIFO → 추천 · 호퍼 유휴는 시간으로만</span></div><div class="bd"><div class="tiles3" id="anaTimes"></div></div></section>
-    <section class="card a-chart" aria-label="대기 차량 그래프">
+  <div class="ana3" id="anaPerf">
+    <section class="card hero2" aria-label="대기 절감"><div class="bd" id="anaHero" style="padding:16px 18px;display:flex;flex-direction:column;gap:4px"></div></section>
+    <section class="card" aria-label="절감이 어디서 나왔나"><div class="hd"><h2>절감이 어디서 나왔나</h2><span class="sub">제안 종류별로 묶은 건별 효과 · 순번 변경은 따로</span><span class="sp"></span><button class="mini" data-atab="rec">건별 기록 ›</button></div><div class="bd" id="anaSrc"></div></section>
+    <section class="card" aria-label="시간 지표"><div class="hd"><h2>시간 지표 <span class="sub">(분)</span></h2><span class="sub">같은 도착 데이터 · FIFO vs 추천</span><span class="sp"></span><span class="lg2"><span><i style="background:#BDC1C6;border-color:#BDC1C6"></i>FIFO</span><span><i style="background:#141414;border-color:#141414"></i>추천</span></span></div>
+      <div class="bd" style="display:flex;flex-direction:column"><div style="flex:1;min-height:0"><svg id="tbarSvg" role="img" aria-label="평균 대기·최대 대기·호퍼 유휴 FIFO와 추천 비교"></svg></div><p class="cap" style="margin:4px 0 0">호퍼 유휴는 시간으로만 보여 주고 금액에는 넣지 않아요 (팀 결정 전 가정)</p></div></section>
+    <div class="a-tiles" id="anaTiles3" aria-label="가동률·작업 지연·처리 대수"></div>
+    <section class="card" aria-label="대기 차량 그래프">
       <div class="hd"><h2 id="chartTitle">시간대별 대기 차량</h2><span class="sub" id="chartNote"></span><span class="sp"></span>
-        <span class="lg"><span><i style="border-color:#B8420A;border-top-style:dashed"></i>기존 FIFO</span><span><i style="border-color:#1D47B8"></i>추천 방식</span></span></div>
+        <span class="lg"><span><i style="border-color:#9AA0A6;border-top-style:dashed"></i>기존 FIFO</span><span><i style="border-color:#141414"></i>추천 방식</span></span></div>
       <div class="bd" style="display:flex;flex-direction:column"><div class="chart-wrap"><svg id="chart" role="img" aria-label="FIFO와 추천 방식의 대기 비교 그래프"></svg><div class="tip" id="tip" hidden></div></div></div>
     </section>
-    <section class="card a-fb" aria-label="추천 일치율"><div class="hd"><h2>추천 일치율</h2><span class="sub" id="fbSub"></span></div><div class="bd" id="fbBox"></div></section>
+    <section class="card" aria-label="추천 일치율"><div class="bd" id="fbBox" style="padding-top:14px"></div></section>
   </div>
   <div class="ana-rec" id="anaRec" hidden>
     <section class="card" aria-label="차량별 효과"><div class="hd"><h2>차량별 효과</h2><span class="sub">최근 순 · 관제 화면 카드·순번표 효과와 같은 숫자</span><span class="sp"></span><span class="chs" id="recFilter"></span><a class="mini" id="recCsv" href="/api/export/trips.csv?range=today" download>CSV 내보내기</a></div>
@@ -1064,7 +1121,7 @@ function hopperCard(x){
     (x.status==='down'?'<div class="hold">호퍼 정지 · 배정 차량은 다른 호퍼로</div>':'')+
     '<div class="work">'+work+'</div></div>';
 }
-const STATUS_CLS={'승인 대기':'wait','승인됨':'ok','변경됨':'chg','이동 중':'mv','승인 대기 · 호출 시각 지남':'late'};
+const STATUS_CLS={'현장 승인 대기':'need','승인 대기':'wait','승인됨':'ok','변경됨':'chg','이동 중':'mv','승인 대기 · 호출 시각 지남':'late'};
 let lastSched=null, pvData=null;
 const pvRow=vid=>pvData&&pvData.rows?pvData.rows.find(r=>r.vehicle_id===vid):null;
 function callCell(q){
@@ -1089,7 +1146,7 @@ function renderOrders(s){
       '<td class="r num">'+Math.floor(q.wait_min)+'분</td><td><b>'+esc(sname(q.sector_id))+'</b>'+(bay?'<div class="cap">하차구 '+bay+'</div>':'')+'</td>'+
       '<td class="r num">'+callCell(q)+'</td><td>'+esc(q.reason)+'</td>'+
       '<td>'+(q.alert?'<span class="cap">'+esc(q.alert.kind)+' '+esc(q.alert.ts)+'</span>':'<span class="cap">—</span>')+'</td><td>'+effCell(q.effect)+'</td>'+
-      '<td><span class="st '+(STATUS_CLS[q.status]||'wait')+'">'+esc(q.status)+'</span></td>'+
+      '<td><span class="st '+(STATUS_CLS[q.status]||(q.status.startsWith('현장 승인')?'need':'wait'))+'">'+esc(q.status)+'</span></td>'+
       '<td style="white-space:nowrap">'+(q.status.startsWith('승인 대기')&&q.sector_id?'<button class="mini dark" data-approve="'+esc(q.vehicle_id)+'">승인</button> ':'')+
       (fitSectors(q.cargo).length>1?'<button class="mini" data-edit="'+esc(q.vehicle_id)+'">변경</button>':'<span class="cap" title="받을 수 있는 호퍼가 하나뿐">전용</span>')+'</td></tr>'; }).join('')+'</tbody></table>';
 }
@@ -1106,6 +1163,7 @@ function openEdit(vid){
   ed.innerHTML='<td></td><td colspan="9"><div class="edit">'+
     '<div class="row"><b>'+esc(vid)+'</b> · '+esc(q.cargo)+' · '+esc(sname(q.sector_id))+' → <select id="edSector" aria-label="보낼 호퍼">'+opts.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('')+'</select><span class="impact" id="edImpact">영향 계산 중…</span></div>'+
     '<div class="row" role="radiogroup" aria-label="변경 사유">'+cfg.reasons.map((r,i)=>'<label class="rs"><input type="radio" name="edReason" value="'+esc(r)+'">'+esc(r)+'</label>').join('')+'</div>'+
+    '<div class="row cap">저장 전에 다시 계산해 추천 대비 늘어나는 대기를 먼저 보여 줘요 · 같은 사유가 반복되면 기준값 조정을 제안해요</div>'+
     '<div class="row"><input type="text" id="edMemo" placeholder="메모 (선택) 예: 기사 휴게 중, 5분 뒤 출발 가능" maxlength="200"><button class="mini dark" id="edSave">저장</button><button class="mini" id="edCancel">취소</button><span class="cap" id="edErr"></span></div></div></td>';
   tr.after(ed);
   $('#edSector').addEventListener('change',e=>{ editing.sector_id=e.target.value; loadImpact(); });
@@ -1137,45 +1195,64 @@ $('#orderTable').addEventListener('click',async e=>{
   if(a){ try{ await postJ('/api/order/approve?vehicle_id='+encodeURIComponent(a.dataset.approve)); await refresh(); }catch(err){} }
   else if(ed&&!editing) openEdit(ed.dataset.edit);
 });
+$('#reqApproval').addEventListener('click',async()=>{ try{ const r=await postJ('/api/order/request_approval'); dockMsg=r.requested.length?'현장 담당자에게 '+r.requested.length+'대 승인 요청을 보냈어요(가상 · 모바일 화면은 다음 라운드).':'새로 요청할 순번이 없어요.'; await refresh(); pollView(true);}catch(e){} });
 $('#approveAll').addEventListener('click',async()=>{ try{ const r=await postJ('/api/order/approve_all'); dockMsg=r.approved+'대 승인했습니다.'; await refresh(); pollView(true);}catch(e){} });
 let formBuilt=false, setMsg='', setTab='values';
-const inp=(k,v,cls,step)=>'<input class="sin num'+(cls?' '+cls:'')+'" data-k="'+k+'" inputmode="decimal" value="'+esc(v)+'"'+(step?' step="'+step+'"':'')+' aria-label="'+esc(LABEL_K[k]||k)+'">';
-const LABEL_K={warn_pct:'혼잡 주의 기준',crit_pct:'혼잡 기준',target_wait_min:'목표 대기시간',call_margin_min:'호출 여유시간',delay_factor:'지연 배수',speed_limit_kmh:'구내 제한속도',slow_factor:'감속 계수',wait_per_min:'차량 대기 단가',idle_won_per_hour:'호퍼 유휴 단가'};
+const LABEL_K={warn_pct:'혼잡 주의 기준',crit_pct:'혼잡 기준',target_wait_min:'목표 대기시간',call_margin_min:'호출 여유시간',delay_factor:'지연 배수',speed_limit_kmh:'구내 제한속도',slow_factor:'감속 계수',wait_won_per_hour:'차량 대기 단가',idle_won_per_hour:'호퍼 유휴 단가'};
+const inp=(k,v,cls)=>'<input class="sin num'+(cls?' '+cls:'')+'" data-k="'+k+'" inputmode="decimal" value="'+esc(v)+'" aria-label="'+esc(LABEL_K[k]||k)+'">';
+function renderPredCol(d){
+  $('#setPred').innerHTML='<b style="font-size:13px">예측 하차시간 = 오늘 실측 평균</b>'+d.preds.map(x=>'<div class="prow"><span><b>'+esc(x.cargo)+'</b><span class="cap">'+
+      (x.fixed?'바꿔보기에서 고정 · <button class="mini" data-unfix="'+esc(x.cargo)+'">자동으로</button>':x.auto?x.n+'건 실측':'실측 '+x.n+'건 · '+d.pred_min_n+'건 미만이라 기본값 '+x.base+'분')+'</span></span><span class="pv num">'+x.pred+'분</span></div>').join('')+
+    '<b style="font-size:13px;display:block;margin-top:10px">예측 이동시간</b><div class="prow"><span><b>대기장 → 하차구</b><span class="cap">지도 경로 거리 ÷ 구내 제한속도 × 감속</span></span><span class="pv num">'+d.travel[0]+'~'+d.travel[1]+'분</span></div>'+
+    '<p class="cap" style="margin:10px 0 0">마지막 계산 '+esc(d.pred_at)+' · '+d.pred_every+'분마다 다시 계산 · <a href="#analysis" data-gotorec>건별 기록 ›</a></p>';
+}
 function buildForm(d){
-  const a=d.values, sugg=Object.fromEntries((d.suggestions||[]).map(x=>[x.cargo,x.new]));
-  const act=Object.fromEntries((d.cargo_actual||[]).map(x=>[x.cargo,x]));
-  $('#setRec').innerHTML='<table><thead><tr><th>표준 하차시간</th><th class="r">실측 평균</th><th class="r">제안</th><th class="r">표준 (분)</th></tr></thead><tbody>'+
-    Object.keys(a.std_times).map(c=>{ const x=act[c]; return '<tr><td>'+esc(c)+'</td><td class="r num">'+(x&&x.actual!=null?x.actual+'분 <span class="cap">('+x.n+'건)</span>':'<span class="cap">—</span>')+'</td>'+
-      '<td class="r num">'+(sugg[c]!=null?'<b class="good">'+sugg[c]+'분</b> <span class="cap">운영 분석</span>':'<span class="cap">—</span>')+'</td><td class="r"><input class="sin num" data-std="'+esc(c)+'" inputmode="decimal" value="'+a.std_times[c]+'" aria-label="'+esc(c)+' 표준 하차시간"></td></tr>'; }).join('')+'</tbody></table>'+
-    '<div class="rule"><span class="nm">호출</span><span>호출 여유시간 '+inp('call_margin_min',a.call_margin_min)+' 분<span class="cap" style="display:block">하차구 남은 시간 ≤ 이동시간 + 여유일 때 호출</span></span></div>'+
-    '<div class="rule"><span class="nm">긴급 반입</span><span>대기 순번 맨 앞으로 <span class="cap">(고정 · 같으면 투입 기한 순)</span></span></div>'+
-    '<div class="rule"><span class="nm">구내 운행</span><span>제한속도 '+inp('speed_limit_kmh',a.speed_limit_kmh)+' km/h · 감속 계수 '+inp('slow_factor',a.slow_factor)+'<span class="cap" style="display:block">이동시간 = 경로 거리 ÷ 제한속도 × 감속 계수(1 이상)</span></span></div>';
+  const a=d.values, act=Object.fromEntries(d.preds.map(x=>[x.cargo,x]));
+  const sug=Object.fromEntries(d.target_suggestions.map(x=>[x.cargo,x]));
   $('#setRules').innerHTML=
-    '<div class="rule"><span class="nm">혼잡</span><span>혼잡도가 기준 이상으로 '+(d.congestion_hold_min||5)+'분 지속 · 주의 '+inp('warn_pct',a.warn_pct)+'% · 혼잡 '+inp('crit_pct',a.crit_pct)+'%<span class="sg" style="display:block">→ 제안: 그 호퍼 호출 보류, 풀리는 시각에 호출 · 공용 호퍼로 분산</span></span></div>'+
-    '<div class="rule"><span class="nm">대기 초과</span><span>대기장에서 목표보다 오래 기다림 · 목표 대기시간 '+inp('target_wait_min',a.target_wait_min)+'분<span class="sg" style="display:block">→ 제안: 가장 빨리 비는 하차구로 우선 호출</span></span></div>'+
-    '<div class="rule"><span class="nm">작업 지연</span><span>하차가 표준 하차시간의 '+inp('delay_factor',a.delay_factor)+'배를 넘음<span class="sg" style="display:block">→ 제안: 다음 호출을 지연이 풀리는 시각으로 늦춤</span></span></div>'+
-    '<div class="rule"><span class="nm">안전</span><span class="cap">적재함 상승 중 덤프 반경 5m 안 사람 → 앱 경고 · 하차 중지 요청 · 금액 계산 안 함 (다음 라운드 · 반경은 구역(ROI)에서)</span></div>';
-  $('#setCost').innerHTML=
-    '<div class="rule"><span class="nm">차량 대기</span><span>'+inp('wait_per_min',Math.round(a.wait_won_per_hour/60),'wide')+' ₩/분 <span class="cap">= ₩'+Number(a.wait_won_per_hour).toLocaleString()+'/시간 · 모든 효과 금액에 사용</span></span></div>'+
-    '<div class="rule"><span class="nm">호퍼 유휴</span><span><label class="switch"><input type="checkbox" id="idleSw"'+(a.idle_in_cost?' checked':'')+'><span>금액에 넣기</span></label> · 유휴 단가 '+inp('idle_won_per_hour',a.idle_won_per_hour,'wide')+' ₩/시간'+
-      '<span class="cap" style="display:block">끄면 유휴 감소는 시간 지표로만 보여 줘요 · 인력비는 유휴여도 나가서 두 번 세기 쉬움</span></span></div>'+
-    '<div class="rule"><span class="nm">단가 근거</span><span><textarea class="sin" id="costNote" aria-label="단가 근거 메모">'+esc(a.cost_note||'')+'</textarea></span></div>';
+    '<div class="rl"><div class="h"><span class="tag">작업 지연</span><span class="cap">하차시간 목표 (판정용)</span></div><div class="tgrid">'+
+      Object.keys(a.std_times).map(c=>'<label>'+esc(c)+'<input class="sin num" data-std="'+esc(c)+'" inputmode="decimal" value="'+a.std_times[c]+'" aria-label="'+esc(c)+' 하차시간 목표">'+
+        '<span class="sub2'+(sug[c]?' sg':'')+'">실측 '+(act[c].actual==null?'—':act[c].actual)+(sug[c]?' · '+sug[c].new+'분 제안':'')+'</span></label>').join('')+'</div>'+
+      '<span class="sg">→ 넘으면 기준미달 기록 · 목표의 ×'+inp('delay_factor',a.delay_factor)+' 넘으면 알림 · 제안: 다음 호출을 늦춤</span>'+
+      d.target_suggestions.slice(0,2).map(x=>'<div class="tsug"><span>'+esc(x.text)+'</span><button class="mini dark" data-tset="'+esc(x.cargo)+'" data-tv="'+x.new+'">목표에 반영</button></div>').join('')+'</div>'+
+    '<div class="rl"><div class="h"><span class="tag">대기 초과</span><span class="cap">대기장 도착부터 하차 진입까지</span></div><div class="row2"><b>대기시간 목표</b><span>'+inp('target_wait_min',a.target_wait_min)+' 분</span></div><span class="sg">→ 넘으면 기준미달 기록 + 알림 · 제안: 가장 빨리 비는 하차구로 우선 호출</span></div>'+
+    '<div class="rl"><div class="h"><span class="tag">혼잡</span><span class="cap">혼잡도가 기준 이상으로 '+(d.congestion_hold_min||5)+'분 이어짐</span></div><div class="row2"><b>혼잡 기준</b><span>주의 '+inp('warn_pct',a.warn_pct)+'% · 혼잡 '+inp('crit_pct',a.crit_pct)+'%</span></div><span class="sg">→ 알림 · 제안: 그 호퍼 호출 보류, 풀리는 시각에 호출</span></div>'+
+    '<div class="rl"><div class="h"><span class="tag crit">안전</span><span class="cap">적재함 상승 중 덤프 반경 5m 안 사람 · 바꿀 수 없음</span></div><div class="row2"><span style="color:var(--red);font-size:12.5px">→ L3 자동 실행: 앱 경고 · 하차 중지 요청 · 금액 계산 안 함 (다음 라운드)</span><button class="mini" data-goroi>반경은 ROI에서 ›</button></div></div>';
+  $('#setPolicy').innerHTML=
+    '<div class="rl"><div class="row2"><b>호출 여유시간</b><span>'+inp('call_margin_min',a.call_margin_min)+' 분</span></div><span class="cap">하차구 남은 시간 ≤ 이동 + 여유일 때 호출 추천 · 늘리면 일찍 부르고, 줄이면 하차구가 비는 시간 ↑</span></div>'+
+    '<div class="rl"><div class="row2"><b>긴급 반입 우선</b><span class="num">1 순위 <span class="cap">(고정)</span></span></div><span class="cap">긴급은 대기 순번 맨 앞으로, 같으면 투입 기한 순</span></div>'+
+    '<div class="rl"><div class="row2"><b>구내 운행</b><span>'+inp('speed_limit_kmh',a.speed_limit_kmh)+' km/h · 감속 '+inp('slow_factor',a.slow_factor)+'</span></div><span class="cap">이동시간 = 경로 거리 ÷ 제한속도 × 감속(1 이상)</span></div>'+
+    '<div class="rl"><div class="row2"><b>차량 대기 단가</b><span>'+inp('wait_won_per_hour',a.wait_won_per_hour,'wide')+' ₩/시간</span></div><span class="cap">= ₩'+Math.round(a.wait_won_per_hour/60).toLocaleString()+'/분 · 운영 분석 금액에만 사용</span></div>'+
+    '<div class="rl"><div class="h"><b>단가 근거</b><span class="assumed">확인 필요</span></div><textarea class="sin" id="costNote" aria-label="단가 근거">'+esc(a.cost_note||'')+'</textarea></div>'+
+    '<div class="rl"><div class="row2"><span><b>호퍼 유휴도 금액에 넣기</b><span class="cap" style="display:block">끄면 시간 지표로만 보여요 · 두 번 세기 방지 · 유휴 단가 '+inp('idle_won_per_hour',a.idle_won_per_hour,'wide')+'₩/시간</span></span><label class="switch"><input type="checkbox" id="idleSw"'+(a.idle_in_cost?' checked':'')+'><span>포함</span></label></div></div>'+
+    '<div class="rl" style="border-bottom:0"><div class="row2"><span><b style="color:var(--muted)">마감 초과 단가</b><span class="cap" style="display:block">출하 하역장으로 가면 사용 · [팀 결정 후]</span></span><span class="cap">사용 안 함</span></div></div>';
   formBuilt=true;
 }
 $('#recalc').addEventListener('click',async()=>{
   const body={std_times:{}}; let bad=false;
   document.querySelectorAll('#setValues input.sin').forEach(i=>{ const v=Number(i.value); if(!isFinite(v)||v<0){bad=true;i.style.borderColor='var(--red)';} else i.style.borderColor='';
-    if(i.dataset.std) body.std_times[i.dataset.std]=v; else if(i.dataset.k==='wait_per_min') body.wait_won_per_hour=v*60; else if(i.dataset.k) body[i.dataset.k]=v; });
+    if(i.dataset.std) body.std_times[i.dataset.std]=v; else if(i.dataset.k) body[i.dataset.k]=v; });
   body.idle_in_cost=$('#idleSw').checked; body.cost_note=$('#costNote').value;
   if(bad){ setMsg='숫자가 아닌 칸이 있습니다. 빨간 칸을 고쳐 주세요.'; pollView(true); return; }
-  try{ const r=await postJ('/api/assumptions',body); setMsg=r.changed.length?'저장하고 다시 계산했습니다 · '+r.changed.join(' · '):'바뀐 값이 없습니다.'; formBuilt=false;
+  await saveSettings(body);
+});
+async function saveSettings(body){
+  try{ const r=await postJ('/api/assumptions',body); setMsg=r.changed.length?'저장하고 다시 계산했습니다 · '+r.changed.join(' · ')+(r.history&&r.history[0]&&r.history[0].impact?' · 영향: '+r.history[0].impact:''):'바뀐 값이 없습니다.'; formBuilt=false;
     try{ cfg.settings=(await getJ('/api/config')).settings; }catch(e){} await refresh(); pollView(true); }catch(e){ setMsg='다시 계산하지 못했습니다: '+e.message; pollView(true); }
+}
+$('#setValues').addEventListener('click',e=>{
+  const t=e.target.closest('[data-tset]'), u=e.target.closest('[data-unfix]'), g=e.target.closest('[data-goroi]'), rc=e.target.closest('[data-gotorec]');
+  if(t) saveSettings({std_times:{[t.dataset.tset]:Number(t.dataset.tv)}});
+  else if(u) saveSettings({pred_override:{[u.dataset.unfix]:null}});
+  else if(g) document.querySelector('[data-stab=roi]').click();
+  else if(rc){ anaTab='rec'; setTimeout(()=>document.querySelector('.seg [data-atab=rec]').click(),50); }
 });
 function renderSettings(d){
   $('#setMsg').innerHTML=setMsg?'<div class="notice" style="margin-bottom:8px">'+esc(setMsg)+'</div>':'';
+  renderPredCol(d);
   if(!formBuilt) buildForm(d);
-  $('#setHist').innerHTML=d.history.length?d.history.map(h=>'<div class="r"><span class="num">'+esc(h.at)+'</span><span>'+esc(h.by||'관제 담당자')+'</span><span>'+esc(h.text)+'</span></div>').join('')
-    :'<span class="cap">아직 바꾼 가정값이 없습니다. 모든 값은 가정값입니다.</span>';
+  $('#setHist').innerHTML=d.history.length?'<table class="htab"><tbody>'+d.history.map(h=>'<tr><td class="num" style="width:60px">'+esc(h.at)+'</td><td style="width:110px">'+esc(h.by||'관제 담당자')+'</td><td>'+esc(h.text)+'</td><td class="r cap">'+esc(h.impact||'')+'</td></tr>').join('')+'</tbody></table>'
+    :'<span class="cap">아직 바뀐 값이 없습니다. 예측값은 실측이 쌓이면 자동으로 바뀌고 여기에 남아요.</span>';
 }
 document.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click',()=>{ setTab=b.dataset.stab;
   document.querySelectorAll('[data-stab]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
@@ -1243,65 +1320,76 @@ function renderDock(d){
   $('#autoSw').checked=d.auto_approve; $('#autoTxt').textContent=d.auto_approve?'자동 승인 켜짐':'자동 승인 꺼짐 · 승인해야 호출';
   $('#dockMsg').innerHTML=dockMsg?'<div class="notice" style="margin-bottom:8px">'+esc(dockMsg)+'</div>':'';
   if(last) renderOrders(last);
-  pvBase(d.assumptions);
-  const a=d.assumptions, std=Object.entries(a.std_times).map(([k,v])=>k+' '+v).join(' · ');
-  $('#dockBase').innerHTML='<div class="r"><span>표준 하차시간</span><span class="num">'+esc(std)+'분</span></div>'+
-    '<div class="r"><span>혼잡 · 목표 · 여유</span><span class="num">주의 '+a.warn_pct+'% · 혼잡 '+a.crit_pct+'% · 목표 대기 '+a.target_wait_min+'분 · 호출 여유 '+a.call_margin_min+'분</span></div>'+
+  pvBase(d.assumptions,d.preds);
+  $('#recUpd').textContent='추천 갱신 '+(d.clock||'').slice(11,19);
+  const a=d.assumptions;
+  $('#dockBase').innerHTML='<div class="r"><span>예측 하차시간</span><span class="num">'+Object.entries(d.preds).map(([k,v])=>esc(k)+' '+v+(d.pred_fixed.includes(k)?'(고정)':'')).join(' · ')+'분<span class="cap" style="display:block">자동 · 오늘 실측 평균 · 순번 계산에 씀</span></span></div>'+
+    '<div class="r"><span>하차시간 목표</span><span class="num">'+Object.entries(a.std_times).map(([k,v])=>esc(k)+' '+v).join(' · ')+'분<span class="cap" style="display:block">판정용 · 넘으면 기준미달</span></span></div>'+
+    '<div class="r"><span>대기 목표 · 혼잡</span><span class="num">'+a.target_wait_min+'분 · 주의 '+a.warn_pct+'% · 혼잡 '+a.crit_pct+'%</span></div>'+
+    '<div class="r"><span>호출 정책</span><span class="num">호출 여유 '+a.call_margin_min+'분 · 긴급 반입 맨 앞 · 구내 '+a.speed_limit_kmh+'km/h</span></div>'+
     '<div class="r"><span>최근 변경</span><span>'+(d.history.length?esc(d.history[0].text)+' ('+esc(d.history[0].at)+', '+esc(d.history[0].by||'관제 담당자')+')':'없음')+'</span></div>';
 }
-/* ---------- 바꿔보기 (저장 안 되는 미리보기) ---------- */
-let pvA=null, pvDirty=false, pvTimer=null, pvCargo=null;
-function pvBase(a){
-  pvA=a;
+/* ---------- 바꿔보기 (오른쪽 큰 패널 · 저장 안 되는 미리보기) ---------- */
+let pvA=null, pvP=null, pvDirty=false, pvTimer=null, pvCargo=null, pvOpen=false;
+function togglePv(on){ pvOpen=on==null?!pvOpen:on; $('#pvPanel').hidden=!pvOpen; $('#pvOpen').setAttribute('aria-expanded',String(pvOpen));
+  if(pvOpen&&panelOpen) togglePanel(false); if(!pvOpen) $('#pvOpen').focus(); }
+$('#pvOpen').addEventListener('click',()=>togglePv());
+$('#pvClose').addEventListener('click',()=>togglePv(false));
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&pvOpen) togglePv(false); });
+function pvBase(a,preds){
+  pvA=a; if(preds) pvP=preds;
   if(!$('#pvCargo').options.length) $('#pvCargo').innerHTML=Object.keys(a.std_times).map(c=>'<option>'+esc(c)+'</option>').join('');
   if(!pvCargo) pvCargo=$('#pvCargo').value;
-  if(!pvDirty){ $('#pvStd').value=a.std_times[pvCargo]; $('#pvTw').value=a.target_wait_min; $('#pvMg').value=a.call_margin_min; }
+  if(!pvDirty&&pvP){ $('#pvStd').value=pvP[pvCargo]; $('#pvTw').value=a.target_wait_min; $('#pvMg').value=a.call_margin_min; }
   pvLabels();
 }
 function pvVals(){ return {cargo:pvCargo,std:Number($('#pvStd').value),tw:Number($('#pvTw').value),mg:Number($('#pvMg').value)}; }
 function pvLabels(){
-  if(!pvA) return; const v=pvVals();
-  const lab=(id,chg,old,nw)=>{ $(id).textContent=nw+'분'; const c=$(chg); c.hidden=Number(old)===Number(nw); c.textContent='바뀜 '+old+' → '+nw+'분'; };
-  lab('#pvStdV','#pvStdChg',pvA.std_times[v.cargo],v.std); lab('#pvTwV','#pvTwChg',pvA.target_wait_min,v.tw); lab('#pvMgV','#pvMgChg',pvA.call_margin_min,v.mg);
+  if(!pvA||!pvP) return; const v=pvVals();
+  const lab=(id,chg,old,nw)=>{ $(id).textContent=nw+'분'; const c=$(chg); c.hidden=Math.abs(Number(old)-Number(nw))<0.05; c.textContent='바뀜 '+old+' → '+nw+'분'; };
+  lab('#pvStdV','#pvStdChg',pvP[v.cargo],v.std); lab('#pvTwV','#pvTwChg',pvA.target_wait_min,v.tw); lab('#pvMgV','#pvMgChg',pvA.call_margin_min,v.mg);
+  $('#pvStdNote').textContent='지금 '+pvP[v.cargo]+'분 = 오늘 실측 평균(자동) · 목표 '+pvA.std_times[v.cargo]+'분은 판정용 · 바꾸면 순번이 바뀌어요';
 }
 function pvBody(){
   const v=pvVals(), b={};
-  if(Number(pvA.std_times[v.cargo])!==v.std) b.std_times={[v.cargo]:v.std};
+  if(Math.abs(Number(pvP[v.cargo])-v.std)>=0.05) b.pred={[v.cargo]:v.std};
   if(Number(pvA.target_wait_min)!==v.tw) b.target_wait_min=v.tw;
   if(Number(pvA.call_margin_min)!==v.mg) b.call_margin_min=v.mg;
   return b;
 }
 function pvChanged(){ pvDirty=true; pvLabels(); clearTimeout(pvTimer); pvTimer=setTimeout(runPreview,350); }
 ['#pvStd','#pvTw','#pvMg'].forEach(id=>$(id).addEventListener('input',pvChanged));
-$('#pvCargo').addEventListener('change',e=>{ pvCargo=e.target.value; $('#pvStd').value=pvA.std_times[pvCargo]; pvChanged(); });
+$('#pvCargo').addEventListener('change',e=>{ pvCargo=e.target.value; if(pvP) $('#pvStd').value=pvP[pvCargo]; pvChanged(); });
 async function runPreview(){
   const b=pvBody();
-  if(!Object.keys(b).length){ pvData=null; $('#pvApply').disabled=true; $('#pvRes').innerHTML='<b>바꾸면 이렇게 돼요</b><span class="cap">현재 기준과 같아요.</span>'; if(last) renderOrders(last); if(lastSched) drawSchedule(lastSched); return; }
-  $('#pvRes').innerHTML='<b>바꾸면 이렇게 돼요</b><span class="cap">다시 계산하는 중…</span>';
-  try{ pvData=await postJ('/api/preview',b); }catch(e){ $('#pvRes').innerHTML='<b>계산하지 못했어요</b><span class="cap">'+esc(e.message)+'</span>'; return; }
+  if(!Object.keys(b).length){ pvData=null; $('#pvApply').disabled=true; $('#pvRes').innerHTML='<b>바꾸면 이렇게 돼요</b><p class="cap">현재 기준과 같아요.</p>'; if(last) renderOrders(last); if(lastSched) drawSchedule(lastSched); return; }
+  $('#pvRes').innerHTML='<b>바꾸면 이렇게 돼요</b><p class="cap">다시 계산하는 중…</p>';
+  try{ pvData=await postJ('/api/preview',b); }catch(e){ $('#pvRes').innerHTML='<b>계산하지 못했어요</b><p class="cap">'+esc(e.message)+'</p>'; return; }
   $('#pvApply').disabled=false;
-  const ch=pvData.rows.filter(r=>r.changed), same=pvData.rows.length-ch.length;
-  const li=[];
-  ch.slice(0,3).forEach(r=>{ const nw=r.call_new||(r.state_new&&r.state_new!=='yard'?'바로 호출':'보류');
-    li.push('· 순번 '+r.rank+' <b>'+esc(r.vehicle_id)+'</b> 호출 '+esc(r.call_old||'(지금 순번 없음)')+' → <b>'+esc(nw)+'</b>'+(r.sector_old&&r.sector_new&&r.sector_old!==r.sector_new?' ('+esc(sname(r.sector_old))+' → '+esc(sname(r.sector_new))+')':''));
-    if(r.effect_old!=null&&r.effect_new!=null&&Math.abs(r.effect_old-r.effect_new)>=0.5) li.push('· 같은 차량 효과 '+sgn(r.effect_old,'분')+' → <b>'+sgn(r.effect_new,'분')+'</b> (FIFO도 같이 다시 계산)'); });
-  if(ch.length>3) li.push('· 그 밖에 '+(ch.length-3)+'대 호출이 바뀌어요');
-  pvData.bays.slice(0,2).forEach(x=>li.push('· '+esc(x.name)+' 하차구 '+x.bay+' 비는 시각 '+x.old+' → <b>'+x.new+'</b>'));
-  if(!ch.length) li.push('· 지금 순번표의 호출 시각은 그대로예요');
-  else if(same>0) li.push('· 다른 순번 '+same+'대는 그대로');
-  li.push('· 오늘 효과 합 '+sgn(pvData.total_old.min,'분')+' → <b>'+sgn(pvData.total_new.min,'분')+'</b>');
-  $('#pvRes').innerHTML='<b>바꾸면 이렇게 돼요</b>'+li.map(x=>'<span>'+x+'</span>').join('')+'<span class="cap">'+(last?hhmm(last.clock)+' 기준 · ':'')+'순번표와 시간표에 점선으로 표시돼요</span>';
+  const ch=pvData.rows.filter(r=>r.changed), j=pvData.judge;
+  const nw=r=>r.call_new||(r.state_new&&r.state_new!=='yard'?'바로 호출':'보류');
+  let h='<b style="font-size:14px">바꾸면 이렇게 돼요</b> <span class="cap">'+(last?hhmm(last.clock)+' 기준':'')+'</span>';
+  if(pvData.judge_only) h+='<div class="notice" style="margin:6px 0">순번은 그대로예요 · 기준미달 판정만 바뀌어요</div>';
+  h+=ch.length?'<table class="pvt" style="margin-top:6px"><thead><tr><th>순번</th><th>차량</th><th class="r">호출 전 → 후</th><th class="r">효과 전 → 후</th></tr></thead><tbody>'+
+    ch.slice(0,8).map(r=>'<tr><td><span class="rank">'+r.rank+'</span></td><td class="plate">'+esc(r.vehicle_id)+(r.sector_old&&r.sector_new&&r.sector_old!==r.sector_new?'<div class="cap">'+esc(sname(r.sector_old))+' → '+esc(sname(r.sector_new))+'</div>':'')+'</td>'+
+      '<td class="r num"><span class="pv-old">'+esc(r.call_old||'—')+'</span> → <span class="pv-new">'+esc(nw(r))+'</span></td>'+
+      '<td class="r num">'+(r.effect_old!=null?sgn(r.effect_old,'분'):'—')+' → <b>'+(r.effect_new!=null?sgn(r.effect_new,'분'):'—')+'</b></td></tr>').join('')+'</tbody></table>'+(ch.length>8?'<p class="cap">그 밖에 '+(ch.length-8)+'대</p>':'')
+    :'<p class="cap" style="margin:6px 0">지금 순번표의 호출 시각은 그대로예요.</p>';
+  if(pvData.bays.length) h+='<table class="pvt" style="margin-top:8px"><thead><tr><th>하차구</th><th class="r">비는 시각 전 → 후</th></tr></thead><tbody>'+pvData.bays.map(x=>'<tr><td>'+esc(x.name)+' 하차구 '+x.bay+'</td><td class="r num"><span class="pv-old">'+x.old+'</span> → <span class="pv-new">'+x.new+'</span></td></tr>').join('')+'</tbody></table>';
+  h+='<div class="base" style="margin-top:8px"><div class="r"><span>오늘 효과 합</span><span class="num">'+sgn(pvData.total_old.min,'분')+' → <b>'+sgn(pvData.total_new.min,'분')+'</b> <span class="cap">(FIFO도 같은 값으로 다시 계산)</span></span></div>'+
+    '<div class="r"><span>기준미달</span><span class="num">하차 '+j.old.unload+' → <b>'+j.new.unload+'</b>건 · 대기 '+j.old.wait+' → <b>'+j.new.wait+'</b>건 <span class="cap">(끝난 '+j.new.n+'건 중)</span></span></div></div>';
+  $('#pvRes').innerHTML=h;
   if(last) renderOrders(last); if(lastSched) drawSchedule(lastSched);
 }
 $('#pvOff').addEventListener('click',()=>{ pvDirty=false; pvData=null; $('#pvApply').disabled=true; if(pvA) pvBase(pvA);
-  $('#pvRes').innerHTML='<b>바꾸면 이렇게 돼요</b><span class="cap">미리보기를 껐어요. 현재 기준 그대로입니다.</span>'; if(last) renderOrders(last); if(lastSched) drawSchedule(lastSched); });
+  $('#pvRes').innerHTML='<b>바꾸면 이렇게 돼요</b><p class="cap">미리보기를 껐어요. 현재 기준 그대로입니다.</p>'; if(last) renderOrders(last); if(lastSched) drawSchedule(lastSched); });
 $('#pvApply').addEventListener('click',async()=>{
   const b=pvBody(); if(!Object.keys(b).length) return;
-  try{ const r=await postJ('/api/assumptions',b); dockMsg='설정에 반영했어요 · '+r.changed.join(' · ')+' · 모든 화면을 다시 계산했습니다.';
-    pvDirty=false; pvData=null; $('#pvApply').disabled=true; $('#pvRes').innerHTML='<b>반영했어요</b><span class="cap">설정 변경 이력에 남았습니다.</span>';
+  const body=Object.assign({},b); if(body.pred){ body.pred_override=body.pred; delete body.pred; }
+  try{ const r=await postJ('/api/assumptions',body); dockMsg='설정에 반영했어요 · '+r.changed.join(' · ')+(r.history&&r.history[0]&&r.history[0].impact?' · 영향: '+r.history[0].impact:'');
+    pvDirty=false; pvData=null; $('#pvApply').disabled=true; $('#pvRes').innerHTML='<b>반영했어요</b><p class="cap">설정 › 변경 이력에 남았습니다.</p>';
     try{ cfg.settings=(await getJ('/api/config')).settings; }catch(e){} await refresh(); pollView(true); }catch(e){ dockMsg='반영하지 못했습니다: '+e.message; }
 });
-
 /* ---------- 운영 분석 (성과·비용 · 건별 기록) ---------- */
 let anaTab='perf', anaRange='today', recCargo='';
 document.querySelectorAll('[data-atab]').forEach(b=>b.addEventListener('click',()=>{ anaTab=b.dataset.atab;
@@ -1310,33 +1398,59 @@ document.querySelectorAll('[data-atab]').forEach(b=>b.addEventListener('click',(
 document.querySelectorAll('[data-rng]').forEach(b=>b.addEventListener('click',()=>{ anaRange=b.dataset.rng;
   document.querySelectorAll('[data-rng]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
   $('#anaExport').href='/api/export/report.csv?range='+anaRange; $('#recCsv').href='/api/export/trips.csv?range='+anaRange;
-  $('#anaNote').textContent=anaRange==='week'?'최근 7일 = 시드를 바꾼 시뮬레이션 6일 + 오늘 · 실제 운영 기록이 아님':'같은 도착 데이터로 FIFO와 추천을 비교 · 숫자는 시뮬레이션 값';
+  $('#anaNote').textContent={week:'최근 7일 = 시드를 바꾼 시뮬레이션 6일 + 오늘 · 실제 운영 기록이 아님',demo:'시연 시나리오 = 정해진 돌발(호퍼 정지 · 긴급 반입 · 복구)을 넣은 하루를 미리 끝까지 돌린 고정 결과'}[anaRange]||'같은 도착 데이터로 FIFO와 추천을 비교 · 숫자는 시뮬레이션 값';
   if(anaRange==='week') $('#anaHero').innerHTML='<span class="s">7일치를 시뮬레이션하는 중… (처음 한 번 약 5초)</span>';
   pollView(true); }));
 const dTxt=(a,b,u,better)=>{ const d=Math.round((b-a)*10)/10, good=better==='low'?d<0:d>0; return '<span class="d '+(Math.abs(d)<0.05?'':good?'good':'bad')+'">'+(d>0?'+':d<0?'−':'±')+Math.abs(d)+u+'</span>'; };
+function spark(pts,key,col){
+  const v=pts.map(p=>p[key]).filter(x=>x!=null); if(v.length<2) return '<svg viewBox="0 0 130 56"></svg>';
+  const mn=Math.min(...v), mx=Math.max(...v), rg=mx-mn||1, X=i=>4+i*(122/(v.length-1)), Y=x=>50-(x-mn)/rg*42;
+  const d=v.map((x,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(x).toFixed(1)).join(' ');
+  return '<svg viewBox="0 0 130 56" aria-hidden="true"><path d="'+d+' L'+X(v.length-1)+' 54 L4 54 Z" fill="#EFEFEC"/><path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="2"/><circle cx="'+X(v.length-1)+'" cy="'+Y(v[v.length-1])+'" r="3.5" fill="'+col+'"/><text x="126" y="54" font-size="9" fill="#9AA0A6" text-anchor="end">'+esc(pts[pts.length-1].x)+'</text></svg>';
+}
+function drawTbar(T){
+  const sv=$('#tbarSvg'), W=sv.clientWidth||420, H=sv.clientHeight||200; sv.setAttribute('viewBox','0 0 '+W+' '+H);
+  const G=[['평균 대기',T.avg_wait],['최대 대기',T.max_wait],['호퍼 유휴',T.idle]], mx=Math.max(1,...G.flatMap(g=>g[1]));
+  const top=Math.ceil(mx/20)*20||20, bot=H-38, y=v=>12+(bot-12)*(1-v/top), gw=(W-40)/3;
+  let g='';
+  for(let v=0;v<=top;v+=top/3){ g+='<line x1="30" x2="'+W+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="#EFEFEC"/><text x="24" y="'+(y(v)+4)+'" font-size="10" fill="#9AA0A6" text-anchor="end">'+Math.round(v)+'</text>'; }
+  G.forEach((it,i)=>{ const cx=40+gw*i+gw/2, bw=Math.min(36,gw/3.2), f=it[1][0], r=it[1][1];
+    [[f,'#BDC1C6',cx-bw-3],[r,'#141414',cx+3]].forEach(([v,c,x])=>{ g+='<rect x="'+x+'" y="'+y(v)+'" width="'+bw+'" height="'+(bot-y(v))+'" rx="5" fill="'+c+'"/><text x="'+(x+bw/2)+'" y="'+(y(v)-4)+'" font-size="11" font-weight="700" text-anchor="middle" fill="#141414">'+Math.round(v)+'분</text>'; });
+    const pct=f?Math.round((r-f)/f*100):0;
+    g+='<text x="'+cx+'" y="'+(bot+16)+'" font-size="12" text-anchor="middle" fill="#3C4043">'+it[0]+'</text><text x="'+cx+'" y="'+(bot+31)+'" font-size="12" font-weight="700" text-anchor="middle" fill="'+(pct<0?'#1F7A4F':'#B8420A')+'">'+(pct>0?'+':'')+pct+'%</text>'; });
+  sv.innerHTML=g;
+}
+let tbarData=null;
 function renderAnalysis(a){
-  const t=a.total, wk=a.range==='week';
-  $('#anaHero').innerHTML='<span class="k">'+(wk?'최근 7일 대기 절감 (시뮬레이션)':'오늘 대기 절감')+'</span><span class="v num">'+won(Math.max(0,t.won))+'</span>'+
-    '<span class="s">절감 '+(-t.effect_min)+'분 × ₩'+t.won_per_min+'/분'+(t.idle_in_cost?' + 호퍼 유휴 '+won(t.idle_won):'')+' · 효과 확정 '+t.vehicles+'대</span>'+
-    '<span class="s" style="margin-top:6px;display:block">차량 1대마다 <b style="color:#fff">FIFO였을 때 대기 − 추천 대기</b>를 더한 값이에요. 관제 화면 알림 패널과 순번표의 효과를 모두 더하면 이 숫자예요. '+(t.idle_in_cost?'호퍼 유휴도 금액에 넣고 있어요(설정).':'호퍼 유휴는 금액에 넣지 않고 시간 지표로만 봐요.')+' <span class="assumed">팀 결정 전 가정 단가</span></span>';
-  const S=a.sources, tot=S.reduce((m,x)=>m+x.min,0), totN=S.reduce((m,x)=>m+x.n,0), totW=S.reduce((m,x)=>m+x.won,0);
-  $('#anaSrc').innerHTML='<table class="srct"><thead><tr><th>효과를 만든 것</th><th class="r">건수</th><th class="r">효과</th><th class="r">금액</th></tr></thead><tbody>'+
-    S.map(x=>{ const chg=x.source==='담당자 순번 변경'; return '<tr><td>'+esc(x.source)+(chg?'<div class="cap">추천보다 늘어난 시간 '+x.added+'분 (현장 판단 · 손실이 아닐 수 있음)</div>':x.n?'<div class="cap">줄어든 '+x.saved+'분 · 늘어난 '+x.added+'분</div>':'')+'</td><td class="r num">'+x.n+'건</td>'+
-      '<td class="r num '+(x.min<-0.05?'good':x.min>0.05?'bad':'')+'">'+(x.n?sgn(x.min,'분'):'—')+'</td><td class="r num">'+(x.n?(x.won<=0?'':'−')+won(Math.abs(x.won)):'—')+'</td></tr>'; }).join('')+
-    '<tr class="tot"><td>합계 · '+totN+'대 <span class="cap">= 줄어든 '+t.saved_min+'분 − 늘어난 '+t.added_min+'분</span></td><td class="r num">'+totN+'건</td><td class="r num">'+sgn(Math.round(tot*10)/10,'분')+'</td><td class="r num">'+won(-totW)+'</td></tr></tbody></table>'+
-    '<p class="cap" style="margin:8px 0 0">"효과를 만든 것"은 그 차량에 붙은 알림·결정으로 정해요: 담당자 변경 → 긴급 반입 → 호퍼 정지 → 대기 초과 → 혼잡 → 작업 지연 → 그 밖은 일반 추천.</p>';
-  const T=a.times, tile=(k,fv,rv,u,better)=>'<div class="t3"><span class="k">'+k+'</span><span class="v num">'+fv+' → '+rv+'<small>'+u+'</small></span>'+dTxt(fv,rv,u,better)+'</div>';
-  $('#anaTimes').innerHTML=tile('하역 가동률',T.util[0],T.util[1],'%','high')+tile('작업 지연 건수',T.delays[0],T.delays[1],'건','low')+tile('처리 대수',T.trips[0],T.trips[1],'대','high')+tile('호퍼 유휴 (시간만)',T.idle[0],T.idle[1],'분','low');
-  $('#chartTitle').textContent=wk?'날짜별 평균 대기 (시뮬레이션 7일)':'시간대별 대기 차량';
-  drawChart(a.series);
-  const fb=a.feedback, mx=Math.max(1,...Object.values(fb.counts)), dec=a.decisions.approved+a.decisions.changed;
-  $('#fbSub').textContent=a.match_pct==null?'아직 결정 없음':'승인 '+a.decisions.approved+' · 변경 '+a.decisions.changed;
-  $('#fbBox').innerHTML='<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap"><div><span class="num" style="font-size:30px;font-weight:700">'+(a.match_pct==null?'—':a.match_pct+'%')+'</span><div class="cap">'+(dec?dec+'건 중 '+a.decisions.approved+'건 그대로 승인':'순번을 승인하거나 바꾸면 계산돼요')+'</div></div>'+
-    '<div class="bars" style="flex:1;min-width:220px"><span class="cap">담당자가 바꾼 이유 · '+fb.total+'건</span>'+Object.entries(fb.counts).map(([k,v])=>'<div class="b"><span>'+esc(k)+'</span><span class="t"><i style="width:'+(v/mx*100)+'%"></i></span><span class="num r">'+v+'</span></div>').join('')+'</div></div>'+
-    (fb.suggestions.length?fb.suggestions.map(x=>'<div class="sugg" style="margin-top:10px"><b>가정값 조정 제안</b><span>'+esc(x.text)+'</span><div style="display:flex;gap:6px"><button class="mini dark" data-apply="'+esc(x.key)+'">설정에서 적용</button><button class="mini" data-ignore="'+esc(x.key)+'">무시</button></div></div>').join('')
-      :'<p class="cap" style="margin:10px 0 0">같은 호퍼에서 같은 사유가 3번 쌓이면 표준 하차시간 조정을 제안해요.</p>');
+  const t=a.total, rl={week:'최근 7일 대기 절감 (시뮬레이션)',demo:'시연 시나리오 대기 절감 (고정)'}[a.range]||'오늘 대기 절감';
+  $('#anaHero').innerHTML='<span class="k">'+rl+'</span><span class="v num">'+won(Math.max(0,t.won))+'</span>'+
+    '<span class="s">절감 '+(-t.effect_min)+'분 × ₩'+t.won_per_min+'/분'+(t.idle_in_cost?' + 호퍼 유휴 '+won(t.idle_won):'')+'</span><span class="sp"></span>'+
+    '<span class="s" style="border-top:1px solid #3C4043;padding-top:8px;margin-top:6px">차량 1대마다 <b style="color:#fff">FIFO였을 때 대기 − 추천 대기</b>를 계산해서 더한 값이에요. 관제 화면 카드와 순번표의 효과를 모두 더하면 이 숫자예요.</span>'+
+    '<span class="s">'+(t.idle_in_cost?'호퍼 유휴도 금액에 넣고 있어요(설정).':'호퍼 유휴는 금액에 넣지 않고 시간 지표로만 봐요 · 팀 결정 전 가정')+'</span>'+
+    (a.demo?'<span class="s" style="margin-top:4px">시연 순서: '+a.demo.actions.map(x=>esc(x.say)).join(' → ')+'</span>':'')+
+    '<span style="margin-top:6px"><span class="assumed">단가 근거 확인 필요</span></span>';
+  const S=a.sources, mxs=Math.max(1,...S.map(x=>Math.abs(x.min))), SUB={'가장 빨리 비는 하차구 (일반 추천)':'일반 추천','대기 초과 → 우선 배정':'대기 초과 알림','혼잡 → 호출 보류':'혼잡 알림','작업 지연 → 호출 늦춤':'작업 지연 알림','긴급 반입 → 순번 올림':'긴급 반입','호퍼 정지 → 재배정':'호퍼 이상 알림','담당자 순번 변경':'추천보다 늘어난 시간'};
+  const totN=S.reduce((m,x)=>m+x.n,0), tot=Math.round(S.reduce((m,x)=>m+x.min,0)*10)/10, totW=S.reduce((m,x)=>m+x.won,0);
+  $('#anaSrc').innerHTML=S.map(x=>{ const chg=x.source==='담당자 순번 변경', add=x.min>0.05; const nm=x.source.replace(' (일반 추천)','');
+    return '<div class="srcb"><span class="nm"><b>'+esc(nm)+'</b><span>'+(chg?x.n+'건 · ':'')+esc(SUB[x.source]||'')+'</span></span><span class="t"><i class="'+(add?'add':'')+'" style="width:'+(Math.abs(x.min)/mxs*100)+'%"></i></span>'+
+      '<span class="m '+(x.min<-0.05?'':add?'bad':'')+'" style="'+(x.min<-0.05?'color:var(--ink)':'')+'">'+(x.n?sgn(x.min,'분'):'—')+'</span><span class="w" style="color:'+(add?'var(--orange)':'var(--blue)')+'">'+(x.n?(add?'−':'')+won(Math.abs(x.won)):'—')+'</span></div>'; }).join('')+
+    '<div class="srcb tot"><span class="nm"><b>합계 · '+totN+'대</b></span><span class="cap">'+t.saved_min+' − '+t.added_min+' = '+(-tot)+'분 × ₩'+t.won_per_min+'</span><span class="m">'+sgn(tot,'분')+'</span><span class="w">'+won(-totW)+'</span></div>';
+  tbarData=a.times; drawTbar(a.times);
+  const T=a.times, sp=a.spark, tile=(ic,k,f,r,u,better,key)=>{ const d=Math.round((r-f)*10)/10, good=better==='low'?d<0:d>0;
+    return '<div class="tile4"><span class="k">'+ic+' '+k+'</span><span class="v num">'+f+u+' → <b>'+r+'</b>'+u+'</span><span class="bd2'+(good||Math.abs(d)<0.05?'':' bad')+'">'+(d>0?'+':d<0?'−':'±')+Math.abs(d)+(u==='%'?'%p':u)+'</span>'+spark(sp[key],'rec','#141414')+'</div>'; };
+  $('#anaTiles3').innerHTML=tile('◔','하차구 가동률',T.util[0],T.util[1],'%','high','util')+tile('◷','작업 지연 건수',T.delays[0],T.delays[1],'건','low','delays')+tile('▤','처리 대수',T.trips[0],T.trips[1],'대','high','trips');
+  $('#chartTitle').textContent=a.range==='week'?'날짜별 평균 대기 (시뮬레이션 7일)':'시간대별 대기 차량';
+  drawChart(a.series,a.range==='week'?null:a.wait_band,a.now);
+  const fb=a.feedback, mx=Math.max(1,...Object.values(fb.counts)), dec=a.decisions.approved+a.decisions.changed, pct=a.match_pct;
+  const C=2*Math.PI*36, arc=pct==null?0:C*pct/100;
+  $('#fbBox').innerHTML='<div style="display:flex;gap:14px;align-items:center"><svg class="donut" viewBox="0 0 88 88" aria-hidden="true"><circle cx="44" cy="44" r="36" fill="none" stroke="#E6EDFF" stroke-width="12"/><circle cx="44" cy="44" r="36" fill="none" stroke="#1D47B8" stroke-width="12" stroke-dasharray="'+arc+' '+C+'" transform="rotate(-90 44 44)" stroke-linecap="round"/></svg>'+
+    '<div><span class="cap">추천 일치율 · '+(a.range==='today'?'오늘':'이 기간')+'</span><div><b class="num" style="font-size:28px">'+(pct==null?'—':pct+'%')+'</b> <span class="cap">'+(dec?dec+'건 중 '+a.decisions.approved+'건 그대로 승인':'승인·변경이 생기면 계산돼요')+'</span></div></div></div>'+
+    '<div class="bars" style="margin-top:10px"><b style="font-size:13px">'+(pct==null?'담당자가 바꾼 이유':'안 맞은 '+(100-pct)+'% · 담당자가 바꾼 이유')+'</b>'+Object.entries(fb.counts).map(([k,v])=>'<div class="b"><span>'+esc(k)+'</span><span class="t"><i style="width:'+(v/mx*100)+'%;background:#141414"></i></span><span class="num r">'+v+'</span></div>').join('')+'</div>'+
+    (fb.suggestions.length?fb.suggestions.slice(0,1).map(x=>'<div class="sugg" style="margin-top:10px;background:var(--blue-bg);border:0"><b>⚙ 가정값 조정 제안</b><span>'+esc(x.text)+'</span><div style="display:flex;gap:6px"><button class="mini dark" data-apply="'+esc(x.key)+'">설정에서 적용</button><button class="mini" data-ignore="'+esc(x.key)+'">무시</button></div></div>').join('')
+      :'<p class="cap" style="margin:10px 0 0">같은 호퍼에서 같은 사유가 3번 쌓이면 목표 조정을 제안해요.</p>');
   renderRecords(a);
 }
+window.addEventListener('resize',()=>{ if(view==='analysis'&&tbarData) drawTbar(tbarData); });
 function renderRecords(a){
   const cargos=[...new Set(a.records.map(r=>r.cargo))];
   $('#recFilter').innerHTML=['','...'].slice(0,1).concat(cargos).map(c=>'<button class="mini'+(c===recCargo?' dark':'')+'" data-rc="'+esc(c)+'">'+esc(c||'전체')+'</button>').join('');
@@ -1362,8 +1476,9 @@ $('#fbBox').addEventListener('click',async e=>{
        pollView(true); }catch(err){}
 });
 let chartData=null;
-function drawChart(series){
-  chartData=series;
+let chartBand=null, chartNow=null;
+function drawChart(series,band,nowLbl){
+  chartData=series; if(band!==undefined){ chartBand=band; chartNow=nowLbl; }
   const svgc=$('#chart'), W=svgc.clientWidth||600, H=svgc.clientHeight||220;
   svgc.setAttribute('viewBox','0 0 '+W+' '+H);
   const pad={l:34,r:12,t:10,b:24}, rec=series.rec, fifo=series.fifo, unit=series.unit||'';
@@ -1377,11 +1492,13 @@ function drawChart(series){
   const lbl=rec.length>=fifo.length?rec:fifo, every=Math.ceil(n/8);
   lbl.forEach((p,i)=>{ if(i%every===0) g+='<text x="'+x(i)+'" y="'+(H-6)+'" text-anchor="middle" font-size="11" fill="#5F6368">'+p.hhmm+'</text>'; });
   const path=arr=>arr.map((p,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(p.waiting).toFixed(1)).join(' ');
-  g+='<path d="'+path(fifo)+'" fill="none" stroke="#B8420A" stroke-width="2" stroke-dasharray="6 4" stroke-linejoin="round"/>';
-  g+='<path d="'+path(rec)+'" fill="none" stroke="#1D47B8" stroke-width="2" stroke-linejoin="round"/>';
+  if(chartBand&&chartBand<top) g='<rect x="'+pad.l+'" y="'+y(top)+'" width="'+(W-pad.l-pad.r)+'" height="'+(y(chartBand)-y(top))+'" fill="#FFF1E8"/><text x="'+(pad.l+8)+'" y="'+(y(top)+14)+'" font-size="11" fill="#B8420A">대기 '+chartBand+'대 이상</text>'+g;
+  g+='<path d="'+path(fifo)+'" fill="none" stroke="#9AA0A6" stroke-width="2" stroke-dasharray="6 4" stroke-linejoin="round"/>';
+  g+='<path d="'+path(rec)+'" fill="none" stroke="#141414" stroke-width="2.5" stroke-linejoin="round"/>';
   const lastI=n-1;
-  if(rec[lastI]) g+='<circle cx="'+x(lastI)+'" cy="'+y(rec[lastI].waiting)+'" r="4" fill="#1D47B8" stroke="#fff" stroke-width="2"/>';
-  if(fifo[lastI]) g+='<circle cx="'+x(lastI)+'" cy="'+y(fifo[lastI].waiting)+'" r="4" fill="#B8420A" stroke="#fff" stroke-width="2"/>';
+  if(chartNow){ g+='<line x1="'+x(lastI)+'" x2="'+x(lastI)+'" y1="'+(pad.t+16)+'" y2="'+(H-pad.b)+'" stroke="#1D47B8" stroke-dasharray="3 3"/><rect x="'+(x(lastI)-24)+'" y="'+pad.t+'" width="48" height="16" rx="8" fill="#1D47B8"/><text x="'+x(lastI)+'" y="'+(pad.t+12)+'" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">'+esc(chartNow)+'</text>'; }
+  if(rec[lastI]) g+='<circle cx="'+x(lastI)+'" cy="'+y(rec[lastI].waiting)+'" r="4" fill="#141414" stroke="#fff" stroke-width="2"/>';
+  if(fifo[lastI]) g+='<circle cx="'+x(lastI)+'" cy="'+y(fifo[lastI].waiting)+'" r="4" fill="#9AA0A6" stroke="#fff" stroke-width="2"/>';
   g+='<line id="xh" y1="'+pad.t+'" y2="'+(H-pad.b)+'" stroke="#141414" stroke-width="1" opacity="0"/><rect id="hit" x="'+pad.l+'" y="0" width="'+(W-pad.l-pad.r)+'" height="'+H+'" fill="transparent"/>';
   svgc.innerHTML=g;
   const fmax=Math.max(...fifo.map(p=>p.waiting)), rmax=Math.max(...rec.map(p=>p.waiting));
