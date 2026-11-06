@@ -714,7 +714,7 @@ class Runtime:
                            "open": sum(c["status"] in ("승인 대기", "확인 필요") for c in cards)},
                 "clock": self.rec.hhmm(self.rec.t)}
 
-    # ---------- 순번·배정: 하차구(베이) 비는 시각 시간표 ----------
+    # ---------- 순번·배정: 베이 비는 시각 시간표 ----------
     def schedule(self, before=5, after=40):
         sim, t = self.rec, self.rec.t
         t0, t1 = t - before, t + after
@@ -820,7 +820,7 @@ class Runtime:
                 "wait_rate": a["wait_won_per_hour"], "won_per_min": eff["won_per_min"], "idle_rate": a["idle_won_per_hour"]}
 
     # ---------- 효과를 만든 것 · 건별 기록 ----------
-    SOURCES = ["가장 빨리 비는 하차구 (일반 추천)", "대기 초과 → 우선 배정", "혼잡 → 호출 보류", "작업 지연 → 호출 늦춤",
+    SOURCES = ["가장 빨리 비는 베이 (일반 추천)", "대기 초과 → 우선 배정", "혼잡 → 호출 보류", "작업 지연 → 호출 늦춤",
                "긴급 반입 → 순번 올림", "호퍼 정지 → 재배정", "담당자 순번 변경"]
     ALERT_SOURCE = {"호퍼 이상": "호퍼 정지 → 재배정", "대기 초과": "대기 초과 → 우선 배정", "혼잡": "혼잡 → 호출 보류",
                     "하차 지연": "작업 지연 → 호출 늦춤"}
@@ -849,7 +849,7 @@ class Runtime:
         for s in ["호퍼 정지 → 재배정", "대기 초과 → 우선 배정", "혼잡 → 호출 보류", "작업 지연 → 호출 늦춤"]:
             if s in srcs:
                 return s
-        return "가장 빨리 비는 하차구 (일반 추천)"
+        return "가장 빨리 비는 베이 (일반 추천)"
 
     def records(self, eff=None):
         """차량별 효과 표 (건별 기록). 효과 합 = effect_total()과 같은 반입 집합."""
@@ -1226,7 +1226,7 @@ class Runtime:
                 ["효과 합(분)", t["effect_min"]], ["효과 확정 차량", t["vehicles"]], ["단가(원/분)", t["won_per_min"]],
                 ["호퍼 유휴 금액 포함", "예" if t["idle_in_cost"] else "아니오"], [], ["절감이 어디서 나왔나", "건수", "효과(분)", "금액(원)"]]
         rows += [[s["source"], s["n"], s["min"], s["won"]] for s in a["sources"]]
-        rows += [[], ["시간 지표", "FIFO", "추천"], ["하차구 가동률(%)"] + a["times"]["util"], ["작업 지연(건)"] + a["times"]["delays"],
+        rows += [[], ["시간 지표", "FIFO", "추천"], ["베이 가동률(%)"] + a["times"]["util"], ["작업 지연(건)"] + a["times"]["delays"],
                  ["처리(회)"] + a["times"]["trips"], ["호퍼 유휴(분)"] + a["times"]["idle"], ["평균 대기(분)"] + a["times"]["avg_wait"]]
         if rng == "week":
             rows += [[], ["날짜", "효과(분)", "절감(원)", "FIFO 평균 대기", "추천 평균 대기"]]

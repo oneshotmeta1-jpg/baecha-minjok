@@ -99,7 +99,9 @@ async def state():
 
 
 @app.get("/api/events")
-async def events(limit: int = 50):
+async def events(limit: int = 50, sector_id: str | None = None):
+    if sector_id:       # 하역장 상세 › 이벤트 기록: 그 호퍼 것만
+        return [e for e in rt.store.recent_events(2000) if e.get("sector_id") == sector_id][:min(limit, 500)]
     return rt.store.recent_events(min(limit, 500))
 
 

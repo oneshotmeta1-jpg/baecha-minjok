@@ -304,6 +304,10 @@ class Sim:
     def safety_open_for(self, v):
         return any(x["status"] == "open" and x["key"] == self.key(v) for x in self.safety)
 
+    def safety_rule_for(self, v):
+        x = next((x for x in self.safety if x["status"] == "open" and x["key"] == self.key(v)), None)
+        return x.get("rule_text") if x else None
+
     def safety_plan(self, v):
         """반입마다 한 번 정한다(같은 시드·같은 반입이면 같은 결과): 이번 하차 중 작업자가 들어오는지, 언제, 계속 감지되는지."""
         if "safety_plan" in v:
@@ -815,7 +819,7 @@ class Sim:
                          "remain_min": round(engine.remain_min(v["work_elapsed"], v["std"]), 1),
                          "dump_deg": self.dump_angle(v), "track_id": v["track_id"],
                          "judge": self.cam_judge(v)[0],
-                         "safety": self.safety_open_for(v), "delay_x": round(v["work_elapsed"] / v["target"], 1) if v["target"] else None,
+                         "safety": self.safety_open_for(v), "safety_rule": self.safety_rule_for(v), "delay_x": round(v["work_elapsed"] / v["target"], 1) if v["target"] else None,
                          "delayed": "delay" in v["flags"]} for v in sorted(working, key=lambda v: v["bay"])],
             "queue": [v["id"] for v in sorted(queue, key=lambda v: v["queue_idx"])],
             "queue_info": [{"vehicle_id": v["id"], "cargo": v["cargo"], "track_id": v["track_id"],
