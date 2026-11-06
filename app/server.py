@@ -26,7 +26,7 @@ from app.sim import STEP, load  # noqa: E402
 
 DATA = ROOT / "data"
 WEB = ROOT / "web"
-VERSION = "v4"
+VERSION = "v5"
 TICK = 0.1  # 실제 초
 
 rt = Runtime(seed=7, db_path=DATA / "events.db", assumptions_path=DATA / "assumptions.json")
@@ -162,6 +162,23 @@ async def order_approve(vehicle_id: str):
     if not rt.approve(vehicle_id):
         raise HTTPException(409, "순번표에 없는 차량입니다")
     return {"ok": True}
+
+
+@app.post("/api/approval")
+async def approval(auto: bool):
+    """자동 승인 스위치. auto=false면 현장 담당자가 승인해야 호출 (L2)."""
+    return {"auto_approve": rt.set_auto_approve(auto)}
+
+
+@app.get("/api/schedule")
+async def schedule():
+    return rt.schedule()
+
+
+@app.get("/api/panel")
+async def panel():
+    """알림 패널: 무슨 일 → 제안 → 효과(차량별 FIFO 대비) + 오늘 대기 절감 합계."""
+    return rt.panel()
 
 
 @app.post("/api/order/approve_all")

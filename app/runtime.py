@@ -88,6 +88,7 @@ class Runtime:
         self.acks = {}           # 알림 id → {ack_sec}
         self.ui_events = []      # 담당자 행동 이벤트 — 재계산 때 같은 시각에 다시 기록
         self.alert_wall = {}     # 알림 id → 발생 실제 시각
+        self.auto_approve = True # 자동 승인 스위치 (끄면 현장 담당자가 승인해야 호출 — L2)
         self.store.clear()
         self._new_sims()
 
@@ -125,6 +126,10 @@ class Runtime:
             self.rec.add_urgent(); self.fifo.add_urgent()
         elif k == "override":
             self.rec.override(a["vehicle_id"], a["sector_id"])
+        elif k == "approve":
+            self.rec.approved.add(a["key"])
+        elif k == "auto":
+            self.rec.require_approval = not a["on"]
         self.rec.replan(); self.fifo.replan()
 
     def step(self):
@@ -184,9 +189,21 @@ class Runtime:
         p = next((p for p in self.rec.plan if p["vehicle_id"] == vid), None)
         if not p:
             return False
-        self.approved.add(self._key(vid))
+        key = self._key(vid)
+        self.approved.add(key)
+        self._record("approve", key=key)          # 승인이 호출을 풀어 주므로 재계산 때도 같은 시각에 다시 넣는다
         self._ui("ORDER_APPROVED", vid, p["sector_id"], {"rank": p["rank"], "reason": p["reason"]})
         return True
+
+    def set_auto_approve(self, on: bool):
+        """자동 승인 스위치. 끄면 호출 시각이 돼도 현장 담당자 승인 전에는 출발하지 않는다(L2)."""
+        on = bool(on)
+        if on == self.auto_approve:
+            return on
+        self.auto_approve = on
+        self._record("auto", on=on)
+        self._ui("APPROVAL_MODE", None, None, {"auto": on})
+        return on
 
     def approve_all(self):
         n = 0
@@ -227,7 +244,9 @@ class Runtime:
             return "이동 중"
         if vid in self.rec.overrides:
             return "변경됨"
-        return "승인됨" if self._key(vid) in self.approved else "승인 대기"
+        if self._key(vid) in self.approved:
+            return "승인됨"
+        return "승인 대기 · 호출 시각 지남" if self._key(vid) in self.rec.pending else "승인 대기"
 
     # ---------- 알림 ----------
     def ack(self, aid):
@@ -281,20 +300,63 @@ class Runtime:
         return changed
 
     # ---------- 비교 · 분석 ----------
+    # ---------- 효과: 차량 1대마다 (FIFO였을 때 대기 − 추천 대기) ----------
+    @staticmethod
+    def _waits(sim):
+        """반입("차량#회차")별 대기(대기장 진입 → 하차 시작). (분, 확정 여부). 아직 못 들어갔으면 지금까지(하한)."""
+        out = {}
+        for d in sim.done_trips:
+            out[f"{d['id']}#{d['trip']}"] = (d["wait_total"], True)
+        for v in sim.vehicles.values():
+            if v["gone"] or v["yard_t"] is None:
+                continue
+            if v["state"] in ("working", "done"):
+                out[sim.key(v)] = (v["work_start"] - v["yard_t"], True)
+            else:
+                out[sim.key(v)] = (sim.t - v["yard_t"], False)
+        return out
+
+    def won_per_min(self):
+        return self.assumptions["wait_won_per_hour"] / 60        # ₩30,000/시간 = ₩500/분 (가정)
+
+    def effects(self):
+        """반입별 효과. 확정 = 두 방식 모두 하차를 시작한 반입. 예상 = 추천 쪽은 순번표의 예상 하차 시작, FIFO 쪽은 지금까지 대기(하한)."""
+        rw, fw = self._waits(self.rec), self._waits(self.fifo)
+        plan_start = {self.rec.key(self.rec.vehicles[p["vehicle_id"]]): p["start_t"] for p in self.rec.plan if p.get("start_t") is not None}
+        out = {}
+        for k, (r, r_ok) in rw.items():
+            if k not in fw:
+                continue
+            f, f_ok = fw[k]
+            if not r_ok and k in plan_start:
+                v = self.rec.vehicles[k.split("#")[0]]
+                r = plan_start[k] - v["yard_t"]
+            out[k] = {"rec": round(r, 1), "fifo": round(f, 1), "effect": round(r - f, 1),
+                      "confirmed": r_ok and f_ok, "fifo_lower": not f_ok}
+        return out
+
+    def effect_total(self, eff=None):
+        eff = eff if eff is not None else self.effects()
+        done = [e for e in eff.values() if e["confirmed"]]
+        m = round(sum(e["effect"] for e in done), 1)
+        return {"min": m, "won": int(round(m * self.won_per_min())), "vehicles": len(done),
+                "won_per_min": self.won_per_min(), "saved_min": round(-sum(min(e["effect"], 0) for e in done), 1),
+                "added_min": round(sum(max(e["effect"], 0) for e in done), 1)}
+
     def compare(self):
         r, f = self.rec.metrics(), self.fifo.metrics()
         a = self.assumptions
         saved_wait = f["wait_total"] - r["wait_total"]
         saved_idle = f["idle_min"] - r["idle_min"]
-        cost_wait = saved_wait / 60 * a["wait_won_per_hour"]
-        cost_idle = saved_idle / 60 * a["idle_won_per_hour"]
+        eff = self.effect_total()
         dec = sum(1 for _ in self.approved) + len(self.changes)
         return {"fifo": f, "rec": r,
                 "reduction_pct": round((f["avg_wait"] - r["avg_wait"]) / f["avg_wait"] * 100) if f["avg_wait"] else 0,
                 "saved_wait_min": round(saved_wait, 1), "saved_idle_min": round(saved_idle, 1),
-                "cost": {"wait": int(round(cost_wait, -2)), "idle": int(round(cost_idle, -2)),
-                         "total": int(round(cost_wait + cost_idle, -2)),
-                         "wait_rate": a["wait_won_per_hour"], "idle_rate": a["idle_won_per_hour"]},
+                "effect": eff,
+                # 금액 = 차량별 효과 합(분) × 대기 단가. 호퍼 유휴는 금액에 넣지 않고 시간으로만 (두 번 세기 방지)
+                "cost": {"total": -eff["won"], "wait": -eff["won"], "idle": 0,
+                         "wait_rate": a["wait_won_per_hour"], "won_per_min": eff["won_per_min"]},
                 "match_pct": round(len(self.approved) / dec * 100) if dec else None,
                 "decisions": {"approved": len(self.approved), "changed": len(self.changes)}}
 
@@ -349,18 +411,141 @@ class Runtime:
     def ignore_suggestion(self, key):
         self.ignored.add(key)
 
+    # ---------- 알림 패널: 무슨 일 → 제안 → 효과 ----------
+    AUTO_DONE = {"호퍼 이상", "대기 초과"}     # 엔진이 바로 처리하는 제안 (재배정 · 우선 배정)
+
+    def _in_plan(self, key):
+        vid = key.split("#")[0]
+        v = self.rec.vehicles.get(vid)
+        return bool(v and self.rec.key(v) == key and v["state"] == "yard")
+
+    def alert_status(self, a):
+        if a["ack"]:
+            return "확인함"
+        waiting = [k for k in a.get("related", []) if k in self.rec.pending
+                   or (self.rec.require_approval and k not in self.approved and self._in_plan(k))]
+        if waiting:
+            return "승인 대기"
+        return "실행됨" if a["kind"] in self.AUTO_DONE else "확인 필요"
+
+    def alert_cards(self, limit=30, eff=None):
+        eff = eff if eff is not None else self.effects()
+        rank = {self.rec.key(self.rec.vehicles[p["vehicle_id"]]): p["rank"] for p in self.rec.plan}
+        out = []
+        for a in reversed(self.rec.alerts_all):
+            if a["kind"] == "호출":
+                continue
+            es = [eff[k] for k in a.get("related", []) if k in eff]
+            card = dict(a, status=self.alert_status(a), ranks=[rank[k] for k in a.get("related", []) if k in rank])
+            card["approve_vid"] = next((k.split("#")[0] for k in a.get("related", [])
+                                        if self._in_plan(k) and k not in self.approved), None) if card["status"] == "승인 대기" else None
+            if es:
+                m = round(sum(e["effect"] for e in es), 1)
+                card["effect"] = {"min": m, "won": int(round(m * self.won_per_min())), "n": len(es),
+                                  "fifo": round(sum(e["fifo"] for e in es), 1), "rec": round(sum(e["rec"] for e in es), 1),
+                                  "confirmed": all(e["confirmed"] for e in es), "fifo_lower": any(e["fifo_lower"] for e in es)}
+            out.append(card)
+            if len(out) >= limit:
+                break
+        return out
+
+    def panel(self):
+        eff = self.effects()
+        cards = self.alert_cards(eff=eff)
+        return {"cards": cards, "total": self.effect_total(eff), "auto_approve": self.auto_approve,
+                "counts": {"all": len(cards), "safety": 0, "ops": len(cards),
+                           "open": sum(c["status"] in ("승인 대기", "확인 필요") for c in cards)},
+                "clock": self.rec.hhmm(self.rec.t)}
+
+    # ---------- 순번·배정: 하차구(베이) 비는 시각 시간표 ----------
+    def schedule(self, before=5, after=40):
+        sim, t = self.rec, self.rec.t
+        t0, t1 = t - before, t + after
+        rows = []
+        plan_by_sector = {}
+        for p in sim.plan:
+            if p["sector_id"] and p.get("start_t") is not None:
+                plan_by_sector.setdefault(p["sector_id"], []).append(p)
+        for sid, sc in sim.sec_cfg.items():
+            up = sim.sectors[sid]["up"]
+            view = sim.sector_view(sid)
+            lanes = [[] for _ in range(sc["bays"])]
+            free = [t] * sc["bays"]
+            for v in sim.vehicles.values():                     # 하차 중
+                if v["state"] == "working" and v["sector"] == sid:
+                    late = "delay" in v["flags"]
+                    if not up:
+                        end, kind = t1, "stop"
+                    elif late:
+                        end, kind = max(t + 1, v["work_start"] + v["work_elapsed"] * 1.05), "late"
+                    else:
+                        end, kind = v["work_start"] + max(v["std"], v["work_elapsed"] + 0.25), "work"
+                    pct = round(v["work_elapsed"] / v["std"] * 100)
+                    label = v["id"] + (" · 지연 ×%.1f" % (v["work_elapsed"] / v["std"]) if late else " · %d%%" % min(100, pct))
+                    lanes[v["bay"]].append({"kind": kind, "t0": v["work_start"], "t1": end, "vehicle_id": v["id"], "label": label})
+                    free[v["bay"]] = max(free[v["bay"]], end)
+            incoming = sorted([v for v in sim.vehicles.values() if v["sector"] == sid and v["state"] in ("moving", "queue")],
+                              key=lambda v: (v["path_t0"] + v["path_dur"]) if v["state"] == "moving" else t)
+            for v in incoming:                                   # 호출돼 오는 중 · 호퍼 앞 대기
+                arr = max(t, v["path_t0"] + v["path_dur"]) if v["state"] == "moving" else t
+                b = min(range(sc["bays"]), key=lambda i: free[i])
+                st_ = max(arr, free[b])
+                where = " · 이동 중 " + sim.hhmm(arr) + " 도착" if v["state"] == "moving" else " · 호퍼 앞 대기"
+                lanes[b].append({"kind": "coming", "t0": st_, "t1": st_ + v["std"], "vehicle_id": v["id"], "label": v["id"] + where})
+                free[b] = st_ + v["std"]
+            if up:
+                for p in sorted(plan_by_sector.get(sid, []), key=lambda p: p["start_t"]):   # 순번표 예약
+                    v = sim.vehicles[p["vehicle_id"]]
+                    b = min(range(sc["bays"]), key=lambda i: free[i])
+                    st_ = max(p["start_t"], free[b])
+                    k = sim.key(v)
+                    need = sim.require_approval and k not in self.approved and v["id"] not in sim.overrides
+                    lanes[b].append({"kind": "pending" if need else "reserved", "t0": st_, "t1": st_ + v["std"],
+                                     "vehicle_id": v["id"], "rank": p["rank"],
+                                     "label": f"{p['rank']}. {v['id']} · {sim.hhmm(p['call_t'])} 호출" + (" · 승인 대기" if need else "")})
+                    free[b] = st_ + v["std"]
+            for i, lane in enumerate(lanes):
+                segs = [dict(x, at0=sim.hhmm(x["t0"]), at1=sim.hhmm(x["t1"]),
+                             t0=round(max(x["t0"], t0), 2), t1=round(min(x["t1"], t1), 2))
+                        for x in lane if x["t1"] > t0 and x["t0"] < t1]
+                busy_until = max([x["t1"] for x in lane if x["kind"] in ("work", "late", "stop", "coming")] + [t])
+                rows.append({"sector_id": sid, "name": sc["name"], "bay": i + 1, "up": up, "level": view["level"],
+                             "pct": view["congestion_pct"], "free_at": sim.hhmm(busy_until),
+                             "free_now": busy_until <= t + 1e-9 and up, "segs": segs})
+        ticks = []
+        k = int((t0 // 5 + 1) * 5)
+        while k <= t1:
+            ticks.append({"t": k, "hhmm": sim.hhmm(k), "major": k % 15 == 0})
+            k += 5
+        return {"t0": t0, "t1": t1, "now": t, "now_hhmm": sim.hhmm(t), "ticks": ticks, "rows": rows,
+                "auto_approve": self.auto_approve}
+
     # ---------- 화면용 묶음 ----------
     def state(self):
         s = self.rec.state()
         s["running"] = self.running
+        eff = self.effects()
+        last_alert = {}
+        for a in self.rec.alerts_all:
+            if a["kind"] != "호출":
+                for k in a.get("related", []):
+                    last_alert[k] = {"id": a["id"], "kind": a["kind"], "ts": a["ts"]}
         for q in s["queue"]:
             q["status"] = self.order_status(q["vehicle_id"])
+            k = self.rec.key(self.rec.vehicles[q["vehicle_id"]])
+            q["effect"] = eff.get(k)
+            q["alert"] = last_alert.get(k)
         s["compare_brief"] = {"reduction_pct": self.compare()["reduction_pct"]}
+        s["auto_approve"] = self.auto_approve
+        s["effect_total"] = self.effect_total(eff)
+        s["panel_open"] = sum(self.alert_status(a) in ("승인 대기", "확인 필요")
+                              for a in self.rec.alerts_all[-60:] if a["kind"] != "호출")
         return s
 
     def dock(self):
         return {"compare": self.compare(), "assumptions": self.assumptions, "history": self.history[:5],
-                "changes": list(reversed(self.changes[-10:])), "reasons": REASONS,
+                "changes": list(reversed(self.changes[-10:])), "reasons": REASONS, "auto_approve": self.auto_approve,
+                "schedule": self.schedule(),
                 "sectors": [self.rec.sector_view(sid) for sid in self.rec.sec_cfg]}
 
     def analysis(self):

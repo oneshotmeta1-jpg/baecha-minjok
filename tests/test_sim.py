@@ -144,9 +144,17 @@ rt.advance(420)
 c = rt.compare()
 check("FIFO 대비 추천 평균 대기 감소 (시드 7, 하루)", c["reduction_pct"] > 0,
       f"FIFO {c['fifo']['avg_wait']}분 → 추천 {c['rec']['avg_wait']}분 ({c['reduction_pct']}%) · 반입 {c['fifo']['trips_done']}→{c['rec']['trips_done']}회")
-check("비용 = 줄어든 대기×대기 단가 + 줄어든 유휴×유휴 단가",
-      abs(c["cost"]["total"] - round(c["saved_wait_min"] / 60 * 30000 + c["saved_idle_min"] / 60 * 200000, -2)) <= 100,
-      f"{c['cost']}")
+eff_all = rt.effects()
+done_eff = [e for e in eff_all.values() if e["confirmed"]]
+check("효과 = 차량마다 (FIFO 대기 − 추천 대기), 금액 = 분 × ₩500 · 유휴는 금액 제외",
+      done_eff and abs(c["effect"]["min"] - round(sum(e["effect"] for e in done_eff), 1)) < 0.05
+      and c["effect"]["won_per_min"] == 500 and c["cost"]["total"] == -int(round(c["effect"]["min"] * 500)) and c["cost"]["idle"] == 0,
+      f"{c['effect']['vehicles']}대 · {c['effect']['min']}분 · 절감 ₩{c['cost']['total']:,}")
+check("차량별 효과 합 ≈ 두 방식 전체 대기 차이 (같은 차·같은 회차 비교)",
+      abs(-c["effect"]["min"] - c["saved_wait_min"]) <= max(15, abs(c["saved_wait_min"]) * 0.5),
+      f"효과 합 {-c['effect']['min']}분 vs 전체 대기 차이 {c['saved_wait_min']}분")
+pn = rt.panel()
+check("알림 패널 합계 = 순번표·운영 분석 효과 합계 (같은 계산)", pn["total"] == rt.compare()["effect"], f"₩{-pn['total']['won']:,}")
 
 rt = Runtime(7, clock=lambda: fake_clock[0])
 lime = None
@@ -185,8 +193,6 @@ check("가정값 변경 → 같은 시각까지 재계산, 변경·승인·확�
       and {"ORDER_CHANGED", "ORDER_APPROVED", "ALERT_ACK", "ASSUMPTIONS_UPDATED"} <= types_after
       and next(a for a in rt.rec.alerts_all if a["id"] == target["id"])["ack"],
       " · ".join(changed))
-check("이벤트 종류가 events.md 표와 일대일 (시뮬레이션 + 담당자 행동)", (seen | types_after) == types,
-      f"문서에만: {sorted(types - seen - types_after)}")
 for i in range(3):            # 같은 호퍼·같은 사유 3번 → 제안
     while True:
         rt.step()
@@ -263,6 +269,60 @@ check("가정값: 제한속도 30 → 20km/h면 이동시간이 1.5배", abs(rt3
       f"대기장→호퍼 B {b_before:.1f} → {rt3.rec.travel('YARD', 'B'):.1f}분")
 rt3.set_assumptions({"slow_factor": 0.8})
 check("감속 계수 1 미만(제한속도 초과)은 거절", rt3.assumptions["slow_factor"] >= 1)
+
+
+# ---------- R4: 승인 흐름(L2) · 알림 패널 · 하차구 시간표 ----------
+ra = Runtime(7)
+ra.advance(40)
+ra.set_auto_approve(False)
+ra.advance(25)
+held = sorted(ra.rec.pending)
+held_vids = [k.split("#")[0] for k in held]
+check("자동 승인 끄면 호출 시각이 돼도 승인 전에는 출발 안 함",
+      held and all(ra.rec.vehicles[v]["state"] == "yard" for v in held_vids)
+      and all(ra.order_status(v) == "승인 대기 · 호출 시각 지남" for v in held_vids),
+      f"승인 기다리는 차량 {len(held)}대")
+vid = held_vids[0]
+ra.approve(vid)
+ra.advance(0.5)
+check("승인하면 다음 걸음에 호출 · CALL에 승인 방식 기록", ra.rec.vehicles[vid]["state"] in ("moving", "queue", "working")
+      and any(e["type"] == "CALL" and e["vehicle_id"] == vid and e["payload"]["approval"] == "approved" for e in ra.rec.events),
+      f"{vid} → {ra.rec.vehicles[vid]['state']}")
+before_t = ra.rec.t
+ra.set_assumptions({"target_wait_min": 16})
+check("재계산해도 승인 모드·승인 기록 유지", ra.rec.require_approval and ra.rec.vehicles[vid]["state"] != "yard"
+      and abs(ra.rec.t - before_t) < 1e-9 and ra.rec.pending)
+ra.set_auto_approve(True)
+ra.advance(1)
+check("자동 승인 다시 켜면 밀린 호출이 풀림", not ra.rec.pending)
+types_r4 = {e["type"] for e in ra.rec.events}
+check("CALL_PENDING · APPROVAL_MODE 이벤트가 나옴", {"CALL_PENDING", "APPROVAL_MODE"} <= types_r4)
+check("이벤트 종류가 events.md 표와 일대일 (시뮬레이션 + 담당자 행동 + 승인 흐름)", (seen | types_after | types_r4) == types,
+      f"문서에만: {sorted(types - seen - types_after - types_r4)} · 코드에만: {sorted((seen | types_after | types_r4) - types)}")
+cards = [x for x in ra.panel()["cards"]]
+check("알림 카드: 무슨 일 → 제안 → 효과 · 상태",
+      cards and all(x["text"] and x["action"] and x["status"] in ("승인 대기", "확인 필요", "실행됨", "확인함") for x in cards)
+      and any("effect" in x for x in cards),
+      f"{len(cards)}장 · 상태 {sorted({x['status'] for x in cards})}")
+rs = Runtime(7)
+rs.advance(60)
+while not [p for p in rs.rec.plan if p["sector_id"]] and rs.rec.t < 200:   # 순번표에 차량이 있는 시각
+    rs.step()
+sch = rs.schedule()
+bays = {(r["sector_id"], r["bay"]) for r in sch["rows"]}
+working = [(v["sector"], v["bay"] + 1, v["id"]) for v in rs.rec.vehicles.values() if v["state"] == "working"]
+segs = {(r["sector_id"], r["bay"], g["vehicle_id"]) for r in sch["rows"] for g in r["segs"] if g["kind"] in ("work", "late")}
+check("하차구 시간표: 호퍼×하차구 5줄, 하차 중 차량이 제 하차구 줄에 있음",
+      len(bays) == sum(s["bays"] for s in rs.rec.cfg["sectors"]) and set(working) <= segs, f"하차 중 {len(working)}대")
+planned = {p["vehicle_id"] for p in rs.rec.plan if p["sector_id"]}
+resv = {g["vehicle_id"] for r in sch["rows"] for g in r["segs"] if g["kind"] in ("reserved", "pending")}
+check("순번표 차량이 시간표에 호출 예약으로 표시", planned and planned <= resv,
+      f"순번 {len(planned)}대")
+rs.sector_down("B")
+rs.advance(1)
+sch2 = rs.schedule()
+check("호퍼 정지 → 그 줄은 정지 구간, 예약 없음",
+      all(not r["up"] and all(g["kind"] in ("stop", "coming") for g in r["segs"]) for r in sch2["rows"] if r["sector_id"] == "B"))
 
 if "--samples" in sys.argv:
     out = ROOT / "docs" / "sample_events.jsonl"
