@@ -235,6 +235,36 @@ main.simple #sideL{display:none} main.simple #sideR{grid-column:2;grid-row:1;ove
 .nextcalls .r:last-child{border-bottom:0}
 .mapsum{display:flex;gap:6px;flex-wrap:wrap}
 .mapsum .chip b{font-weight:700;color:var(--ink)}
+/* R8 안전 띠 · 알림 패널 [순번 | 안전] · 맵 보기 전환 */
+.sstrip{display:flex;align-items:center;gap:10px;background:var(--red);color:#fff;border-radius:16px;padding:9px 14px;font-size:13.5px}
+.sstrip[hidden]{display:none}
+.sstrip b{font-size:14px} .sstrip .l3{background:#fff;color:var(--red);font-weight:800;font-size:11.5px;border-radius:999px;padding:2px 8px}
+.sstrip button{border:1px solid rgba(255,255,255,.7);background:transparent;color:#fff;border-radius:999px;padding:4px 12px;font-weight:700;font-size:12.5px}
+.sstrip button.w{background:#fff;color:var(--red);border-color:#fff}
+.btabs{display:flex;gap:6px;padding:0 18px 8px}
+.btabs button{flex:1;border:1px solid var(--line-2);background:var(--card);border-radius:14px;padding:9px 12px;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px}
+.btabs button[aria-selected="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btabs .n{min-width:22px;height:22px;border-radius:11px;background:var(--soft);color:var(--ink);font-size:12px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
+.btabs button[aria-selected="true"] .n{background:#fff;color:var(--ink)}
+.btabs .n.red{background:var(--red);color:#fff}
+.stabs{display:flex;gap:4px;background:var(--soft);border-radius:999px;padding:3px;margin:0 18px 8px}
+.stabs button{flex:1;border:0;background:transparent;border-radius:999px;padding:6px 10px;font-size:13px;font-weight:600}
+.stabs button[aria-selected="true"]{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.pcard{border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.pcard .l1{display:flex;align-items:center;gap:8px} .pcard .l1 .tt{flex:1;min-width:0}
+.pcard .l2{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12.5px} .pcard .l2 .why{flex:1;min-width:0}
+.echip{font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:var(--green-bg);color:var(--green);white-space:nowrap}
+.echip.bad{background:var(--orange-bg);color:var(--orange)}
+.pcard.safe{border-color:var(--red);background:#FFF5F6}
+.pcard .items{display:flex;flex-direction:column;gap:3px;border-top:1px dashed var(--line);padding-top:6px;font-size:12.5px}
+.pnote{font-size:12px;color:var(--muted);padding:2px 2px 0}
+.pstrip{background:var(--red-bg);color:var(--red);border-radius:12px;padding:8px 12px;font-size:12.5px;font-weight:600;display:flex;gap:8px;align-items:center;cursor:pointer;border:0;text-align:left;width:100%}
+.psec{font-size:13px;font-weight:700;margin:6px 2px 0;display:flex;gap:6px;align-items:center}
+.mapnote{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--muted);align-items:center}
+.mapnote .mcam{font-weight:700;color:var(--ink-2)}
+#isoSvg{flex:1;min-height:0;width:100%}
+.vbadge{font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;margin-left:4px;white-space:nowrap}
+.vbadge.safe{background:var(--red);color:#fff} .vbadge.late{background:var(--orange-bg);color:var(--orange)}
 /* 종 아이콘 · 알림 패널 */
 .bell{position:relative;width:40px;height:40px;border-radius:50%;border:1px solid var(--line-2);background:var(--card);display:inline-flex;align-items:center;justify-content:center}
 .bell:hover{border-color:var(--ink)}
@@ -409,7 +439,7 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
 .hpc .top{display:flex;align-items:center;gap:8px} .hpc .top b{font-size:15px} .hpc .role{font-size:12px;color:var(--muted)}
 .hpc .pct{margin-left:auto;font-size:26px;font-weight:700}
 .hpc .meta{font-size:12.5px}
-.hpc .wl{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:4px 10px;align-items:center;font-size:12.5px}
+.hpc .wl{display:grid;grid-template-columns:minmax(96px,auto) minmax(0,1fr) auto;gap:4px 10px;align-items:center;font-size:12.5px}
 .side .nc{flex:1;min-height:250px;display:flex;flex-direction:column}
 .side .nc .bd{flex:1;min-height:0;overflow-y:auto}
 .nextcalls .r{grid-template-columns:28px minmax(0,1fr) auto;padding:7px 0}
@@ -445,6 +475,7 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
     <select class="pill-btn" id="downSel" aria-label="정지할 호퍼"></select>
     <button class="pill-btn danger" id="downBtn">호퍼 정지</button>
     <button class="pill-btn" id="urgentBtn">긴급 반입 넣기</button>
+    <button class="pill-btn danger" id="safetyBtn" title="고른 호퍼에서 하차 중인 차에 덤프 반경 작업자 경고를 만든다(시연)">안전 경고</button>
   </div>
   <button class="bell" id="bellBtn" aria-label="알림 패널 열기" aria-expanded="false" aria-controls="panel"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="cnt num" id="bellCnt" hidden></span></button>
 </header>
@@ -466,16 +497,18 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
 </aside>
 
 <aside class="panel" id="panel" hidden aria-label="알림 패널">
-  <div class="ph"><h2>알림</h2><span class="sub cap">무슨 일 → 제안 → 효과</span><span class="sp"></span><button class="pill-btn" id="panelClose">닫기</button></div>
-  <div class="pf" id="panelFilter"><button class="mini dark" data-pf="all">전체</button><button class="mini" data-pf="need">승인 대기</button><button class="mini" data-pf="look">확인 필요</button><span class="sp"></span><span class="cap" id="panelCount"></span></div>
+  <div class="ph"><h2>알림</h2><span class="cap" id="panelClock"></span><span class="sp"></span><button class="pill-btn" id="panelClose">닫기</button></div>
+  <div class="btabs" role="tablist" aria-label="알림 종류"><button role="tab" data-bt="seq" aria-selected="true">순번 <span class="n num" id="btSeq">0</span></button><button role="tab" data-bt="safe" aria-selected="false">안전 <span class="n red num" id="btSafe">0</span></button></div>
+  <div class="stabs" id="stabs" role="tablist" aria-label="순번 알림"><button role="tab" data-st="appr" aria-selected="true">승인 대기 <b class="num" id="stAppr">0</b></button><button role="tab" data-st="chk" aria-selected="false">확인 필요 <b class="num" id="stChk">0</b></button></div>
   <div class="pb" id="panelBody"><div class="empty">아직 알림이 없습니다.</div></div>
-  <div class="pt"><span class="cap">오늘 대기 절감 · 차량별 효과(FIFO였을 때 대기 − 추천 대기)의 합</span><span class="v num" id="panelTotal">₩0</span><span class="cap" id="panelTotalS">—</span>
-    <a href="#alerts" class="cap" id="panelAll" style="margin-top:4px">알림 이력 전체 보기 →</a></div>
+  <div class="pt"><div style="display:flex;align-items:baseline;gap:8px"><span class="cap">오늘 대기 절감</span><span class="v num" id="panelTotal">₩0</span><span class="cap num" id="panelTotalN"></span><span class="sp"></span><a class="mini" href="#analysis" id="panelHow">계산 방법</a></div>
+    <a href="#alerts" class="cap" id="panelAll" style="margin-top:4px">처리한 알림 · 이력 ›</a></div>
 </aside>
 
 <div class="view" id="view-monitor">
 <div class="mon-bar"><h1>원료 하역장 현황</h1><span class="simnote" id="monNote">시뮬레이션 값</span><span class="sp"></span>
   <div class="seg" role="group" aria-label="보기 방식"><button data-mode="simple" aria-pressed="true">간단 보기</button><button data-mode="detail" aria-pressed="false">상세 보기</button></div></div>
+<div class="sstrip" id="sstrip" hidden role="alert"></div>
 <section class="kpis" aria-label="요약">
   <div class="kpi"><span class="k">대기장 대기 차량</span><span class="v num" id="kWait">0<small>대</small></span><span class="s" id="kWaitS">—</span></div>
   <div class="kpi"><span class="k">평균 대기시간 (호출까지)</span><span class="v num" id="kAvg">0<small>분</small></span><span class="s" id="kAvgS">—</span></div>
@@ -486,10 +519,12 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
 <main id="monMain">
   <div class="side" id="sideL" aria-label="호퍼 A · B"></div>
   <section class="card c-map" aria-label="시나리오 좌표 맵">
-    <div class="hd"><h2>① 시나리오 맵</h2><span class="mapsum" id="mapSum"></span><span class="sub">호퍼를 누르면 하역장 상세, 경로를 누르면 거리·시간</span><span class="sp"></span>
+    <div class="hd"><h2>하역장 관제 맵</h2><div class="seg" role="group" aria-label="맵 보기" style="background:var(--soft)"><button data-mv="iso" aria-pressed="false">3D 배치도</button><button data-mv="plan" aria-pressed="true">평면도</button></div><span class="mapsum" id="mapSum"></span><span class="sp"></span>
       <span class="chip" title="배경 지도와 경로 거리는 OpenStreetMap 실제 데이터, 원료야드·계근대·대기장·호퍼 위치는 가정">OSM 실제 지도 · 시설 위치 가정</span></div>
     <div class="bd" id="mapBd">
-      <svg id="mapSvg" role="img" aria-label="소결공장 원료 반입 배치도와 덤프트럭 위치" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="mapnote"><span class="mcam">CAM-01 호퍼 A</span>·<span class="mcam">CAM-02 호퍼 B</span>·<span class="mcam">CAM-03 호퍼 C</span>·<span class="mcam">CAM-04 대기장</span><span class="sp"></span><span>야드를 누르면 상세 · 작업 기록은 운영 분석 → 건별 기록</span></div>
+      <svg id="mapSvg" role="img" aria-label="하역장 평면도와 덤프트럭 위치" preserveAspectRatio="xMidYMid meet"></svg>
+      <svg id="isoSvg" style="display:none" role="img" aria-label="하역장 3D 배치도와 덤프트럭 위치" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="legend">
         <span class="chip ok">원활 &lt;60%</span><span class="chip warn">주의 60~85%</span><span class="chip crit">혼잡 85%+</span>
         <span class="chip"><i style="background:var(--s-yard)"></i>대기장 대기</span><span class="chip"><i style="background:var(--s-moving)"></i>호출 이동</span>
@@ -613,7 +648,7 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
 <!-- 알림 이력 -->
 <div class="view" id="view-alerts" hidden>
   <div class="mon-bar"><h1>알림 이력</h1><span class="simnote" id="alNote">알림 → 제안 → 처리 → 효과를 한 줄로 · 숫자는 시뮬레이션 값</span><span class="sp"></span>
-    <div class="seg" aria-label="종류"><button data-ag="all" aria-pressed="true">전체 <span class="num" id="agAll"></span></button><button data-ag="운영" aria-pressed="false">운영 <span class="num" id="agOps"></span></button><button data-ag="순번 변경" aria-pressed="false">순번 변경 <span class="num" id="agChg"></span></button></div>
+    <div class="seg" aria-label="종류"><button data-ag="all" aria-pressed="true">전체 <span class="num" id="agAll"></span></button><button data-ag="운영" aria-pressed="false">운영 <span class="num" id="agOps"></span></button><button data-ag="순번 변경" aria-pressed="false">순번 변경 <span class="num" id="agChg"></span></button><button data-ag="안전" aria-pressed="false">안전 <span class="num" id="agSafe"></span></button></div>
     <div class="seg" aria-label="기간"><button data-arng="today" aria-pressed="true">오늘</button><button data-arng="week" aria-pressed="false">최근 7일</button></div>
     <a class="pill-btn" id="alCsv" href="/api/export/alerts.csv?range=today" download>CSV 내보내기</a></div>
   <div class="al-grid">
@@ -735,7 +770,7 @@ S.sectors.forEach(s=>{
   for(let i=0;i<s.bays;i++){const x=b[0]+(b[2]-b[0])*(0.5+0.45*(i+0.5)/s.bays);g.appendChild(el('rect',{x:x-20,y:b[1]+46,width:40,height:26,fill:'#141414',opacity:.16,rx:4}));}
   g.appendChild(el('text',{x:b[0]+8,y:b[1]+21,'font-size':18,'font-weight':700,fill:'#141414'},s.name));
   g.appendChild(el('text',{x:b[0]+8,y:b[1]+38,'font-size':12,fill:'#3C4043'},s.cargo.join('·')));
-  const pct=el('text',{x:b[2]-8,y:b[1]+21,'font-size':19,'font-weight':700,'text-anchor':'end',fill:'#141414'},'0%');
+  const pct=el('text',{x:b[2]-8,y:b[3]-8,'font-size':16,'font-weight':800,'text-anchor':'end',fill:'#141414'},'0%');
   g.appendChild(pct);
   g.addEventListener('click',()=>openCam(s.cam_id));
   g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openCam(s.cam_id);}});
@@ -785,7 +820,75 @@ function drawRoutes(st){
     signSub.textContent='이동시간 = 거리 ÷ '+st.road_cfg.speed_limit_kmh+'km/h × 감속 '+st.road_cfg.slow_factor+' · 알약 = 구간 분'; }
   if(legSel) renderLegInfo();
 }
-const vehLayer=el('g',{}); svg.appendChild(vehLayer); svg.appendChild(legInfo);
+const vehLayer=el('g',{}); const ovLayer=el('g',{}); svg.appendChild(vehLayer); svg.appendChild(ovLayer); svg.appendChild(legInfo);
+/* 평면도 덧그림: 야드 이름·상태, 지연 배지, 안전 반경, 이동 말풍선, 대기장 대수 */
+S.sectors.forEach(s=>{ const t=secShape[s.id]; if(t&&t.poly&&t.poly.parentNode){ const nm=t.poly.parentNode.querySelector('text'); if(nm) nm.textContent=s.name+' 야드'; } });
+const yardLbl=[...svg.querySelectorAll('text')].find(t=>t.textContent==='차량 대기장');
+function pill(x,y,txt,fill,col,bold){ const g=el('g',{transform:'translate('+x.toFixed(1)+','+y.toFixed(1)+')'}); const t=el('text',{x:10,y:15,'font-size':14,'font-weight':bold?800:700,fill:col,'font-family':'Inter,Noto Sans KR,sans-serif'},txt);
+  g.appendChild(el('rect',{x:0,y:0,width:txt.length*8.6+20,height:22,rx:11,fill,stroke:'#fff','stroke-width':2})); g.appendChild(t); return g; }
+function drawOverlay(s){
+  ovLayer.innerHTML='';
+  if(yardLbl) yardLbl.textContent='차량 대기장 · '+s.counts.yard+'대';
+  s.sectors.forEach(x=>{ const sc=S.sectors.find(y=>y.id===x.id), b=bbox(sc.poly);
+    secShape[x.id].pct.textContent=x.status==='down'?'정지':LV_TEXT[x.level]+' '+x.congestion_pct+'%';
+    const late=x.working.filter(w=>w.delayed), safe=x.working.filter(w=>w.safety);
+    if(late.length) ovLayer.appendChild(pill(b[2]-4,b[1]-30,'작업 지연 ×'+Math.max(...late.map(w=>w.delay_x||1.3)).toFixed(1),'#FFE9DD','#B8420A'));
+    safe.forEach(w=>{ const cx=b[0]+(b[2]-b[0])*(0.5+0.45*(w.bay+0.5)/x.bays)+26, cy=b[1]+(b[3]-b[1])*0.64;
+      ovLayer.appendChild(el('circle',{cx,cy,r:30,fill:'rgba(215,38,61,.18)',stroke:'#D7263D','stroke-width':2.5,'stroke-dasharray':'5 4'}));
+      const g=el('g',{transform:'translate('+(cx+16)+','+(cy-6)+')'}); g.appendChild(el('circle',{cx:0,cy:-7,r:4.5,fill:'#D7263D'})); g.appendChild(el('path',{d:'M-6 10 L0 -2 L6 10 Z',fill:'#D7263D'})); ovLayer.appendChild(g);
+      ovLayer.appendChild(pill(cx+30,cy+8,'작업자 · 덤프 하차 반경 안','#D7263D','#fff',true)); });
+  });
+  s.vehicles.filter(v=>v.state==='moving'&&v.xy&&v.sector_id).slice(0,4).forEach(v=>{
+    ovLayer.appendChild(pill(v.xy[0]+14,v.xy[1]-34,v.id+' → '+sname(v.sector_id)+(v.bay!=null?' '+(v.bay+1)+'번 하차구':'')+' · '+(v.eta_min||0)+'분','#1D47B8','#fff')); });
+}
+/* 3D 배치도: 같은 좌표를 비스듬한 입체로 (정지 그림이 아니라 실시간) */
+const iso=$('#isoSvg');
+const ISO=(()=>{ const pts=[].concat(...S.sectors.map(s=>s.poly),...S.zones.map(z=>z.poly),S.ore?S.ore.poly:[],...S.roads.map(r=>r.points));
+  const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]), x0=Math.min(...xs)-60, x1=Math.max(...xs)+60, y0=Math.min(...ys)-60, y1=Math.max(...ys)+60;
+  const SH=0.32, VY=0.82, k=Math.min(1480/((x1-x0)+(y1-y0)*SH),700/((y1-y0)*VY));
+  const ox=(1600-((x1-x0)+(y1-y0)*SH)*k)/2, oy=150+(700-(y1-y0)*VY*k)/2; return {x0,y0,x1,y1,k,SH,VY,ox,oy}; })();
+const P3=(x,y,z)=>[ISO.ox+((x-ISO.x0)+(y-ISO.y0)*ISO.SH)*ISO.k, ISO.oy+((y-ISO.y0)*ISO.VY)*ISO.k-(z||0)*ISO.k];
+const pp=a=>a.map(q=>q.map(v=>v.toFixed(1)).join(',')).join(' ');
+function box3(x0,y0,x1,y1,h,top,side,front,stroke){
+  const A=P3(x0,y0,h),B=P3(x1,y0,h),C=P3(x1,y1,h),D=P3(x0,y1,h),E=P3(x1,y1,0),F=P3(x0,y1,0),G=P3(x1,y0,0);
+  return '<polygon points="'+pp([D,C,E,F])+'" fill="'+front+'" stroke="'+(stroke||'#B9BDC2')+'" stroke-width="1"/><polygon points="'+pp([C,B,G,E])+'" fill="'+side+'" stroke="'+(stroke||'#B9BDC2')+'" stroke-width="1"/><polygon points="'+pp([A,B,C,D])+'" fill="'+top+'" stroke="'+(stroke||'#9AA0A6')+'" stroke-width="1.2"/>';
+}
+const LV_TOP={ok:'#CDEBD9',warn:'#FFD9C2',crit:'#F7B9C2',down:'#F7B9C2'}, LV_SIDE={ok:'#A9D6BC',warn:'#F2BA97',crit:'#E7949F',down:'#E7949F'};
+let isoBuilt=false;
+function drawIso(s){
+  iso.setAttribute('viewBox','0 0 1600 900');
+  let g='<rect x="0" y="0" width="1600" height="900" rx="18" fill="#F3F2EE"/>';
+  const gr=[P3(ISO.x0,ISO.y0,0),P3(ISO.x1,ISO.y0,0),P3(ISO.x1,ISO.y1,0),P3(ISO.x0,ISO.y1,0)];
+  g+='<polygon points="'+pp(gr)+'" fill="#E9E7E1" stroke="#DAD7CF"/>';
+  S.roads.forEach(r=>{ const ret=r.to==='ORE'; g+='<polyline points="'+pp(r.points.map(q=>P3(q[0],q[1],0)))+'" fill="none" stroke="'+(ret?'#D2CFC7':'#C3C0B8')+'" stroke-width="'+(ret?7:10)+'" stroke-linejoin="round" stroke-linecap="round"/>'; });
+  const lbl=(x,y,z,t,o)=>{ const q=P3(x,y,z); return '<text x="'+q[0].toFixed(1)+'" y="'+q[1].toFixed(1)+'" font-size="'+((o&&o.fs)||17)+'" font-weight="'+((o&&o.fw)||700)+'" text-anchor="middle" fill="'+((o&&o.fill)||'#141414')+'" stroke="#F3F2EE" stroke-width="4" paint-order="stroke" font-family="Inter,Noto Sans KR,sans-serif">'+esc(t)+'</text>'; };
+  if(S.ore){ const b=bbox(S.ore.poly); g+=box3(b[0],b[1],b[2],b[3],6,'#E5D3C8','#CDB6A8','#D8C2B5'); g+=lbl((b[0]+b[2])/2,b[1],34,'원료야드 (상차)'); }
+  S.zones.forEach(z=>{ const b=bbox(z.poly); g+=box3(b[0],b[1],b[2],b[3],z.id==='YARD'?3:14,'#FFFFFF','#DADCE0','#ECEDEF');
+    g+=lbl((b[0]+b[2])/2,b[1],z.id==='YARD'?30:40,z.id==='YARD'?'차량 대기장 · '+s.counts.yard+'대':z.name); });
+  s.sectors.forEach(x=>{ const sc=S.sectors.find(y=>y.id===x.id), b=bbox(sc.poly), lv=x.status==='down'?'down':x.level;
+    g+='<g class="hop3" data-cam="'+sc.cam_id+'" style="cursor:pointer">'+box3(b[0],b[1],b[2],b[3],10,LV_TOP[lv],LV_SIDE[lv],LV_SIDE[lv],'#3C4043');
+    const bw=(b[2]-b[0])/(x.bays+1.2); for(let i=0;i<x.bays;i++){ const bx=b[0]+(b[2]-b[0])*(0.5+0.45*(i+0.5)/x.bays); g+=box3(bx-14,b[1]+8,bx+14,b[1]+30,26,'#5F6368','#3C4043','#4A4E52','#2B2D2F'); }
+    g+=lbl((b[0]+b[2])/2,b[1],62,x.name+' 야드 · '+(x.status==='down'?'정지':LV_TEXT[x.level]+' '+x.congestion_pct+'%'),{fs:18});
+    g+=lbl((b[0]+b[2])/2,b[3],-4,sc.cargo.join(' · '),{fs:13,fw:600,fill:'#5F6368'});
+    const late=x.working.filter(w=>w.delayed); if(late.length) g+=lbl(b[2],b[1],104,'작업 지연 ×'+Math.max(...late.map(w=>w.delay_x||1.3)).toFixed(1),{fs:14,fill:'#B8420A'});
+    x.working.filter(w=>w.safety).forEach(w=>{ const cx=b[0]+(b[2]-b[0])*(0.5+0.45*(w.bay+0.5)/x.bays)+24, cy=b[1]+(b[3]-b[1])*0.64, c=P3(cx,cy,0);
+      g+='<ellipse cx="'+c[0].toFixed(1)+'" cy="'+c[1].toFixed(1)+'" rx="'+(34*ISO.k)+'" ry="'+(20*ISO.k)+'" fill="rgba(215,38,61,.2)" stroke="#D7263D" stroke-width="2.5" stroke-dasharray="5 4"/>'+lbl(cx+20,cy,30,'작업자 · 덤프 하차 반경 안',{fs:14,fill:'#D7263D'}); });
+    g+='</g>'; });
+  s.vehicles.forEach(v=>{ if(!v.xy) return; const x=v.xy[0], y=v.xy[1], col=STATE_COLOR[v.state]||'#999';
+    g+=box3(x-14,y-7,x+14,y+7,9,col,col,col,v.urgent?'#D7263D':'#FFFFFF');
+    if(v.state==='working'&&v.dump_deg>=15){ const a=P3(x-14,y,9), b2=P3(x+6,y,9); g+='<polygon points="'+pp([a,b2,[b2[0]+4,b2[1]-22],[a[0]-6,a[1]-14]])+'" fill="#7D8287" stroke="#fff" stroke-width="1"/>'; }
+    if(v.state==='moving'&&v.sector_id) g+=lbl(x,y,46,v.id+' → '+sname(v.sector_id)+' · '+(v.eta_min||0)+'분',{fs:13,fill:'#1D47B8'}); });
+  (s.road||[]).forEach(r=>{ const col=ROAD_PHASE[r.phase][1]; g+=box3(r.xy[0]-12,r.xy[1]-6,r.xy[0]+12,r.xy[1]+6,8,col,col,col,'#fff'); });
+  g+='<g transform="translate(46,48)"><circle r="30" fill="#fff" stroke="#D7263D" stroke-width="7"/><text y="9" font-size="25" font-weight="800" text-anchor="middle" fill="#141414">'+cfg.settings.road.speed_limit_kmh+'</text></g><text x="86" y="54" font-size="17" font-weight="700" fill="#141414">구내 제한속도 '+cfg.settings.road.speed_limit_kmh+'km/h</text>';
+  g+='<text x="1580" y="886" font-size="12" text-anchor="end" fill="#5F6368">3D 배치도 · 평면도와 같은 좌표 · 배치: OpenStreetMap 기반 · 호퍼 위치는 가정</text>';
+  iso.innerHTML=g;
+}
+iso.addEventListener('click',e=>{ const h=e.target.closest('[data-cam]'); if(h) openCam(h.dataset.cam); });
+let mapView='plan'; try{ mapView=localStorage.getItem('mapView')||'plan'; }catch(e){}
+function setMapView(m){ mapView=m; try{ localStorage.setItem('mapView',m); }catch(e){}
+  $('#mapSvg').style.display=m==='plan'?'':'none'; $('#isoSvg').style.display=m==='iso'?'':'none';
+  document.querySelectorAll('[data-mv]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mv===m))); if(last) render(last); }
+document.querySelectorAll('[data-mv]').forEach(b=>b.addEventListener('click',()=>setMapView(b.dataset.mv)));
 const vehNodes={};
 const ROAD_PHASE={return:['공차 복귀','#BDC1C6'],loading:['원료야드 상차','#B08A7A'],inbound:['적재 반입','#8C6D4F']};
 function drawVehicles(vs,road){
@@ -972,11 +1075,17 @@ function render(s){
   });
   const openN=s.alerts.filter(a=>!a.ack&&a.kind!=='호출').length;
   $('#navAlert').hidden=!openN; $('#navAlert').textContent=openN;
-  $('#bellCnt').hidden=!s.panel_open; $('#bellCnt').textContent=s.panel_open;
+  const so=s.safety_open||[], bn=(s.panel_open||0)+so.length;
+  $('#bellCnt').hidden=!bn; $('#bellCnt').textContent=bn; $('#bellCnt').style.background=so.length?'var(--red)':'';
+  const ss=$('#sstrip');
+  if(so.length&&view==='monitor'){ const x=so[0];
+    ss.innerHTML='<span class="l3">L3 자동 실행</span><b>'+esc(sname(x.sector_id))+' · '+esc(x.cargo)+' 덤프 하차 반경 진입</b><span>'+esc(x.cam_id)+' · 적재함 올린 '+esc(x.vehicle_id)+' 뒤 '+x.dist_m+'m 안 작업자 1명 · 운전자 하차 중지 요청됨(가상) · '+esc(x.ts)+(x.repeat?' · 다시 감지':'')+(so.length>1?' · 외 '+(so.length-1)+'건':'')+'</span><span class="sp"></span>'+
+      '<button class="w" data-sack="'+esc(x.id)+'">확인</button><button data-sdis="'+esc(x.id)+'">취소 · 오탐지</button>'; ss.hidden=false; }
+  else ss.hidden=true;
   if(view==='dock') renderOrders(s);
   if(view==='cam'){ drawBig(s); return; }
   if(view!=='monitor'){ renderAlerts(); return; }
-  drawVehicles(s.vehicles,s.road); drawRoutes(s);
+  drawVehicles(s.vehicles,s.road); drawRoutes(s); drawOverlay(s); if(mapView==='iso') drawIso(s);
   $('#mapSum').innerHTML='<span class="chip">대기장 <b class="num">'+c.yard+'대</b></span><span class="chip">호출 이동 <b class="num">'+c.moving+'대</b></span><span class="chip">평균 대기 <b class="num">'+k.yard_avg_wait+'분</b></span>';
   $('#monNote').textContent='시뮬레이션 '+hhmm(s.clock)+' · 숫자는 시뮬레이션 값';
   if(monMode==='simple'){ renderSides(s); renderAlerts(); return; }
@@ -998,10 +1107,10 @@ function render(s){
   }).join('');
 
   $('#qCount').textContent=s.queue.length?'('+s.queue.length+')':'';
-  const sname=Object.fromEntries(S.sectors.map(x=>[x.id,x.name]));
+  const snm=Object.fromEntries(S.sectors.map(x=>[x.id,x.name]));
   $('#tab-queue').innerHTML=s.queue.length?'<table><thead><tr><th>순번</th><th>차량</th><th>원료</th><th class="r">투입 기한</th><th class="r">대기</th><th>보낼 호퍼</th><th class="r">호출 예정</th><th>추천 이유</th></tr></thead><tbody>'+
     s.queue.map(q=>'<tr><td><span class="rank">'+q.rank+'</span></td><td><span class="plate">'+esc(q.vehicle_id)+'</span>'+(q.urgent?'<span class="badge">긴급</span>':'')+'</td><td>'+esc(q.cargo)+' '+q.load_t+'t</td><td class="r num">'+esc(q.due)+'</td>'+
-      '<td class="r num">'+Math.floor(q.wait_min)+'분</td><td>'+esc(q.sector_id?sname[q.sector_id]:'보류')+'</td><td class="r num">'+esc(q.call_at||'—')+'</td><td>'+esc(q.reason)+'</td></tr>').join('')+'</tbody></table>'
+      '<td class="r num">'+Math.floor(q.wait_min)+'분</td><td>'+esc(q.sector_id?snm[q.sector_id]:'보류')+'</td><td class="r num">'+esc(q.call_at||'—')+'</td><td>'+esc(q.reason)+'</td></tr>').join('')+'</tbody></table>'
     :'<div class="empty">대기장에서 순번을 기다리는 덤프트럭이 없습니다.</div>';
   renderAlerts();
 }
@@ -1017,10 +1126,10 @@ document.querySelectorAll('.seg [data-mode]').forEach(b=>b.addEventListener('cli
 function sideCard(x){
   const lv=x.status==='down'?'down':x.level, col={ok:'var(--green)',warn:'var(--orange)',crit:'var(--red)',down:'var(--red)'}[lv];
   const pos=p=>Math.min(p,120)/120*100;
-  const work=x.working.map(w=>{ const late=w.elapsed_min>w.std; return '<span class="plate num">'+esc(w.vehicle_id)+'</span><div class="pbar'+(w.delayed?' late':'')+'"><i style="width:'+w.progress_pct+'%"></i></div>'+
+  const work=x.working.map(w=>{ const late=w.elapsed_min>w.std; return '<span class="plate num">'+esc(w.vehicle_id)+(w.safety?'<span class="vbadge safe">안전 경고</span>':w.delayed?'<span class="vbadge late">지연 ×'+(w.delay_x||1.3)+'</span>':'')+'</span><div class="pbar'+(w.delayed?' late':'')+'"><i style="width:'+w.progress_pct+'%"></i></div>'+
     '<span class="num'+(late?' late-t':'')+'">'+(late?'목표 +'+Math.round(w.elapsed_min-w.std)+'분':w.progress_pct+'% · 남은 '+Math.ceil(w.remain_min)+'분')+'</span>'; }).join('');
   return '<div class="hpc'+(x.status==='down'?' down':'')+'" data-cam="'+x.cam_id+'" tabindex="0" role="button" aria-label="'+esc(x.name)+' 하역장 상세">'+
-    '<div class="top"><div><b>'+esc(x.name)+'</b> <span class="role">'+esc(x.cargo.join('·'))+'</span></div><span class="chip '+lv+'">'+LV_TEXT[lv]+'</span><span class="pct num">'+x.congestion_pct+'%</span></div>'+
+    '<div class="top"><div><b>'+esc(x.name)+'</b> <span class="role">'+esc(x.cargo.join(' · '))+' · '+esc(x.cam_id)+'</span></div><span class="chip '+lv+'">'+LV_TEXT[lv]+'</span><span class="pct num">'+x.congestion_pct+'%</span></div>'+
     '<div class="ruler" title="혼잡도 '+x.congestion_pct+'% · 주의 '+x.warn_pct+' · 혼잡 '+x.crit_pct+'"><i style="width:'+pos(x.congestion_pct)+'%;background:'+col+'"></i><b style="left:'+pos(x.warn_pct)+'%"></b><b style="left:'+pos(x.crit_pct)+'%"></b></div>'+
     '<div class="meta"><span>하차구 <b class="num">'+x.working.length+'/'+x.bays+'</b></span><span>배정 대기 <b class="num">'+x.assigned+'</b></span><span>오늘 처리 <b class="num">'+x.done+'</b></span><span>대기장→ <b class="num">'+x.travel_min+'분</b></span></div>'+
     (x.status==='down'?'<div class="hold">호퍼 정지 · 배정 차량은 다른 호퍼로</div>':'')+
@@ -1040,48 +1149,75 @@ function renderSides(s){
   $(id).addEventListener('keydown',e=>{const h=e.target.closest('[data-cam]'); if(h&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openCam(h.dataset.cam);}});
 });
 
-/* ---------- 알림 패널 (종 아이콘) ---------- */
-let panelOpen=false, panelFilter='all', panelData=null;
-const PST={'승인 대기':'need','확인 필요':'look','실행됨':'done','확인함':'wait'};
+/* ---------- 알림 패널 (시안 v4: [순번 | 안전] · 순번 › [승인 대기 | 확인 필요]) ---------- */
+let panelOpen=false, bigTab='seq', subTab='appr', panelData=null, openGroups=new Set();
 function togglePanel(on){
   panelOpen=on==null?!panelOpen:on; $('#panel').hidden=!panelOpen; $('#bellBtn').setAttribute('aria-expanded',String(panelOpen));
-  if(panelOpen) loadPanel(); else $('#bellBtn').focus();
+  if(panelOpen){ if(typeof togglePv==='function'&&pvOpen) togglePv(false); loadPanel(); } else $('#bellBtn').focus();
 }
 $('#bellBtn').addEventListener('click',()=>togglePanel());
 $('#panelClose').addEventListener('click',()=>togglePanel(false));
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&panelOpen) togglePanel(false); });
-$('#panelAll').addEventListener('click',()=>togglePanel(false));
-$('#panelFilter').addEventListener('click',e=>{ const b=e.target.closest('[data-pf]'); if(!b) return; panelFilter=b.dataset.pf;
-  document.querySelectorAll('#panelFilter [data-pf]').forEach(x=>x.classList.toggle('dark',x===b)); if(panelData) renderPanel(panelData); });
-async function loadPanel(){ try{ renderPanel(await getJ('/api/panel')); }catch(e){} }
+['#panelAll','#panelHow'].forEach(id=>$(id).addEventListener('click',()=>togglePanel(false)));
+document.querySelectorAll('[data-bt]').forEach(b=>b.addEventListener('click',()=>{ bigTab=b.dataset.bt; if(panelData) renderPanel(panelData); }));
+document.querySelectorAll('[data-st]').forEach(b=>b.addEventListener('click',()=>{ subTab=b.dataset.st; if(panelData) renderPanel(panelData); }));
+async function loadPanel(){ try{ renderPanel(await getJ('/api/panel2')); }catch(e){} }
 setInterval(()=>{ if(panelOpen) loadPanel(); },1000);
-function effTxt(e){
-  if(!e) return '<span class="cap">관련 차량이 하차를 시작하면 계산돼요</span>';
-  const m=e.min, cls=m<-0.05?'good':m>0.05?'bad':'';
-  return '<span class="eff '+cls+'">'+(Math.abs(m)<0.05?'0분':sgn(m,'분'))+' · '+(m>0.05?'+':'')+won(Math.abs(e.won))+(m<-0.05?' 절감':m>0.05?' 늘어남':'')+'</span>'+
-    ' <span class="cap">FIFO '+(e.fifo_lower?'≥':'')+e.fifo+'분 → 추천 '+e.rec+'분'+(e.n>1?' · '+e.n+'대':'')+(e.confirmed?' · 확정':' · 예상')+'</span>';
-}
+const chip=(m,ok)=>m==null||Math.abs(m)<0.05?'':'<span class="echip'+(m>0?' bad':'')+'" title="'+(ok?'확정':'예상')+' · FIFO 대비">'+sgn(m,'분')+'</span>';
 function renderPanel(d){
-  panelData=d;
-  const cards=d.cards.filter(c=>panelFilter==='all'||PST[c.status]===panelFilter);
-  $('#panelCount').textContent='전체 '+d.counts.all+' · 처리할 것 '+d.counts.open;
-  $('#panelBody').innerHTML=cards.length?cards.map(c=>'<div class="acard '+c.level+(c.status==='확인함'?' done':'')+'">'+
-    '<div class="top"><span class="lvl '+c.level+'">'+esc(c.kind)+'</span>'+(c.ranks&&c.ranks.length?'<span class="cap">순번 '+c.ranks.join('·')+'</span>':'')+'<span class="st '+(PST[c.status]||'wait')+'">'+esc(c.status)+'</span><span class="t num">'+esc(c.ts)+'</span></div>'+
-    '<div class="ln"><span>무슨 일</span><span>'+esc(c.text)+'</span></div>'+
-    '<div class="ln"><span>→ 제안</span><span>'+esc(c.action)+'</span></div>'+
-    '<div class="ln"><span>→ 효과</span><span>'+effTxt(c.effect)+'</span></div>'+
-    (c.status==='확인함'?'':'<div class="btns">'+(c.approve_vid?'<button class="mini dark" data-papprove="'+esc(c.approve_vid)+'">'+esc(c.approve_vid)+' 승인</button>':'')+'<button class="mini" data-pack="'+esc(c.id)+'">확인</button></div>')+
-    '</div>').join(''):'<div class="empty">'+(d.cards.length?'이 조건의 알림이 없습니다.':'아직 알림이 없습니다. 시작을 누르면 덤프트럭이 들어옵니다.')+'</div>';
-  const t=d.total;
-  $('#panelTotal').textContent=won(Math.max(0,-t.won))+(t.won>0?' (늘어남 '+won(t.won)+')':'');
-  $('#panelTotalS').textContent=t.vehicles?('하차를 시작한 '+t.vehicles+'대 · 줄어든 '+t.saved_min+'분 − 늘어난 '+t.added_min+'분 = '+sgn(t.min,'분')+' × ₩'+t.won_per_min+'/분 (가정 단가)'):'아직 두 방식 모두 하차를 시작한 차량이 없습니다';
+  panelData=d; const c=d.counts;
+  $('#panelClock').textContent='시뮬레이션 '+d.clock;
+  $('#btSeq').textContent=c.seq; $('#btSafe').textContent=c.safety; $('#stAppr').textContent=c.approvals; $('#stChk').textContent=c.checks;
+  document.querySelectorAll('[data-bt]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.bt===bigTab)));
+  document.querySelectorAll('[data-st]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.st===subTab)));
+  $('#stabs').hidden=bigTab!=='seq';
+  let h='';
+  if(bigTab==='seq'){
+    if(c.safety){ const x=d.safety_open[0]; h+='<button class="pstrip" data-gosafe>⚠ 안전 경고 '+c.safety+'건 미확인 · '+esc(d.sector_names[x.sector_id])+' 덤프 반경 안 작업자 <span class="sp"></span>안전 탭에서 보기 ›</button>'; }
+    if(subTab==='appr'){
+      h+=d.approvals.length?d.approvals.map(a=>'<div class="pcard"><div class="l1"><span class="tt"><b class="plate">'+esc(a.vehicle_id)+'</b>'+(a.urgent?'<span class="badge">긴급</span>':'')+' → '+esc(a.name)+(a.bay?' '+a.bay+'번 하차구':'')+' '+(a.overdue?'지금 호출':'우선 호출')+'</span>'+chip(a.effect,a.effect_confirmed)+'</div>'+
+        '<div class="l2"><span class="why">'+esc(a.why)+' · 이동 '+a.travel+'분 · '+esc(a.call_at||'—')+'</span><button class="mini" data-pchg="'+esc(a.vehicle_id)+'">변경</button><button class="mini dark" data-pok="'+esc(a.vehicle_id)+'">승인</button></div></div>').join('')
+        :'<div class="empty">승인을 기다리는 순번이 없습니다.</div>';
+      h+='<p class="pnote">시스템이 순번·호출을 바꾸려는 제안이에요 · '+(d.auto_approve?'지금은 자동 승인이 켜져 있어 호출 시각이 되면 자동으로 가요':'승인해야 운전자에게 호출이 가요')+'</p>';
+    } else {
+      h+=d.checks.length?d.checks.map(g=>{ const k=g.sector_id+'|'+g.kind, op=openGroups.has(k); return '<div class="pcard"><div class="l1"><span class="tt"><b>'+esc(g.title)+'</b></span>'+(g.n>1?'<button class="mini" data-gx="'+esc(k)+'">'+(op?'접기':'펼치기')+'</button>':'')+'</div>'+
+        '<div class="l2"><span class="why">'+esc(g.suggest)+' · '+esc(g.ts)+'</span><button class="mini dark" data-gack="'+esc(g.ids.join(','))+'">확인</button></div>'+
+        (op||g.n===1?'<div class="items">'+g.items.map(x=>'<span>'+esc(x.ts)+' · '+esc(x.text)+(x.effect!=null?' '+chip(x.effect,true):'')+'</span>').join('')+'</div>':'')+'</div>'; }).join('')
+        :'<div class="empty">현장 점검을 기다리는 알림이 없습니다.</div>';
+      h+='<p class="pnote">현장 점검 요청이에요 · 같은 호퍼·같은 종류는 한 카드로 묶어요 · 확인하면 알림 이력으로 가요</p>';
+    }
+  } else {
+    h+='<div class="psec">지금 확인할 것 <span class="badge">'+d.safety_open.length+'</span></div>';
+    h+=d.safety_open.length?d.safety_open.map(x=>'<div class="pcard safe"><div class="l1"><span class="tt"><b>'+esc(d.sector_names[x.sector_id])+' · '+esc(x.cargo)+' 덤프 반경 안 작업자</b> <span class="cap" style="color:var(--red)">미확인'+(x.repeat?' · 위험 계속 감지 중':'')+'</span></span></div>'+
+      '<div class="l2"><span class="why">'+esc(x.cam_id)+' · '+esc(x.vehicle_id)+' 적재함 상승 중 · '+x.dist_m+'m · L3 자동 실행 (앱 경고 · 하차 중지 요청, 가상) · '+esc(x.ts)+'</span><button class="mini" data-sdis="'+esc(x.id)+'">오탐지</button><button class="mini dark" data-sack="'+esc(x.id)+'">확인</button></div></div>').join('')
+      :'<div class="empty">지금 확인할 안전 경고가 없습니다.</div>';
+    h+='<p class="pnote">확인해도 같은 위험이 계속 감지되면 다시 위로 올라와요 · 안전 경고는 금액으로 계산하지 않아요 · 반경 '+((d.safety_open[0]||{}).radius_m||5)+'m는 가정값(확인 필요)</p>';
+    h+='<div class="psec">오늘 확인한 것 <span class="cap">'+d.safety_done.length+'</span></div>';
+    h+=d.safety_done.length?d.safety_done.map(x=>'<div class="pcard"><div class="l1"><span class="tt">'+esc(d.sector_names[x.sector_id])+' · 덤프 반경 안 작업자 <b>'+({ack:'확인됨 · 해제',dismissed:'오탐지',auto:'자동 해제 · 미확인'}[x.status])+'</b></span></div>'+
+      '<div class="l2"><span class="why">'+esc(x.cam_id)+' · '+esc(x.ts)+' · 하차 중지 요청'+(x.ack_sec!=null?' · 확인까지 '+x.ack_sec+'초':'')+'</span></div></div>').join('')
+      :'<div class="empty">오늘 확인한 안전 경고가 없습니다.</div>';
+  }
+  $('#panelBody').innerHTML=h;
+  const t=d.total; $('#panelTotal').textContent=won(Math.max(0,-t.won)); $('#panelTotalN').textContent='· '+t.vehicles+'대';
 }
 $('#panelBody').addEventListener('click',async e=>{
-  const a=e.target.closest('[data-papprove]'), k=e.target.closest('[data-pack]');
-  try{ if(a) await postJ('/api/order/approve?vehicle_id='+encodeURIComponent(a.dataset.papprove));
-       else if(k) await postJ('/api/alerts/'+encodeURIComponent(k.dataset.pack)+'/ack'); }catch(err){}
+  const ok=e.target.closest('[data-pok]'), ch=e.target.closest('[data-pchg]'), ga=e.target.closest('[data-gack]'), gx=e.target.closest('[data-gx]'),
+        sa=e.target.closest('[data-sack]'), sd=e.target.closest('[data-sdis]'), gs=e.target.closest('[data-gosafe]');
+  try{
+    if(ok) await postJ('/api/order/approve?vehicle_id='+encodeURIComponent(ok.dataset.pok));
+    else if(ch){ togglePanel(false); location.hash='#dock'; return; }
+    else if(ga){ for(const id of ga.dataset.gack.split(',')) await postJ('/api/alerts/'+encodeURIComponent(id)+'/ack'); }
+    else if(gx){ const k=gx.dataset.gx; openGroups.has(k)?openGroups.delete(k):openGroups.add(k); renderPanel(panelData); return; }
+    else if(sa) await postJ('/api/safety/'+encodeURIComponent(sa.dataset.sack)+'/ack');
+    else if(sd) await postJ('/api/safety/'+encodeURIComponent(sd.dataset.sdis)+'/dismiss');
+    else if(gs){ bigTab='safe'; renderPanel(panelData); return; }
+  }catch(err){}
   loadPanel(); refresh();
 });
+$('#sstrip').addEventListener('click',async e=>{ const sa=e.target.closest('[data-sack]'), sd=e.target.closest('[data-sdis]');
+  try{ if(sa) await postJ('/api/safety/'+encodeURIComponent(sa.dataset.sack)+'/ack'); else if(sd) await postJ('/api/safety/'+encodeURIComponent(sd.dataset.sdis)+'/dismiss'); }catch(err){}
+  refresh(); if(panelOpen) loadPanel(); });
+$('#safetyBtn').addEventListener('click',async()=>{ try{ await postJ('/api/events/safety?sector_id='+encodeURIComponent($('#downSel').value)); }catch(e){ alert('그 호퍼에서 하차 중인 차량이 없어요. 다른 호퍼를 고르거나 잠시 뒤에 눌러 보세요.'); } refresh(); });
 
 function renderAlerts(){
   if(!last) return;
@@ -1569,7 +1705,7 @@ const HCLS={'실행':'done','변경 저장':'chg','승인 대기':'need','무시
 const effS=(e,note)=>e?'<b class="num '+(e.min<-0.05?'good':e.min>0.05?'bad':'')+'">'+(Math.abs(e.min)<0.05?'0분':sgn(e.min,'분'))+'</b><div class="cap num">'+(e.won>0?'+':'')+won(Math.abs(e.won))+(note?' · '+note:'')+'</div>':null;
 function renderAlertHistory(d){
   const all=d.rows, ops=all.filter(r=>r.group==='운영'), chg=all.filter(r=>r.group==='순번 변경');
-  $('#agAll').textContent=all.length; $('#agOps').textContent=ops.length; $('#agChg').textContent=chg.length;
+  $('#agAll').textContent=all.length; $('#agOps').textContent=ops.length; $('#agChg').textContent=chg.length; $('#agSafe').textContent=all.filter(r=>r.group==='안전').length;
   const rows=alGroup==='all'?all:all.filter(r=>r.group===alGroup), wk=d.range==='week';
   $('#alTable').innerHTML=rows.length?'<table><thead><tr><th>시각</th><th>알림</th><th>무슨 일</th><th>제안</th><th>처리</th><th class="r">예상 효과</th><th class="r">실제 효과</th><th></th></tr></thead><tbody>'+
     rows.slice(0,400).map(r=>'<tr class="'+(r.ack||r.group!=='운영'?'':'unacked')+'"><td class="num">'+(wk?'<span class="cap">'+esc(r.date.split(' ')[0])+'</span> ':'')+esc(r.ts)+'</td><td><span class="lvl '+r.level+'">'+esc(r.kind)+'</span></td><td>'+esc(r.text)+'</td><td class="cap">'+esc(r.suggest)+'</td>'+
@@ -1603,7 +1739,7 @@ function connect(){
   ws.onmessage=e=>render(JSON.parse(e.data));
   ws.onclose=()=>{ $('#conn').classList.remove('on'); $('#conn').title='재연결 중'; if(!poll) poll=setInterval(refresh,1000); setTimeout(connect,2000); };
 }
-setMonMode(monMode); route(); refresh(); connect();
+setMonMode(monMode); setMapView(mapView); route(); refresh(); connect();
 })();
 </script>
 </body>

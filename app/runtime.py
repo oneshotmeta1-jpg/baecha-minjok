@@ -98,12 +98,16 @@ class Runtime:
         self.auto_approve = True # 자동 승인 스위치 (끄면 현장 담당자가 승인해야 호출 — L2)
         self.ignored_alerts = set()   # 담당자가 [무시]한 알림
         self.requested = {}           # 현장 담당자에게 승인 요청을 보낸 반입 → 요청 시각
+        self.safety_wall = {}         # 안전 경고 id → 발생 실제 시각 (확인까지 걸린 초)
+        self.safety_acks = {}         # 안전 경고 id → {how, ack_sec} (재계산 때 유지)
         self.week_cache = None
         self.store.clear()
         self._new_sims()
 
     def _on_event(self, ev):
         self.store.event(ev)
+        if ev["type"] == "SAFETY_ALERT":
+            self.safety_wall.setdefault(ev["payload"]["id"], self.clock())
         if ev["type"] == "ALERT":
             a = ev["payload"]["id"]
             self.alert_wall.setdefault(a, self.clock())
@@ -147,6 +151,10 @@ class Runtime:
             self.rec.approved.add(a["key"])
         elif k == "auto":
             self.rec.require_approval = not a["on"]
+        elif k == "safety_force":
+            self.rec.force_safety(a["sector_id"]); self.fifo.force_safety(a["sector_id"])
+        elif k == "safety":
+            self.rec.safety_resolve(a["id"], a["how"], self.safety_acks.get(a["id"], {}).get("ack_sec"))
         self.rec.replan(); self.fifo.replan()
 
     def step(self):
@@ -256,6 +264,24 @@ class Runtime:
         self._record("approve", key=key)          # 승인이 호출을 풀어 주므로 재계산 때도 같은 시각에 다시 넣는다
         self._ui("ORDER_APPROVED", vid, p["sector_id"], {"rank": p["rank"], "reason": p["reason"]})
         return True
+
+    # ---------- 안전 경고 ----------
+    def force_safety(self, sid):
+        n0 = len(self.rec.safety)
+        self._record("safety_force", sector_id=sid)
+        return self.rec.safety[-1] if len(self.rec.safety) > n0 else None
+
+    def safety_resolve(self, sid_, how):
+        """[확인] 또는 [오탐지]. 하차 중지가 풀리고, 확인까지 걸린 실제 초를 남긴다."""
+        x = next((x for x in self.rec.safety if x["id"] == sid_), None)
+        if not x or x["status"] != "open" or how not in ("ack", "dismiss"):
+            return None
+        wall = self.safety_wall.get(sid_)
+        self.safety_acks[sid_] = {"how": how, "ack_sec": round(self.clock() - wall, 1) if wall is not None else None}
+        self._record("safety", id=sid_, how=how)
+        self._ui("SAFETY_ACK" if how == "ack" else "SAFETY_DISMISS", x["vehicle_id"], x["sector_id"],
+                 {"id": sid_, "ack_sec": self.safety_acks[sid_]["ack_sec"], "repeat": x["repeat"]})
+        return x
 
     def request_approval(self):
         """[현장 담당자에게 승인 요청]: 아직 승인 안 된 순번을 현장 담당자 앱으로 보낸다(가상)."""
@@ -576,6 +602,64 @@ class Runtime:
                 break
         return out
 
+    CHECK_KINDS = ("하차 지연", "혼잡", "호퍼 이상")
+
+    def panel2(self):
+        """알림 패널(시안 v4): [순번 | 안전] · 순번 › [승인 대기 | 확인 필요]."""
+        sim, eff = self.rec, self.effects()
+        hh = sim.hhmm
+        # 확인 필요: 현장 점검 요청 — 같은 호퍼·같은 종류는 한 카드로
+        groups = {}
+        for a in sim.alerts_all:
+            if a["kind"] not in self.CHECK_KINDS or a["ack"] or a["id"] in self.ignored_alerts or a["level"] == "info":
+                continue
+            g = groups.setdefault((a["sector_id"], a["kind"]), {"sector_id": a["sector_id"], "kind": a["kind"], "items": []})
+            es = [eff[k] for k in a.get("related", []) if k in eff]
+            g["items"].append({"id": a["id"], "ts": a["ts"], "t": a["t"], "text": a["text"], "vehicle_id": a["vehicle_id"],
+                               "suggest": a["action"], "effect": round(sum(e["effect"] for e in es), 1) if es and all(e["confirmed"] for e in es) else None})
+        checks = []
+        for g in groups.values():
+            g["items"].sort(key=lambda x: -x["t"])
+            name = sim.sec_cfg[g["sector_id"]]["name"] if g["sector_id"] in sim.sec_cfg else ""
+            n = len(g["items"])
+            g.update(name=name, n=n, ts=g["items"][0]["ts"], t=g["items"][0]["t"], suggest=g["items"][0]["suggest"],
+                     title=f"{name} {g['kind']}" + (f" {n}건" if n > 1 else ""), ids=[x["id"] for x in g["items"]])
+            checks.append(g)
+        checks.sort(key=lambda g: -g["t"])
+        # 승인 대기: 순번·호출을 바꾸는 제안 (승인해야 운전자에게 호출이 감)
+        cause = {}
+        for g in checks:
+            for a in sim.alerts_all:
+                if a["id"] in g["ids"]:
+                    for k in a.get("related", []):
+                        cause[k] = f"{g['title']} 때문 (확인 필요 탭)"
+        waitover = {k: a for a in sim.alerts_all if a["kind"] == "대기 초과" for k in a.get("related", [])}
+        sched = self.schedule()
+        bay = {g["vehicle_id"]: r["bay"] for r in sched["rows"] for g in r["segs"]}
+        appr = []
+        for p in sim.plan:
+            if not p["sector_id"] or p["vehicle_id"] in sim.overrides:
+                continue
+            v = sim.vehicles[p["vehicle_id"]]
+            k = sim.key(v)
+            if k in self.approved:
+                continue
+            e = eff.get(k)
+            why = cause.get(k) or (f"대기 {int(sim.t - v['yard_t'])}분 (목표 {self.assumptions['target_wait_min']:g}분)" if k in waitover
+                                   else p["reason"].split(" · ")[0])
+            appr.append({"vehicle_id": v["id"], "rank": p["rank"], "sector_id": p["sector_id"], "name": sim.sec_cfg[p["sector_id"]]["name"],
+                         "bay": bay.get(v["id"]), "call_at": hh(p["call_t"]) if p["call_t"] is not None else None,
+                         "travel": round(sim.travel("YARD", p["sector_id"]), 1), "why": why, "urgent": v["urgent"],
+                         "effect": e["effect"] if e else None, "effect_confirmed": bool(e and e["confirmed"]),
+                         "overdue": k in sim.pending, "wait": round(sim.t - v["yard_t"], 1)})
+        safe_open = [x for x in sim.safety if x["status"] == "open"]
+        safe_done = [dict(x, ack_sec=self.safety_acks.get(x["id"], {}).get("ack_sec", x["ack_sec"])) for x in sim.safety if x["status"] != "open"]
+        n_checks = sum(g["n"] for g in checks)
+        return {"approvals": appr, "checks": checks, "safety_open": safe_open, "safety_done": list(reversed(safe_done)),
+                "counts": {"approvals": len(appr), "checks": n_checks, "seq": len(appr) + n_checks, "safety": len(safe_open)},
+                "auto_approve": self.auto_approve, "total": self.effect_total(eff), "clock": hh(sim.t),
+                "sector_names": {sid: sc["name"] for sid, sc in sim.sec_cfg.items()}}
+
     def panel(self):
         eff = self.effects()
         cards = self.alert_cards(eff=eff)
@@ -819,6 +903,15 @@ class Runtime:
                          "actual": {"min": e["effect"], "won": int(round(e["effect"] * self.won_per_min()))} if e and e["confirmed"] else None,
                          "has_vehicles": True, "sector_id": c["to"], "vehicle_id": c["vehicle_id"], "group": "순번 변경", "ack": True,
                          "actual_note": "FIFO 대비"})
+        for x in self.rec.safety:                        # 안전 경고도 한 줄로 (금액 계산 안 함)
+            how = {"open": "미확인", "ack": "확인", "dismissed": "오탐지", "auto": "자동 해제 · 미확인"}[x["status"]]
+            ack = self.safety_acks.get(x["id"], {}).get("ack_sec")
+            rows.append({"id": x["id"], "ts": x["ts"][:5], "t": x["t"], "level": "crit", "kind": "안전",
+                         "text": f"{self.rec.sec_cfg[x['sector_id']]['name']} · {x['cargo']} 덤프 반경 안 작업자 ({x['dist_m']}m) · {x['vehicle_id']}"
+                                 + (" · 다시 감지" if x["repeat"] else ""),
+                         "suggest": "L3 자동 실행: 앱 경고 · 하차 중지 요청 (가상)", "handling": how + (f" · {ack}초" if ack is not None else ""),
+                         "expected": None, "actual": None, "has_vehicles": False, "sector_id": x["sector_id"], "vehicle_id": x["vehicle_id"],
+                         "group": "안전", "ack": x["status"] != "open", "actual_note": "금액 없음"})
         rows.sort(key=lambda r: -r["t"])
         return rows
 
@@ -1041,6 +1134,12 @@ class Runtime:
                 r.sector_up(a["sector_id"])
             elif a["kind"] == "urgent":
                 r.add_urgent()
+            elif a["kind"] == "safety":
+                x = r.force_safety(a["sector_id"])
+                if x:                                    # 시연: 관제 담당자가 40초 뒤 확인했다고 가정
+                    r.advance(0.75)
+                    r.safety_wall[x["id"]] = r.clock() - 40
+                    r.safety_resolve(x["id"], "ack")
         r.advance(r.rec.fc["shift_min"] + 30 - r.rec.t)
         day = r._day_summary(r, demo["label"])
         day["demo"] = demo

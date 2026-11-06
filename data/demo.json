@@ -4,6 +4,12 @@
  "seed": 7,
  "actions": [
   {
+   "t": 30,
+   "kind": "safety",
+   "sector_id": "A",
+   "say": "08:30 호퍼 A 덤프 반경 안 작업자 → L3 자동 실행(하차 중지 요청)"
+  },
+  {
    "t": 40,
    "kind": "down",
    "sector_id": "A",

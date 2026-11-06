@@ -79,6 +79,9 @@
 | `CALL_ACK` | 기사 모바일 화면 | 기사가 ‘출발’을 누름 |
 | `CRANE_START` / `CRANE_DONE` | 설비 신호(가정) 또는 담당자 화면 버튼 | 크레인 상하역 시작·완료 (DONE이면 진척도 100% 확정) |
 | `SECTOR_DOWN` / `SECTOR_UP` | 돌발 이벤트 버튼 | 섹터 정지·복구 → 재배정 |
+| `SAFETY_ALERT` | 영상(합성) · 시뮬레이터 | 안전 경고: 적재함 상승 중 덤프 반경(가정 5m, rois.json REAR 구역) 안 작업자 → L3 자동 실행(기사 앱 경고 · 하차 중지 요청, 가상). 하차 진행이 멈춤 (payload: id, level=L3, rule, dist_m, bay, dump_deg, repeat, action, stand_in) |
+| `SAFETY_ACK` | 맵 위 안전 띠 · 알림 패널 안전 탭 | 관제 담당자가 안전 경고 확인 → 하차 재개 (payload: id, ack_sec = 뜬 뒤 확인까지 실제 초, repeat). 같은 위험이 계속 감지되면 SAFETY_ALERT(repeat=1)가 다시 온다 |
+| `SAFETY_DISMISS` | 맵 위 안전 띠 · 알림 패널 안전 탭 | 오탐지로 해제 → 하차 재개 (payload: id, ack_sec, repeat) |
 | `ALERT` | 배정 엔진 | 알림 발생 (payload: level, kind, text, action, related = 제안이 영향을 주는 반입 "차량#회차" 목록) |
 | `ORDER_APPROVED` | 통합하역작업 탭 | 담당자가 추천 순번 승인 (payload: rank, reason) |
 | `ORDER_CHANGED` | 통합하역작업 탭 | 담당자가 보낼 호퍼 변경 (payload: from, to, reason, memo, delta_min, cost_won) |
@@ -168,9 +171,19 @@ R2에서 팀이 제안한 `order_approved` 등 소문자 이름은 기존 형식
 - 바꿔보기의 예측 하차시간은 `pred_override`로 고정할 수 있고, 설정 ①에서 [자동으로]를 누르면 풀린다.
 - 시연 시나리오: data/demo.json (시드 7, 08:40 호퍼 A 정지 → 08:55 긴급 반입 → 09:15 복구)을 하루 끝까지 돌린 고정 결과. `GET /api/analysis2?range=demo`.
 
-### 다음 라운드 예정 (아직 내지 않음)
+### 안전 경고 (R8)
 
-- 안전 경고: 적재함 상승 중 덤프 반경 5m 안 사람 → 이름은 SAFETY_ALERT 로 예정 (payload: sector_id, bay, distance_m, action = 앱 경고·하차 중지 요청). 표에 올리는 것은 시뮬레이터나 영상이 실제로 낼 때.
+- 반입마다 시드로 한 번 정한다: 적재함이 올라가 있는 시간 × `sectors.json` safety.per_raised_hour(가정 0.6회/시간). 같은 시드·같은 반입이면 같은 결과.
+- 열려 있는 동안 그 차의 하차 시간은 멈춘다(지연 배수에 안전 중지 시간이 들어가지 않음). 아무도 확인하지 않으면 6분 뒤 "자동 해제 · 미확인"으로 남는다.
+- 확인 뒤에도 30% 확률(가정)로 3분 뒤 같은 위험이 다시 감지된다(repeat=1). 오탐지는 다시 오지 않는다.
+- 안전 경고는 금액으로 계산하지 않는다. 시연 시나리오(data/demo.json)는 08:30 호퍼 A에 1건을 넣는다. 화면 상단 [안전 경고] 버튼으로도 만든다(`POST /api/events/safety?sector_id=`).
+- `GET /api/panel2`: 알림 패널 [순번 | 안전] — approvals(승인 대기) · checks(확인 필요, 같은 호퍼·종류 묶음) · safety_open · safety_done. `POST /api/safety/{id}/ack` · `/dismiss`.
+
+```json
+{"ts": "2026-11-09T08:30:00", "type": "SAFETY_ALERT", "source": "sim", "cam_id": "CAM-01", "sector_id": "A", "zone": "rear",
+ "track_id": 7, "vehicle_id": "82아 2341", "payload": {"id": "SA-1", "level": "L3", "rule": "덤프 반경 5m", "dist_m": 3.0, "bay": 1,
+ "dump_deg": 50, "repeat": 0, "action": "앱 경고 · 하차 중지 요청 (가상)", "stand_in": "cam"}}
+```
 
 ## 차량 상태
 

@@ -298,7 +298,13 @@ check("자동 승인 다시 켜면 밀린 호출이 풀림", not ra.rec.pending)
 ra.ignore_alert(next(a["id"] for a in ra.rec.alerts_all if a["kind"] != "호출"))
 ra.advance(0.25)
 ra.request_approval()
-types_r4 = {e["type"] for e in ra.rec.events}
+rx_ = Runtime(7)                                     # 안전 경고 확인 · 오탐지도 이벤트 표에
+rx_.advance(60)
+for sid_ in "ABC":
+    x_ = rx_.force_safety(sid_)
+    if x_:
+        rx_.safety_resolve(x_["id"], "ack" if not any(e["type"] == "SAFETY_ACK" for e in rx_.rec.events) else "dismiss")
+types_r4 = {e["type"] for e in ra.rec.events} | {e["type"] for e in rx_.rec.events}
 check("CALL_PENDING · APPROVAL_MODE 이벤트가 나옴", {"CALL_PENDING", "APPROVAL_MODE"} <= types_r4)
 check("이벤트 종류가 events.md 표와 일대일 (시뮬레이션 + 담당자 행동 + 승인 흐름)", (seen | types_after | types_r4) == types,
       f"문서에만: {sorted(types - seen - types_after - types_r4)} · 코드에만: {sorted((seen | types_after | types_r4) - types)}")
@@ -411,6 +417,39 @@ check("예측값이 바뀌면 변경 이력에 '자동 계산'", any(h["by"] == 
 demos = [Runtime(7).analysis_range("demo")["total"] for _ in range(3)]
 check("시연 시나리오: 3번 눌러도 같은 숫자", demos[0] == demos[1] == demos[2] and demos[0]["vehicles"] > 50,
       f"₩{demos[0]['won']:,} · {demos[0]['effect_min']}분 · {demos[0]['vehicles']}대")
+
+# ---------- R8: 안전 경고 (덤프 반경 작업자 · L3 자동 실행) ----------
+r8 = Runtime(7)
+r8.advance(240)
+nat = r8.rec.safety
+check("안전 경고가 하루에 드물게 생김 (시드 고정, 아무도 안 보면 자동 해제)", 1 <= len(nat) <= 12 and all(x["status"] == "auto" for x in nat),
+      f"{len(nat)}건 · " + " ".join(x["ts"][:5] for x in nat))
+r8b = Runtime(7); r8b.advance(240)
+check("같은 시드 → 같은 시각에 같은 안전 경고", [(x["ts"], x["vehicle_id"]) for x in r8b.rec.safety] == [(x["ts"], x["vehicle_id"]) for x in nat])
+r9 = Runtime(7); r9.advance(60)
+xs = None
+for sid_ in "ABC":
+    xs = r9.force_safety(sid_)
+    if xs:
+        break
+v9 = r9.rec.vehicles[xs["vehicle_id"]]
+r9.advance(0.5); e1 = v9["work_elapsed"]; r9.advance(2)
+check("안전 경고 중에는 하차가 멈춤 (지연 배수에 안 들어감)", v9["work_elapsed"] == e1 and r9.rec.safety_open_for(v9))
+p9 = r9.panel2()
+check("알림 패널: 안전 탭 건수 · 순번 탭(승인 대기 + 확인 필요)", p9["counts"]["safety"] == 1 and p9["counts"]["seq"] == p9["counts"]["approvals"] + p9["counts"]["checks"],
+      str(p9["counts"]))
+r9.safety_resolve(xs["id"], "ack"); r9.advance(1)
+check("확인하면 하차 재개 · 확인 시간 기록 · 안전 탭 '오늘 확인한 것'", v9["work_elapsed"] > e1 and xs["id"] in r9.safety_acks
+      and any(x["id"] == xs["id"] for x in r9.panel2()["safety_done"]))
+check("확인·안전 행이 알림 이력에 (금액 없음)", any(r["group"] == "안전" and r["handling"].startswith("확인") and r["expected"] is None for r in r9.alert_history()))
+r9.set_assumptions({"target_wait_min": 17})
+check("재계산해도 안전 확인 기록 유지", next(x for x in r9.rec.safety if x["id"] == xs["id"])["status"] == "ack")
+grp = [g for g in r8.panel2()["checks"] if g["n"] > 1]
+check("확인 필요: 같은 호퍼·같은 종류는 한 카드로 묶음", grp and all(len(g["items"]) == g["n"] for g in grp), " · ".join(g["title"] for g in grp[:3]))
+d8 = [Runtime(7).analysis_range("demo") for _ in range(2)]
+ds = [r for r in Runtime(7).alerts_range("demo")["rows"] if r["group"] == "안전"]
+check("시연 시나리오: 08:30 호퍼 A 안전 경고 1건 고정 · 같은 숫자", d8[0]["total"] == d8[1]["total"] and any(r["ts"] == "08:30" and r["sector_id"] == "A" for r in ds),
+      " · ".join(r["ts"] + " " + r["handling"] for r in ds[:3]))
 
 if "--samples" in sys.argv:
     out = ROOT / "docs" / "sample_events.jsonl"

@@ -131,6 +131,8 @@ class Sim:
         self.alerts = []            # 최근 80건 (화면용)
         self.alerts_all = []        # 전체 기록 (알림 이력)
         self.overrides = {}         # 담당자가 바꾼 호퍼 {차량: 호퍼}
+        self.safety = []            # 안전 경고 (덤프 반경 안 작업자) — 열림/확인/오탐지/자동 해제
+        self.safety_seq = 0
         self.series = []            # 10분마다 대기 차량 수
         self.busy_min = 0.0         # 하차구가 실제로 쓰인 시간(하차구·분)
         self.cap_min = 0.0          # 가동 중인 하차구 시간(하차구·분)
@@ -289,6 +291,81 @@ class Sim:
         return f >= 1.0
 
     # ---------- user / demo actions ----------
+    # ---------- 안전 경고 (덤프 하차 반경 안 작업자 · L3 자동 실행) ----------
+    def safety_cfg(self):
+        return self.cfg.get("safety", {})
+
+    def safety_open_for(self, v):
+        return any(x["status"] == "open" and x["key"] == self.key(v) for x in self.safety)
+
+    def safety_plan(self, v):
+        """반입마다 한 번 정한다(같은 시드·같은 반입이면 같은 결과): 이번 하차 중 작업자가 들어오는지, 언제, 계속 감지되는지."""
+        if "safety_plan" in v:
+            return v["safety_plan"]
+        c = self.safety_cfg()
+        rnd = random.Random(f"{self.seed}|safety|{self.key(v)}")
+        raised_min = v["base"] * v["work_factor"] * 0.55                  # 적재함이 올라가 있는 시간(약 55%)
+        p = c.get("per_raised_hour", 0) / 60 * raised_min
+        plan = None
+        if rnd.random() < p:
+            plan = {"at": v["base"] * v["work_factor"] * rnd.uniform(0.3, 0.7), "dist": round(rnd.uniform(2.2, 4.6), 1),
+                    "persist": rnd.random() < c.get("persist_prob", 0)}
+        v["safety_plan"] = plan
+        return plan
+
+    def safety_raise(self, v, dist=None, repeat=0, prev=None):
+        sid = v["sector"]
+        self.safety_seq += 1
+        sec_off = int(round((self.t * 60) % 60)) if False else random.Random(f"{self.seed}|s|{self.safety_seq}").randint(0, 59)
+        x = {"id": f"SA-{self.safety_seq}", "t": self.t, "ts": self.hhmm(self.t) + f":{sec_off:02d}", "sector_id": sid,
+             "bay": v["bay"], "vehicle_id": v["id"], "key": self.key(v), "cargo": v["cargo"], "cam_id": self.sec_cfg[sid]["cam_id"],
+             "dist_m": dist or 3.0, "radius_m": self.safety_cfg().get("radius_m", 5), "status": "open", "repeat": repeat,
+             "resolved_t": None, "resolved_at": None, "ack_sec": None, "how": None, "persist": False, "prev": prev}
+        self.safety.append(x)
+        self.emit("SAFETY_ALERT", "sim", vehicle=v, sector_id=sid, zone="rear", cam_id=x["cam_id"],
+                  payload={"id": x["id"], "level": "L3", "rule": f"덤프 반경 {x['radius_m']}m", "dist_m": x["dist_m"],
+                           "bay": v["bay"] + 1, "dump_deg": self.dump_angle(v), "repeat": repeat,
+                           "action": "앱 경고 · 하차 중지 요청 (가상)", "stand_in": "cam"})
+        return x
+
+    def safety_tick(self, v, held):
+        c = self.safety_cfg()
+        if not c:
+            return
+        k = self.key(v)
+        mine = [x for x in self.safety if x["key"] == k]
+        if not mine:
+            plan = self.safety_plan(v)
+            if plan and v["work_elapsed"] >= plan["at"] and self.dump_angle(v) >= 15:
+                x = self.safety_raise(v, plan["dist"])
+                x["persist"] = plan["persist"]
+            return
+        last = mine[-1]
+        if last["status"] == "open" and self.t - last["t"] >= c.get("auto_clear_min", 6):
+            self.safety_resolve(last["id"], "auto")                     # 아무도 확인 안 하면 자동 해제(미확인으로 남김)
+        elif last["status"] == "ack" and last["persist"] and last["repeat"] < 1 and \
+                self.t - last["resolved_t"] >= c.get("repeat_min", 3) and self.dump_angle(v) >= 15:
+            self.safety_raise(v, last["dist_m"], repeat=last["repeat"] + 1, prev=last["id"])   # 같은 위험이 계속 감지됨
+
+    def force_safety(self, sid):
+        """시연용: 그 호퍼에서 하차 중인 차 한 대에 지금 안전 경고를 만든다."""
+        ws = [v for v in self.vehicles.values() if v["state"] == "working" and v["sector"] == sid and not self.safety_open_for(v)]
+        if not ws:
+            return None
+        v = sorted(ws, key=lambda v: v["bay"])[0]
+        v["safety_plan"] = None
+        x = self.safety_raise(v, 3.0)
+        x["persist"] = False
+        return x
+
+    def safety_resolve(self, sid_, how, ack_sec=None):
+        x = next((x for x in self.safety if x["id"] == sid_), None)
+        if not x or x["status"] != "open":
+            return x
+        x.update(status={"ack": "ack", "dismiss": "dismissed", "auto": "auto"}[how], how=how, resolved_t=self.t,
+                 resolved_at=self.hhmm(self.t), ack_sec=ack_sec)
+        return x
+
     def sector_down(self, sid):
         s = self.sectors[sid]
         if not s["up"]:
@@ -414,8 +491,10 @@ class Sim:
                     self.emit("ZONE_ENTER", "sim", vehicle=v, sector_id=s_id, zone="queue", cam_id=cam,
                               payload={"stand_in": "cam"})
             elif v["state"] == "working":
-                if self.sectors[s_id]["up"]:
+                held = self.safety_open_for(v)
+                if self.sectors[s_id]["up"] and not held:
                     v["work_elapsed"] += STEP
+                self.safety_tick(v, held)
                 if v["work_elapsed"] > v["target"] * st["delay"]["factor"] and "delay" not in v["flags"]:
                     v["flags"].add("delay")
                     self.alert("warn", "하차 지연",
@@ -617,6 +696,7 @@ class Sim:
                          "remain_min": round(engine.remain_min(v["work_elapsed"], v["std"]), 1),
                          "dump_deg": self.dump_angle(v), "track_id": v["track_id"],
                          "judge": self.cam_judge(v)[0],
+                         "safety": self.safety_open_for(v), "delay_x": round(v["work_elapsed"] / v["target"], 1) if v["target"] else None,
                          "delayed": "delay" in v["flags"]} for v in sorted(working, key=lambda v: v["bay"])],
             "queue": [v["id"] for v in sorted(queue, key=lambda v: v["queue_idx"])],
             "queue_info": [{"vehicle_id": v["id"], "cargo": v["cargo"], "track_id": v["track_id"],
@@ -690,7 +770,9 @@ class Sim:
                        "state": v["state"], "sector_id": v["sector"] or (p and p["sector_id"]), "rank": p and p["rank"],
                        "wait_min": round(t - v["yard_t"], 1) if v["state"] == "yard" and v["yard_t"] is not None else v.get("wait_min"),
                        "urgent": v["urgent"], "due": self.clock(v["due_t"]).isoformat(timespec="seconds"),
-                       "track_id": v["track_id"], "judge": judge, "dump_deg": ang,
+                       "track_id": v["track_id"], "judge": judge, "dump_deg": ang, "bay": v.get("bay"),
+                       "eta_min": round(max(v["path_t0"] + v["path_dur"] - t, 0), 1) if v["state"] == "moving" and v.get("path") else None,
+                       "safety": v["state"] == "working" and self.safety_open_for(v),
                        "xy": [round(c, 1) for c in v["xy"]] if v["xy"] else None})
         yard = [v for v in self.vehicles.values() if v["state"] == "yard"]
         up_bays = sum(sc["bays"] for sid, sc in self.sec_cfg.items() if self.sectors[sid]["up"])
@@ -724,6 +806,7 @@ class Sim:
                     "levels": {lv: sum(1 for s in sviews if s["status"] == "up" and s["level"] == lv) for lv in ("ok", "warn", "crit")},
                     "up": sum(1 for s in sviews if s["status"] == "up"), "late": sum(d["late"] for d in self.done_trips)},
             "alerts": self.alerts[:40],
+            "safety_open": [x for x in self.safety if x["status"] == "open"],
             "road": self.road_trucks(),
             "road_cfg": self.settings["road"],
             "routes": self.routes_view(),

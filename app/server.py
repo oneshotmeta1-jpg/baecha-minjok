@@ -26,7 +26,7 @@ from app.sim import STEP, load  # noqa: E402
 
 DATA = ROOT / "data"
 WEB = ROOT / "web"
-VERSION = "v7"
+VERSION = "v9"
 TICK = 0.1  # 실제 초
 
 rt = Runtime(seed=7, db_path=DATA / "events.db", assumptions_path=DATA / "assumptions.json")
@@ -233,6 +233,36 @@ async def export_trips(range: str = "today"):
 @app.get("/api/export/alerts.csv")
 async def export_alerts(range: str = "today"):
     return csv_response(rt.csv_alerts(range if range in ("week", "demo") else "today"), f"alerts_{range}.csv")
+
+
+@app.get("/api/panel2")
+async def panel2():
+    """알림 패널 [순번 | 안전] (시안 v4)."""
+    return rt.panel2()
+
+
+@app.post("/api/safety/{sid}/ack")
+async def safety_ack(sid: str):
+    if not rt.safety_resolve(sid, "ack"):
+        raise HTTPException(404, "열린 안전 경고가 없습니다")
+    return {"ok": True}
+
+
+@app.post("/api/safety/{sid}/dismiss")
+async def safety_dismiss(sid: str):
+    if not rt.safety_resolve(sid, "dismiss"):
+        raise HTTPException(404, "열린 안전 경고가 없습니다")
+    return {"ok": True}
+
+
+@app.post("/api/events/safety")
+async def safety_force(sector_id: str):
+    """시연: 그 호퍼에서 하차 중인 차에 안전 경고를 만든다."""
+    need_sector(sector_id)
+    x = rt.force_safety(sector_id)
+    if not x:
+        raise HTTPException(409, "그 호퍼에서 하차 중인 차량이 없습니다")
+    return x
 
 
 @app.get("/api/panel")
