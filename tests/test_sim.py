@@ -5,6 +5,7 @@
 3. 혼잡도·진척도·호출 시점·우선순위 공식을 손계산과 대조
 4. 호퍼 정지 → 재배정 + Alert, 긴급 반입 → 순번 1번
 5. 카메라 판정: 적재함 각도와 판정 문구, 사진 판정 규칙(세로/가로 비율)
+6. (R3) 실제 지도 경로 거리 · 구내 제한속도 30km/h 이동시간 · 왕복 시간
 --samples 를 주면 docs/sample_events.jsonl 을 다시 만든다.
 """
 import json
@@ -203,6 +204,65 @@ if sg:
     rt.apply_suggestion(sg[0]["key"])
     check("제안 [적용] → 표준시간이 바뀌고 이력 남음", rt.assumptions["std_times"]["석회석"] == sg[0]["new"] != old,
           f"석회석 {old:g} → {rt.assumptions['std_times']['석회석']:g}분")
+
+
+# ---------- R3: 실제 지도 경로 · 제한속도 ----------
+r3 = Sim(7)
+v_max = r3.settings["road"]["speed_limit_kmh"] * 1000 / 60          # m/분
+check("900m 구간 = 제한속도 30km/h로 1.8분", abs(900 / v_max - 1.8) < 1e-9, f"{900 / v_max:.2f}분 (감속 계수 ×{r3.settings['road']['slow_factor']} 반영하면 {900 / r3.m_per_min():.1f}분)")
+smap = json.loads((ROOT / "data" / "site_map.json").read_text(encoding="utf-8"))
+legs = {(r["from"], r["to"]): r for r in r3.cfg["roads"]}
+need = [("ORE", "GATE"), ("GATE", "YARD"), ("EXIT", "ORE")] + [("YARD", x) for x in "ABC"] + [(x, "EXIT") for x in "ABC"]
+check("경로 9구간 모두 OSM 도로 길이(m)가 있음", all(k in legs and legs[k]["length_m"] > 100 and legs[k]["osm_nodes"] >= 2 for k in need)
+      and "OpenStreetMap" in smap["attribution"], " · ".join(f"{a}→{b} {legs[(a, b)]['length_m']}m" for a, b in need[:6]))
+# 화면 좌표 길이 × 축척(m/px) ≈ 기록된 길이 (지도와 거리가 같은 좌표계)
+geo = [abs(sum(((p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2) ** 0.5 for p, q in zip(r["points"], r["points"][1:])) * r3.mpp - r["length_m"]) <= 3
+       for r in r3.cfg["roads"]]
+check("화면 경로 길이 × 축척 = 기록된 거리 (±3m)", all(geo), f"축척 1px = {r3.mpp}m")
+r3.run_until(240)
+calls = [e for e in r3.events if e["type"] == "CALL"]
+check("호출 이벤트에 경로 거리·이동시간이 실림",
+      calls and all(e["payload"]["route_m"] == legs[("YARD", e["sector_id"])]["length_m"]
+                    and abs(e["payload"]["travel_min"] - legs[("YARD", e["sector_id"])]["length_m"] / r3.m_per_min()) < 0.06 for e in calls),
+      f"{len(calls)}건 · 예: {calls[0]['payload']['route_m']}m {calls[0]['payload']['travel_min']}분" if calls else "")
+check("엔진 호출 시점이 같은 이동시간을 씀", all(abs(x["travel_min"] - r3.travel("YARD", x["id"])) < 1e-9 for x in r3.sector_inputs()))
+# 모든 이동이 제한속도 이하 (경로 길이 ÷ 걸린 시간)
+r4, speeds = Sim(7), []
+while r4.t < 240:
+    r4.step()
+    for v in r4.vehicles.values():
+        if v.get("path") and v["state"] in ("moving", "done") and not v["gone"] and abs(v["path_t0"] - r4.t) < 1e-9:
+            speeds.append(v["path_m"] / v["path_dur"] * 60 / 1000)
+check("어느 차량도 30km/h를 넘지 않음", speeds and max(speeds) <= r4.settings["road"]["speed_limit_kmh"] + 1e-9,
+      f"이동 {len(speeds)}회 · 최고 {max(speeds):.1f}km/h (감속 계수 반영 평균 속도)")
+# 왕복: 계근대(출) → 원료야드 → 상차 → 계근대(입) = 경로 시간 + 상차 시간
+ret_trips = []
+r5 = Sim(7)
+while r5.t < 240:
+    r5.step()
+    for a in r5.pending_arrivals:
+        if a.get("ret") and abs(a["ret"]["exit_t"] - r5.t) < 1e-9:
+            ret_trips.append(a["arr_t"] - a["ret"]["exit_t"])
+legs_min = r5.travel("EXIT", "ORE") + r5.travel("ORE", "GATE")
+lo, hi = r5.fc["load_min"]
+check("왕복 = 공차 복귀 + 상차 + 적재 반입, 기존 가정 22~38분 범위와 비슷",
+      ret_trips and all(legs_min + lo - 1e-6 <= c <= legs_min + hi + 1e-6 for c in ret_trips) and 18 <= sum(ret_trips) / len(ret_trips) <= 42,
+      f"{len(ret_trips)}회 · 평균 {sum(ret_trips) / len(ret_trips):.1f}분 (이동 {legs_min:.1f}분 + 상차 {lo}~{hi}분)")
+phases = set()
+r6 = Sim(7)
+while r6.t < 120:
+    r6.step()
+    phases |= {x["phase"] for x in r6.road_trucks()}
+check("구내 도로 위 차량: 공차 복귀·상차·적재 반입이 지도에 나옴", phases == {"return", "loading", "inbound"}, str(sorted(phases)))
+from app.runtime import Runtime  # noqa: E402
+rt3 = Runtime(7)
+rt3.advance(30)
+b_before = rt3.rec.travel("YARD", "B")
+rt3.set_assumptions({"speed_limit_kmh": 20})
+check("가정값: 제한속도 30 → 20km/h면 이동시간이 1.5배", abs(rt3.rec.travel("YARD", "B") / b_before - 1.5) < 0.01,
+      f"대기장→호퍼 B {b_before:.1f} → {rt3.rec.travel('YARD', 'B'):.1f}분")
+rt3.set_assumptions({"slow_factor": 0.8})
+check("감속 계수 1 미만(제한속도 초과)은 거절", rt3.assumptions["slow_factor"] >= 1)
 
 if "--samples" in sys.argv:
     out = ROOT / "docs" / "sample_events.jsonl"

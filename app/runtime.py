@@ -264,6 +264,8 @@ class Runtime:
                         self.assumptions["std_times"][cargo] = float(m)
                         changed.append(f"{cargo} 하차 표준 {old:g} → {float(m):g}분")
             elif k in self.assumptions and float(v) != float(self.assumptions[k]):
+                if (k == "slow_factor" and float(v) < 1) or (k == "speed_limit_kmh" and not 5 <= float(v) <= 60):
+                    continue          # 감속 계수는 1 이상(제한속도를 넘지 않게), 속도는 5~60km/h만
                 old = self.assumptions[k]
                 self.assumptions[k] = float(v)
                 changed.append(f"{LABELS.get(k, k)} {old:g} → {float(v):g}")
@@ -368,4 +370,5 @@ class Runtime:
 
 LABELS = {"warn_pct": "혼잡 주의 기준(%)", "crit_pct": "혼잡 기준(%)", "target_wait_min": "목표 대기(분)",
           "call_margin_min": "호출 여유(분)", "delay_factor": "하차 지연 배수", "wait_won_per_hour": "대기 단가(원/시간)",
-          "idle_won_per_hour": "호퍼 유휴 단가(원/시간)"}
+          "idle_won_per_hour": "호퍼 유휴 단가(원/시간)", "speed_limit_kmh": "구내 제한속도(km/h)",
+          "slow_factor": "감속 계수"}

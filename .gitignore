@@ -7,3 +7,4 @@ vision/runs/
 *.mp4
 *.db
 data/assumptions.json
+tools/osm_cache/
