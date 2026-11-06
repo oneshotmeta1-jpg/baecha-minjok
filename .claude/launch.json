@@ -4,14 +4,30 @@
     {
       "name": "dock",
       "runtimeExecutable": "C:\\Users\\mypc\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
-      "runtimeArgs": ["D:\\내문서 및 바탕화면\\Desktop\\해커톤\\app\\server.py"],
+      "runtimeArgs": [
+        "D:\\내문서 및 바탕화면\\Desktop\\해커톤\\app\\server.py"
+      ],
       "port": 8000
     },
     {
       "name": "dock-lan",
       "runtimeExecutable": "C:\\Users\\mypc\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
-      "runtimeArgs": ["D:\\내문서 및 바탕화면\\Desktop\\해커톤\\app\\server.py", "--lan"],
+      "runtimeArgs": [
+        "D:\\내문서 및 바탕화면\\Desktop\\해커톤\\app\\server.py",
+        "--lan"
+      ],
       "port": 8000
+    },
+    {
+      "name": "dock-check",
+      "runtimeExecutable": "C:\\Users\\mypc\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+      "runtimeArgs": [
+        "D:\\내문서 및 바탕화면\\Desktop\\해커톤\\app\\server.py",
+        "--port",
+        "8001",
+        "--check"
+      ],
+      "port": 8001
     }
   ]
 }
