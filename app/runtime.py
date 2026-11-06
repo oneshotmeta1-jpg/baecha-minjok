@@ -279,8 +279,8 @@ class Runtime:
         wall = self.safety_wall.get(sid_)
         self.safety_acks[sid_] = {"how": how, "ack_sec": round(self.clock() - wall, 1) if wall is not None else None}
         self._record("safety", id=sid_, how=how)
-        self._ui("SAFETY_ACK" if how == "ack" else "SAFETY_DISMISS", x["vehicle_id"], x["sector_id"],
-                 {"id": sid_, "ack_sec": self.safety_acks[sid_]["ack_sec"], "repeat": x["repeat"]})
+        self._ui("SAFETY_ACK", x["vehicle_id"], x["sector_id"],
+                 {"id": sid_, "how": "확인" if how == "ack" else "오탐지", "ack_sec": self.safety_acks[sid_]["ack_sec"], "repeat": x["repeat"]})
         return x
 
     def request_approval(self):
@@ -294,7 +294,7 @@ class Runtime:
                 self.requested[k] = self.rec.hhmm(self.rec.t)
                 keys.append(k)
         if keys:
-            self._ui("APPROVAL_REQUESTED", None, None, {"n": len(keys), "vehicles": keys, "to": "현장 담당자"})
+            self._ui("CALL_REQUEST", None, None, {"n": len(keys), "vehicles": keys, "to": "현장 담당자 앱(가상 푸시)"})
         return keys
 
     def set_auto_approve(self, on: bool):
@@ -907,7 +907,7 @@ class Runtime:
             how = {"open": "미확인", "ack": "확인", "dismissed": "오탐지", "auto": "자동 해제 · 미확인"}[x["status"]]
             ack = self.safety_acks.get(x["id"], {}).get("ack_sec")
             rows.append({"id": x["id"], "ts": x["ts"][:5], "t": x["t"], "level": "crit", "kind": "안전",
-                         "text": f"{self.rec.sec_cfg[x['sector_id']]['name']} · {x['cargo']} 덤프 반경 안 작업자 ({x['dist_m']}m) · {x['vehicle_id']}"
+                         "text": f"{self.rec.sec_cfg[x['sector_id']]['name']} · {x['cargo']} {x.get('rule_text', '덤프 반경')} 안 작업자 ({x['dist_m']}m) · {x['vehicle_id']}"
                                  + (" · 다시 감지" if x["repeat"] else ""),
                          "suggest": "L3 자동 실행: 앱 경고 · 하차 중지 요청 (가상)", "handling": how + (f" · {ack}초" if ack is not None else ""),
                          "expected": None, "actual": None, "has_vehicles": False, "sector_id": x["sector_id"], "vehicle_id": x["vehicle_id"],

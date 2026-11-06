@@ -27,7 +27,7 @@
 
 - 샘플: [sample_events.jsonl](sample_events.jsonl) — 소결공장 시나리오, 시드 7, 덤프트럭 20대 4시간 순환 운행, 호퍼 A 정지(08:02)·긴급 반입·A 복구 포함 1,244건
 - 다시 만들기·형식 확인: `py tests/test_sim.py --samples`
-- 소결 호퍼에서는 `CRANE_START`/`CRANE_DONE`을 **덤프 하차 시작·완료**로 쓴다(`payload.stand_in: "dump"`, DONE에는 `load_t`). `GATE_IN.payload`에 `load_t`(적재 t)·`trip`(회차)이 있다.
+- 이벤트 이름은 워크플로우 ⑤(데이터·이벤트 구조)와 같다. 하역 시작·끝은 `BAY_ENTER`/`BAY_EXIT`(베이 1~3), 하역장 정지는 `YARD_DOWN/UP`, 긴급은 `URGENT_IN`, 승인 요청은 `CALL_REQUEST`. `GATE_IN.payload`에 `load_t`(적재 t)·`trip`(회차)이 있다.
 - 영상·설비가 붙기 전에는 시뮬레이터가 대신 내며 `source: "sim"`, `payload.stand_in: "cam" | "crane"`으로 표시한다.
   비전 파트는 같은 이벤트를 `source: "cam"`으로 내면 된다.
 
@@ -71,17 +71,18 @@
 | type | 내는 곳 | 의미 |
 |---|---|---|
 | `GATE_IN` | 기사 앱(가정) → 시뮬레이터 | 도착, 차량 등록 (payload: vehicle, cargo, due, urgent) |
-| `BEACON_NEAR` | 기사 앱(가정) → 시뮬레이터 | 차량이 어느 구역 근처인지. 영상 이벤트에 vehicle_id를 붙이는 데 씀 |
+| `ZONE_ARRIVE` | 기사 앱 위치(가정) → 시뮬레이터 | 차량 대기장 도착 (zone=yard) |
+| `BEACON_NEAR` | 기사 앱(가정) → 시뮬레이터 | 차량이 어느 구역 근처인지(호퍼 대기선). 영상 이벤트에 vehicle_id를 붙이는 데 씀 |
 | `ZONE_ENTER` / `ZONE_EXIT` | 영상 | 구역(`yard`·`queue`·`bay`) 진입·이탈, 3초 이상 유지 시에만 |
 | `VEHICLE_STOPPED` | 영상 | 구역 안에서 멈춤 → 대기 또는 작업 시작 |
 | `CALL` | 배정 엔진 | 차량 호출 (payload: rank, reason, route_m, travel_min, speed_limit_kmh, approval = auto · approved · changed) → 기사 화면 알림 |
 | `CALL_PENDING` | 배정 엔진 | 호출 시각이 됐지만 현장 담당자 승인을 기다림 (자동 승인 꺼짐 · L2). payload: rank, reason, since |
 | `CALL_ACK` | 기사 모바일 화면 | 기사가 ‘출발’을 누름 |
-| `CRANE_START` / `CRANE_DONE` | 설비 신호(가정) 또는 담당자 화면 버튼 | 크레인 상하역 시작·완료 (DONE이면 진척도 100% 확정) |
-| `SECTOR_DOWN` / `SECTOR_UP` | 돌발 이벤트 버튼 | 섹터 정지·복구 → 재배정 |
+| `BAY_ENTER` / `BAY_EXIT` | 영상(베이 구역 3초 이상) | 하역 시작 · 끝 (payload: bay 1~3, cargo / load_t, unload_min). 진입→이탈 = 건별 작업 기록 · 예측 하역시간의 근거 |
+| `YARD_DOWN` / `YARD_UP` | 시연 버튼 | 하역장 정지 · 복구 → 영향 차량 재배정 |
+| `URGENT_IN` | 시연 버튼 | 긴급 입고(소결 재고 부족) → 순번 맨 앞 |
 | `SAFETY_ALERT` | 영상(합성) · 시뮬레이터 | 안전 경고: 적재함 상승 중 덤프 반경(가정 5m, rois.json REAR 구역) 안 작업자 → L3 자동 실행(기사 앱 경고 · 하차 중지 요청, 가상). 하차 진행이 멈춤 (payload: id, level=L3, rule, dist_m, bay, dump_deg, repeat, action, stand_in) |
-| `SAFETY_ACK` | 맵 위 안전 띠 · 알림 패널 안전 탭 | 관제 담당자가 안전 경고 확인 → 하차 재개 (payload: id, ack_sec = 뜬 뒤 확인까지 실제 초, repeat). 같은 위험이 계속 감지되면 SAFETY_ALERT(repeat=1)가 다시 온다 |
-| `SAFETY_DISMISS` | 맵 위 안전 띠 · 알림 패널 안전 탭 | 오탐지로 해제 → 하차 재개 (payload: id, ack_sec, repeat) |
+| `SAFETY_ACK` | 맵 위 안전 띠 · 알림 패널 안전 탭 | 관제·현장 담당자가 안전 경고 확인 또는 오탐지 → 하차 재개 (payload: id, how = 확인/오탐지, ack_sec = 뜬 뒤 확인까지 실제 초, repeat). 같은 위험이 계속 감지되면 SAFETY_ALERT(repeat=1)가 다시 온다 |
 | `ALERT` | 배정 엔진 | 알림 발생 (payload: level, kind, text, action, related = 제안이 영향을 주는 반입 "차량#회차" 목록) |
 | `ORDER_APPROVED` | 통합하역작업 탭 | 담당자가 추천 순번 승인 (payload: rank, reason) |
 | `ORDER_CHANGED` | 통합하역작업 탭 | 담당자가 보낼 호퍼 변경 (payload: from, to, reason, memo, delta_min, cost_won) |
@@ -89,7 +90,7 @@
 | `ASSUMPTIONS_UPDATED` | 설정 › 가정값·단가 | 가정값 변경 → 처음부터 다시 계산 (payload: changes[]) |
 | `EFFECT_CONFIRMED` | 런타임(효과 계산) | 반입 한 건의 효과 확정 — 두 방식 모두 하차를 시작했을 때 한 번 (payload: trip, rec_wait_min, fifo_wait_min, effect_min, won, source = 효과를 만든 것) |
 | `ALERT_IGNORED` | 알림 이력 [무시] | 담당자가 알림의 제안을 무시 (payload: alert_id, kind). 무시한 알림의 실제 효과도 알림 이력에 남는다 |
-| `APPROVAL_REQUESTED` | 순번·배정 [현장 담당자에게 승인 요청] | 아직 승인 안 된 순번을 현장 담당자 앱으로 보냄(가상, 모바일은 다음 라운드) (payload: n, vehicles = "차량#회차" 목록, to) |
+| `CALL_REQUEST` | 순번·배정 [현장 담당자에게 승인 요청] | 관제 → 현장 담당자 앱 승인 요청(가상 푸시) (payload: n, vehicles = "차량#회차", to) |
 | `APPROVAL_MODE` | 순번·배정 자동 승인 스위치 | 자동 승인 켜기/끄기 (payload: auto). 끄면 승인 전 호출은 `CALL_PENDING`으로 멈춘다 |
 
 R2에서 팀이 제안한 `order_approved` 등 소문자 이름은 기존 형식에 맞춰 대문자로 썼다. 변경 사유 코드는

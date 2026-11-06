@@ -3,10 +3,10 @@
 덤프트럭 한 대가 하루에 여러 번 왔다 갔다 한다:
   원료야드 상차 → 계근대(입) → 차량 대기장 → (호출) → 하차 호퍼 → 적재함 상승·하차 → 계근대(출) → 공차 복귀 → 재상차 …
 영상(YOLO)과 기사 앱이 붙기 전까지, 둘이 낼 이벤트를 docs/events.md 형식 그대로 대신 낸다.
-- source "iot": 기사 앱 신호(GATE_IN, BEACON_NEAR, CALL_ACK)
-- source "sim": 영상·설비 신호 대체(ZONE_ENTER/EXIT, VEHICLE_STOPPED, CRANE_START/DONE) — payload.stand_in 에 원래 출처
-  (소결 호퍼에서는 CRANE_START/DONE = 덤프 하차 시작/완료로 쓴다)
-- source "engine": 배정 엔진(CALL, ALERT) / "ui": 화면 버튼(SECTOR_DOWN/UP)
+- source "iot": 기사 앱 신호(GATE_IN, ZONE_ARRIVE, BEACON_NEAR, CALL_ACK)
+- source "sim": 영상 신호 대체(ZONE_ENTER/EXIT, VEHICLE_STOPPED, BAY_ENTER/EXIT, SAFETY_ALERT) — payload.stand_in 에 원래 출처
+- source "engine": 배정 엔진(CALL, ALERT) / "ui": 시연 버튼(YARD_DOWN/UP, URGENT_IN)
+이벤트 이름은 워크플로우 ⑤ 데이터·이벤트 구조와 같다(docs/events.md).
 시간 단위는 분. 고정 간격(STEP)으로 진행해 같은 시드면 항상 같은 결과가 나온다.
 """
 import json
@@ -308,22 +308,24 @@ class Sim:
         p = c.get("per_raised_hour", 0) / 60 * raised_min
         plan = None
         if rnd.random() < p:
-            plan = {"at": v["base"] * v["work_factor"] * rnd.uniform(0.3, 0.7), "dist": round(rnd.uniform(2.2, 4.6), 1),
-                    "persist": rnd.random() < c.get("persist_prob", 0)}
+            rev = rnd.random() < c.get("reverse_share", 0.3)          # 후진 진입 중 후진 경로 침입 / 적재함 상승 중 덤프 반경 침입
+            plan = {"at": 0.25 if rev else v["base"] * v["work_factor"] * rnd.uniform(0.3, 0.7), "dist": round(rnd.uniform(2.2, 4.6), 1),
+                    "persist": rnd.random() < c.get("persist_prob", 0), "rule": "reverse" if rev else "dump"}
         v["safety_plan"] = plan
         return plan
 
-    def safety_raise(self, v, dist=None, repeat=0, prev=None):
+    def safety_raise(self, v, dist=None, repeat=0, prev=None, rule="dump"):
         sid = v["sector"]
         self.safety_seq += 1
         sec_off = int(round((self.t * 60) % 60)) if False else random.Random(f"{self.seed}|s|{self.safety_seq}").randint(0, 59)
         x = {"id": f"SA-{self.safety_seq}", "t": self.t, "ts": self.hhmm(self.t) + f":{sec_off:02d}", "sector_id": sid,
              "bay": v["bay"], "vehicle_id": v["id"], "key": self.key(v), "cargo": v["cargo"], "cam_id": self.sec_cfg[sid]["cam_id"],
              "dist_m": dist or 3.0, "radius_m": self.safety_cfg().get("radius_m", 5), "status": "open", "repeat": repeat,
-             "resolved_t": None, "resolved_at": None, "ack_sec": None, "how": None, "persist": False, "prev": prev}
+             "resolved_t": None, "resolved_at": None, "ack_sec": None, "how": None, "persist": False, "prev": prev,
+             "rule": rule, "rule_text": "후진 경로" if rule == "reverse" else "덤프 반경"}
         self.safety.append(x)
-        self.emit("SAFETY_ALERT", "sim", vehicle=v, sector_id=sid, zone="rear", cam_id=x["cam_id"],
-                  payload={"id": x["id"], "level": "L3", "rule": f"덤프 반경 {x['radius_m']}m", "dist_m": x["dist_m"],
+        self.emit("SAFETY_ALERT", "sim", vehicle=v, sector_id=sid, zone="back" if rule == "reverse" else "rear", cam_id=x["cam_id"],
+                  payload={"id": x["id"], "level": "L3", "rule": "후진 경로" if rule == "reverse" else f"덤프 반경 {x['radius_m']}m", "dist_m": x["dist_m"],
                            "bay": v["bay"] + 1, "dump_deg": self.dump_angle(v), "repeat": repeat,
                            "action": "앱 경고 · 하차 중지 요청 (가상)", "stand_in": "cam"})
         return x
@@ -336,8 +338,8 @@ class Sim:
         mine = [x for x in self.safety if x["key"] == k]
         if not mine:
             plan = self.safety_plan(v)
-            if plan and v["work_elapsed"] >= plan["at"] and self.dump_angle(v) >= 15:
-                x = self.safety_raise(v, plan["dist"])
+            if plan and v["work_elapsed"] >= plan["at"] and (plan.get("rule") == "reverse" or self.dump_angle(v) >= 15):
+                x = self.safety_raise(v, plan["dist"], rule=plan.get("rule", "dump"))
                 x["persist"] = plan["persist"]
             return
         last = mine[-1]
@@ -372,7 +374,7 @@ class Sim:
             return
         s["up"] = False
         name = self.sec_cfg[sid]["name"]
-        self.emit("SECTOR_DOWN", "ui", sector_id=sid)
+        self.emit("YARD_DOWN", "ui", sector_id=sid)
         moved = []
         for v in self.vehicles.values():
             if v["sector"] == sid and v["state"] in ("moving", "queue"):
@@ -389,7 +391,7 @@ class Sim:
         if s["up"]:
             return
         s["up"] = True
-        self.emit("SECTOR_UP", "ui", sector_id=sid)
+        self.emit("YARD_UP", "ui", sector_id=sid)
         self.alert("info", "호퍼 이상", f"{self.sec_cfg[sid]['name']} 복구", "순번 재계산", sector_id=sid, related=[])
 
     def add_urgent(self):
@@ -405,6 +407,7 @@ class Sim:
         a = trip(self.seed, t, 1, self.t, self.fc, urgent=True)
         a["due_t"] = self.t + 30
         self.pending_arrivals.insert(0, a)
+        self.emit("URGENT_IN", "ui", vehicle={"id": plate, "track_id": None}, payload={"cargo": cargo, "reason": "소결 배합 재고 부족(가정)"})
         return plate
 
     def ack_alert(self, aid, ack_sec=None):
@@ -439,9 +442,11 @@ class Sim:
                 elif v["state"] == "moving":
                     pend.append((max(v["path_t0"] + v["path_dur"] - t, 0.0), v["std"]))
             bf = [0.0] * sc["bays"]
+            hold = self.safety_cfg().get("auto_clear_min", 6)
             for v in working:
                 if v.get("bay") is not None:
-                    bf[v["bay"]] = max(bf[v["bay"]], engine.remain_min(v["work_elapsed"], v["std"]))
+                    extra = hold if self.safety_open_for(v) else 0.0          # 안전 중지 → 그 베이 후속 호출 보류
+                    bf[v["bay"]] = max(bf[v["bay"]], engine.remain_min(v["work_elapsed"], v["std"]) + extra)
             for v in sorted((v for v in self.vehicles.values() if v["sector"] == sid and v["state"] in ("queue", "moving")),
                             key=lambda v: (0.0 if v["state"] == "queue" else v["path_t0"] + v["path_dur"] - t, v.get("queue_idx", 0))):
                 b = v.get("bay")
@@ -491,7 +496,7 @@ class Sim:
                 # 2) 대기장 진입: 비콘(신원) + 대기장 카메라(위치)
                 self.track_seq += 1
                 v.update(state="yard", yard_t=t, track_id=self.track_seq, xy=self.yard_xy(v))
-                self.emit("BEACON_NEAR", "iot", vehicle=v, zone="yard")
+                self.emit("ZONE_ARRIVE", "iot", vehicle=v, zone="yard", payload={"stand_in": "app"})
                 self.emit("ZONE_ENTER", "sim", vehicle=v, zone="yard", cam_id=self.zone["YARD"]["cam_id"],
                           payload={"stand_in": "cam"})
             elif v["state"] == "moving":
@@ -515,8 +520,9 @@ class Sim:
                                sector_id=s_id, vehicle=v, related=self.planned_keys(s_id, 1))
                 if v["work_elapsed"] >= v["base"] * v["work_factor"]:
                     cam = self.sec_cfg[s_id]["cam_id"]
-                    self.emit("CRANE_DONE", "sim", vehicle=v, sector_id=s_id,
-                              payload={"stand_in": "dump", "load_t": v["load_t"]})
+                    self.emit("BAY_EXIT", "sim", vehicle=v, sector_id=s_id,
+                              payload={"stand_in": "cam", "bay": v["bay"] + 1, "load_t": v["load_t"],
+                                       "unload_min": round(v["work_elapsed"], 2)})
                     self.emit("ZONE_EXIT", "sim", vehicle=v, sector_id=s_id, zone="bay", cam_id=cam,
                               payload={"stand_in": "cam"})
                     v.update(state="done", done_t=t)
@@ -572,7 +578,7 @@ class Sim:
                           payload={"stand_in": "cam"})
                 self.emit("VEHICLE_STOPPED", "sim", vehicle=v, sector_id=sid, zone="bay", cam_id=sc["cam_id"],
                           payload={"stand_in": "cam"})
-                self.emit("CRANE_START", "sim", vehicle=v, sector_id=sid, payload={"stand_in": "dump"})
+                self.emit("BAY_ENTER", "sim", vehicle=v, sector_id=sid, payload={"stand_in": "cam", "bay": b + 1, "cargo": v["cargo"]})
             rest = sorted((v for v in self.vehicles.values() if v["state"] == "queue" and v["sector"] == sid),
                           key=lambda v: v["queue_idx"])
             for i, v in enumerate(rest):
