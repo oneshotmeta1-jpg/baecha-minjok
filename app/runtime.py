@@ -252,13 +252,19 @@ class Runtime:
         if isinstance(events, dict):
             events = [events]
         out = []
+        seen_ids = self.__dict__.setdefault("ingested_ids", set())
         for ev in sorted(events, key=lambda e: e.get("ts", "")):
+            if ev.get("event_id") and ev["event_id"] in seen_ids:     # 같은 영상 이벤트를 두 번 넣지 않음(영상 한 번 = 반입 한 번)
+                out.append("duplicate")
+                continue
             m = self.ev_minutes(ev)
             while self.rec.t + 1e-9 < m:
                 self.step()
             ev = {"source": "cam", "vehicle_id": None, "sector_id": None, "zone": None, "payload": {}, **ev,
                   "ts": ev.get("ts") or self.rec.clock().isoformat(timespec="seconds")}
             r = self.rec.ingest(ev)
+            if r in ("ok", "ignored") and ev.get("event_id"):
+                seen_ids.add(ev["event_id"])
             if r == "ok":
                 self.store.event(ev)
                 if getattr(self, "ingested", None) is not None:

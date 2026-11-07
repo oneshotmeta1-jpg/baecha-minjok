@@ -240,3 +240,15 @@ py tools/replay_events.py events.jsonl --speed 60
 
 `vision/to_events.py` 판정 규칙: 박스 아래 중심점(접지점)이 `data/rois.json` 구역 안에 3초 이상 → 진입, 3초 이상 밖·화면에서 사라짐 → 이탈.
 사람이 REAR-n(덤프 반경)에 들어오고 그 베이 트럭 박스가 세로/가로 ≥ 0.6(적재함 상승) → 덤프 반경 경고, BACK-n(후진 경로)에 진입 30초 안 → 후진 경로 경고.
+
+## 실제 영상 채널 (R9)
+
+- 채널 설정: `data/cams.json` — CAM-01~04 영상 파일(`해커톤/영상/`, git 제외) · 영상 픽셀 기준 판정 구역 · `time_scale`(15초 클립 → 10분).
+  영상 파일이 없으면 그 채널은 시뮬레이션 그림으로 돌아간다(`GET /api/cams`의 `source`: `video` | `sim`).
+- 영상은 `/media/`로 읽기 전용(Range 지원, 폴더 밖 경로 404).
+- 탐지: `py vision/detect_video.py` → 영상 옆 `<이름>.det.json`(YOLO11n + ByteTrack). 화면은 이 결과를 재생 시각에 맞춰 겹쳐 그린다.
+- 이벤트: `py tools/ingest_videos.py` — det.json → `to_events.py`(추적 ID 바뀜 합치기 · 클립 끝에서 닫기) → `/api/ingest`.
+  영상에 없는 계근(GATE_IN)·원료는 가정으로 붙인다(`payload.assumed`).
+- **영상 한 번 = 반입 한 번**: 이벤트마다 `event_id`(영상 파일 · 재생 회차 · 영상 안 시각 · 종류 · 차량). 같은 것을 다시 넣으면 결과 `duplicate`. 다음 반입으로 넣으려면 `--play 2`.
+  화면의 반복 재생은 이벤트를 넣지 않는다.
+- 판정 규칙 확인 기록: [vision_check.md](vision_check.md).

@@ -25,7 +25,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 HOLD = 3.0          # 초
 STOP_PX = 12        # 3초 동안 이만큼 안 움직이면 정지
-RAISED = 0.6        # 적재함 상승 판정: 박스 세로/가로
+RAISED = 0.6        # 적재함 상승 판정: 박스 세로/가로 — 최근 1초 중앙값이 1초 동안 넘어야 상승(R9 실영상 확인, docs/vision_check.md)
+RAISE_WIN = 1.0     # 초
+SAME_IOU = 0.4      # 새 추적 ID가 3초 안에 본 트럭 박스와 이만큼 겹치면 같은 트럭(ID 바뀜·중복 박스 합치기)
+MIN_AREA = 0.003    # 화면 넓이의 0.3%보다 작은 트럭 박스는 버림(멀리 지나가는 차·오탐)
 
 
 def inside(pt, poly):
@@ -43,7 +46,21 @@ def foot(b):
     return ((b[0] + b[2]) / 2, b[3])
 
 
-def convert(data, start, rois=None):
+def iou(a, b):
+    ix = max(0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
+    i = ix * iy
+    u = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - i
+    return i / u if u > 0 else 0
+
+
+def video_rois(cams_cfg, cam_id):
+    """data/cams.json의 영상 구역(영상 픽셀) → convert()가 읽는 rois 모양"""
+    c = next(c for c in cams_cfg["cams"] if c["camera"] == cam_id)
+    return {"frame": c["size"], "cams": [{"camera": c["camera"], "sector_id": c["sector_id"], "zones": c["zones"]}]}
+
+
+def convert(data, start, rois=None, scale=1.0, flush=False):
     rois = rois or json.loads((ROOT / "data" / "rois.json").read_text(encoding="utf-8"))
     cams = {c["camera"]: c for c in rois["cams"]}
     fw, fh = data.get("size", rois["frame"])
@@ -52,9 +69,12 @@ def convert(data, start, rois=None):
     out = []
     trk = {}            # (cam, track) → {zone, cand, since, last_pt, pt_since, stopped, bay_t}
     person_in = set()   # (cam, track, zone_id)
+    alias = {}          # (cam, 추적 ID) → 같은 트럭으로 본 처음 ID
+    seen = {}           # (cam, 대표 ID) → (마지막 시각, 마지막 박스)
+    area0 = rois["frame"][0] * rois["frame"][1]
 
     def ev(t, typ, cam, vid, tid, sid=None, zone=None, payload=None):
-        out.append({"ts": (t0 + timedelta(seconds=t)).isoformat(timespec="seconds"), "type": typ, "source": "cam", "cam_id": cam,
+        out.append({"ts": (t0 + timedelta(seconds=t * scale)).isoformat(timespec="seconds"), "type": typ, "source": "cam", "cam_id": cam,
                     "sector_id": sid, "zone": zone, "track_id": tid, "vehicle_id": vid, "payload": payload or {}})
 
     def move(t, cam_id, sid, tid, s, zid):
@@ -88,12 +108,33 @@ def convert(data, start, rois=None):
             b = [o["bbox"][0] * kx, o["bbox"][1] * ky, o["bbox"][2] * kx, o["bbox"][3] * ky]
             pt = foot(b)
             if o["cls"] == "truck":
+                if (b[2] - b[0]) * (b[3] - b[1]) < area0 * MIN_AREA:
+                    continue
+                key = (fr["cam_id"], o["track_id"])
+                if key not in alias:            # 처음 보는 ID: 3초 안에 본 트럭과 겹치면 같은 트럭
+                    hit = [k for k, (lt, lb) in seen.items() if k[0] == fr["cam_id"] and t - lt <= HOLD and iou(lb, b) >= SAME_IOU]
+                    alias[key] = min(hit, key=lambda k: trk[k]["first"])[1] if hit else o["track_id"]
+                tid = alias[key]
+                if (fr["cam_id"], tid) in trucks:   # 같은 트럭의 중복 박스는 한 번만
+                    continue
+                seen[(fr["cam_id"], tid)] = (t, b)
+                o = dict(o, track_id=tid)
                 z = next((z for z in zones if z["type"] in ("하차", "대기") and inside(pt, z["points"])), None)
                 zid = z["id"] if z else None
-                vid = o.get("vehicle_id") or f"T{o['track_id']}"
+                vid = o.get("vehicle_id") or f"{fr['cam_id']}-T{o['track_id']}"
                 k = (fr["cam_id"], o["track_id"])
-                s = trk.setdefault(k, {"zone": None, "cand": None, "since": t, "pt": pt, "pt_t": t, "stopped": False, "bay_t": None, "vid": vid})
-                raised = (b[3] - b[1]) / max(b[2] - b[0], 1) >= RAISED
+                s = trk.setdefault(k, {"zone": None, "cand": None, "since": t, "pt": pt, "pt_t": t, "stopped": False, "bay_t": None, "vid": vid, "first": t})
+                hist = s.setdefault("hist", [])          # (t, 비율) 최근 1초
+                hist.append((t, (b[3] - b[1]) / max(b[2] - b[0], 1)))
+                while hist and t - hist[0][0] > RAISE_WIN:
+                    hist.pop(0)
+                rs = sorted(h[1] for h in hist)
+                c_up = rs[len(rs) // 2] >= RAISED          # 1초 중앙값 → 한 프레임 흔들림 무시
+                if c_up != s.get("up_cand"):
+                    s["up_cand"], s["up_since"] = c_up, t
+                elif c_up != s.get("up", False) and t - s["up_since"] >= RAISE_WIN:   # 1초 유지돼야 상승/내림으로 바꿈
+                    s["up"] = c_up
+                raised = s.get("up", False)
                 trucks[k] = (zid, raised, s)
                 move(t, fr["cam_id"], sid, o["track_id"], s, zid)
                 d = ((pt[0] - s["pt"][0]) ** 2 + (pt[1] - s["pt"][1]) ** 2) ** 0.5
@@ -103,7 +144,7 @@ def convert(data, start, rois=None):
                     s["stopped"] = True
                     ev(t, "VEHICLE_STOPPED", fr["cam_id"], vid, o["track_id"], sid, "bay" if "-BAY-" in s["zone"] else "queue")
         for k, s in trk.items():                      # 이번 프레임에 안 보인 트럭 = 구역 밖
-            if k[0] == fr["cam_id"] and k not in trucks:
+            if k[0] == fr["cam_id"] and k not in trucks and t - seen.get(k, (s["since"],))[0] > 1.0:   # 1초 넘게 안 보이면 구역 밖
                 move(t, k[0], sid, k[1], s, None)
         for o in fr["objects"]:
             if o["cls"] != "person" or sid is None:
@@ -129,6 +170,14 @@ def convert(data, start, rois=None):
                     ev(t, "SAFETY_ALERT", fr["cam_id"], s["vid"], k[1], sid, "back" if z.get("rule") == "후진 경로" else "rear",
                        {"level": "L3", "rule": z.get("rule", "덤프 반경 5m"), "zone_id": z["id"], "person_track": o["track_id"],
                         "bay": int(n), "dist_m": None, "action": "앱 경고 · 하차 중지 요청"})
+    if flush and data["frames"]:            # 영상 한 번 = 반입 한 번: 끝날 때 하차장에 남은 차는 이탈로 닫는다
+        t_end = max(f["t"] for f in data["frames"])
+        for (cam_id, tid), s in trk.items():
+            if s["zone"] and "-BAY-" in s["zone"]:
+                sid = s["zone"].split("-")[0]
+                ev(t_end, "BAY_EXIT", cam_id, s["vid"], tid, sid, "bay", {"bay": int(s["zone"].rsplit("-", 1)[1]), "closed_at_clip_end": True})
+                ev(t_end, "ZONE_EXIT", cam_id, s["vid"], tid, sid, "bay")
+                s["zone"] = None
     return out
 
 

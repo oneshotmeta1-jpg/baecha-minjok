@@ -23,6 +23,7 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 from app.runtime import REASONS, Runtime  # noqa: E402
 from app.sim import STEP, load  # noqa: E402
+from app.cams import cam_list  # noqa: E402
 
 DATA = ROOT / "data"
 WEB = ROOT / "web"
@@ -249,6 +250,16 @@ async def mode():
     return {"mode": "video" if rt.video else "sim"}
 
 
+# ---------- 영상 채널 (R9): data/cams.json + 해커톤/영상/ ----------
+CAMS = load("cams.json") if (DATA / "cams.json").exists() else {"dir": "영상", "cams": []}
+MEDIA = ROOT / CAMS.get("dir", "영상")
+
+
+@app.get("/api/cams")
+async def cams():
+    return {"cams": cam_list(CAMS, MEDIA), "time_scale": CAMS.get("time_scale", 1), "mode": "video" if rt.video else "sim"}
+
+
 @app.get("/api/panel2")
 async def panel2():
     """알림 패널 [순번 | 안전] (시안 v4)."""
@@ -381,6 +392,8 @@ async def index():
 
 
 app.mount("/web", StaticFiles(directory=WEB), name="web")
+if MEDIA.is_dir():   # 영상 폴더만 읽기 전용으로 (StaticFiles: Range 요청 지원 · 폴더 밖 경로 거절)
+    app.mount("/media", StaticFiles(directory=MEDIA), name="media")
 
 
 def lan_ips():

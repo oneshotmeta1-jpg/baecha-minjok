@@ -481,6 +481,21 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
 #camBays .bt{font-weight:700;font-size:14px} #camBays .vb{height:6px;border-radius:999px;background:#E4E4E1} #camBays .vb i{display:block;height:100%;border-radius:999px}
 #camBays .vch,.evlog .vch{display:inline-flex;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap}
 .evlog{list-style:none;margin:0;padding:0} .evlog li{display:flex;gap:8px;align-items:center;padding:7px 0;border-top:1px solid #EFEFEC;font-size:12.5px} .evlog .t{color:var(--muted);min-width:62px}
+
+/* 영상 채널 (R9) */
+.vwrap{position:relative} .vwrap video{display:block;width:100%;border-radius:14px;background:#1b1d1f}
+.vwrap.live canvas,.cam.live .vwrap canvas,.ythumb .vwrap canvas{position:absolute;inset:0;width:100%;height:100%;background:transparent!important;pointer-events:none}
+#bigWrap{max-width:calc((100vh - 300px) * 16 / 9);margin:0 auto}
+#bigWrap.live #bigCam{max-height:none}
+.vctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:13px} .vctl .num{font-weight:700;min-width:96px}
+.chip.live,.srcb{background:#D7263D;color:#fff}
+.ovt{display:inline-flex;gap:4px;flex-wrap:wrap} .ovt button{border:1px solid var(--line,#E3E3E0);background:#fff;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;color:var(--muted)}
+.ovt button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.cam{position:relative} .cam .srcb{position:absolute;top:8px;right:8px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;z-index:2}
+.cam:not(.live) .srcb{background:rgba(20,20,20,.65)}
+.cam.live .vwrap video{aspect-ratio:16/9;object-fit:cover}
+.srcd{margin-left:6px;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:999px;background:rgba(20,20,20,.12)} .srcd.on{background:#D7263D;color:#fff}
+#sideR .ythumb{border-radius:14px;overflow:hidden;flex:none;width:100%;max-width:280px} #sideR .ythumb video{border-radius:0}
 </style>
 </head>
 <body>
@@ -565,7 +580,7 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
 
   <div class="side" id="sideR" aria-label="호퍼 C · 다음 호출"></div>
   <section class="card c-cam" aria-label="CAM 4채널">
-    <div class="hd"><h2>③ CAM 4채널</h2><span class="sub">호퍼 A·B·C 측면 + 대기장 · 박스·추적 ID·구역 선·적재함 판정</span><span class="sp"></span><span class="chip blue">추론 재생 (시뮬레이션)</span></div>
+    <div class="hd"><h2>③ CAM 4채널</h2><span class="sub">호퍼 A·B·C 측면 + 대기장 · 박스·추적 ID·구역 선·적재함 판정</span><span class="sp"></span><span class="chip blue" id="camsSrc">추론 재생 (시뮬레이션)</span></div>
     <div class="bd"><div class="cams" id="cams"></div></div>
   </section>
 
@@ -694,8 +709,8 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
   <div class="mon-bar"><a class="pill-btn" href="#monitor">← 관제 화면</a><h1 id="camTitle">하역장 상세</h1><span id="camStat" class="mapsum"></span><span class="sp"></span><span class="chs" id="camChs" role="group" aria-label="카메라 전환"></span></div>
   <div class="cam-grid">
     <section class="card" aria-label="CAM 크게 보기">
-      <div class="hd"><h2 id="camName">CAM</h2><span class="chip blue">추론 결과 재생 (시뮬레이션)</span><span class="sp"></span><span class="cap">박스 · 추적 ID · 구역 선 · 적재함 판정</span></div>
-      <div class="bd"><canvas id="bigCam" width="1280" height="720"></canvas>
+      <div class="hd"><h2 id="camName">CAM</h2><span class="chip blue" id="camSrc">추론 결과 재생 (시뮬레이션)</span><span class="sp"></span><span class="ovt" id="ovToggles" role="group" aria-label="겹쳐 그리기"><button data-ov="box" aria-pressed="true">박스</button><button data-ov="id" aria-pressed="true">추적 ID</button><button data-ov="zone" aria-pressed="true">구역 선</button><button data-ov="radius" aria-pressed="true">덤프 하역 반경</button></span></div>
+      <div class="bd"><div class="vwrap" id="bigWrap"><video id="bigVid" muted loop playsinline preload="auto" hidden></video><canvas id="bigCam" width="1280" height="720"></canvas></div><div class="vctl" id="vctl" hidden><span class="chip live">LIVE(영상)</span><span class="num" id="vTime">00:00 / 00:00</span><button class="pill-btn" id="vPlay">일시정지</button><span class="seg" role="group" aria-label="재생 속도"><button data-rate="1" aria-pressed="true">×1</button><button data-rate="4" aria-pressed="false">×4</button><button data-rate="8" aria-pressed="false">×8</button></span><span class="cap" id="vNote"></span></div>
         <div class="bays3" id="camBays"></div>
         <p class="cap">판정 규칙: 박스 아래 중심점이 베이·대기선 구역 안에 3초 이상 있으면 진입으로 본다. 덤프트럭 전체 박스의 세로/가로 비율이 0.6 이상이면 적재함 상승(하차 중)으로 판정한다. 지금 화면의 차량·각도는 시뮬레이터가 만든 합성 화면이다(실제 영상 연결 전).</p></div>
     </section>
@@ -964,7 +979,47 @@ function drawVehicles(vs,road){
 }
 
 /* ---------- CAM (측면 시점 합성 화면 + 판정 오버레이) ---------- */
-$('#cams').innerHTML=S.cams.map(c=>'<div class="cam" id="cam-'+c.id+'" role="button" tabindex="0" aria-label="'+esc(c.id+' '+c.name)+' 크게 보기"><canvas width="640" height="330"></canvas><div class="jd">영상 준비 중</div></div>').join('');
+/* ---------- 영상 채널 (R9): /api/cams → 영상이 있으면 LIVE(영상), 없으면 시뮬레이션 그림 ---------- */
+const VC={}; let VSCALE=1;
+try{ const r=await (await fetch('/api/cams')).json(); (r.cams||[]).forEach(c=>{ if(c.source==='video') VC[c.camera]=c; }); VSCALE=r.time_scale||1; }catch(e){}
+const isLive=id=>!!VC[id];
+const DET={};
+async function loadDet(id){ if(id in DET) return DET[id]; DET[id]=null; const c=VC[id]; if(c&&c.det_url){ try{ DET[id]=await (await fetch(c.det_url)).json(); }catch(e){} } return DET[id]; }
+Object.keys(VC).forEach(loadDet);
+function detAt(d,t){ if(!d||!d.frames.length) return null; const F=d.frames; let lo=0,hi=F.length-1; while(lo<hi){ const m=(lo+hi+1)>>1; if(F[m].t<=t) lo=m; else hi=m-1; } return F[lo]; }
+const OV={box:true,id:true,zone:true,radius:true};
+const ZCOL={하차:'#5BD38F',대기:'#F0A54A',위험:'#FF5A6E'};
+function drawOv(cv,id,t,small){
+  const c=VC[id], ctx=cv.getContext('2d'); if(!c) return; const [fw,fh]=c.size;
+  if(cv.width!==fw||cv.height!==fh){ cv.width=fw; cv.height=fh; }
+  ctx.clearRect(0,0,fw,fh); const lw=Math.max(2,fw/480), fs=Math.round(fw/(small?40:64));
+  ctx.font='700 '+fs+'px Inter,Noto Sans KR,sans-serif'; ctx.lineJoin='round';
+  if(OV.zone||OV.radius) (c.zones||[]).forEach(z=>{ if(z.type==='위험'?!OV.radius:!OV.zone) return;
+    ctx.setLineDash([lw*4,lw*3]); ctx.lineWidth=lw; ctx.strokeStyle=ZCOL[z.type]||'#fff'; ctx.beginPath(); z.points.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.closePath(); ctx.stroke();
+    if(z.type==='위험'){ ctx.fillStyle='rgba(255,90,110,.12)'; ctx.fill(); } ctx.setLineDash([]);
+    if(!small){ ctx.fillStyle=ZCOL[z.type]; ctx.fillText(z.name,z.points[0][0]+6,z.points[0][1]+fs+4); } });
+  const f=detAt(DET[id],t); if(!f||!OV.box) return;
+  const zs=(c.zones||[]).filter(z=>z.type!=='위험');
+  const TB=f.objects.filter(o=>o.cls==='truck').map(o=>o.bbox);
+  const inner=b=>TB.some(q=>q!==b&&(q[2]-q[0])*(q[3]-q[1])>(b[2]-b[0])*(b[3]-b[1])&&Math.max(0,Math.min(b[2],q[2])-Math.max(b[0],q[0]))*Math.max(0,Math.min(b[3],q[3])-Math.max(b[1],q[1]))>=0.8*(b[2]-b[0])*(b[3]-b[1]));
+  f.objects.forEach(o=>{ const b=o.bbox, w=b[2]-b[0], h=b[3]-b[1], truck=o.cls==='truck';
+    if(truck&&(w*h<fw*fh*0.003||inner(b))) return;   // 작은 오탐 · 큰 트럭 박스 안의 중복 박스(운전석만 잡힌 것 등)는 숨김
+    const fx=(b[0]+b[2])/2, fy=b[3], inZ=zs.find(z=>ptIn([fx,fy],z.points)), out=truck&&!inZ;   // 구역 밖 트럭(원료 벽 오탐 등)은 판정하지 않음
+    const rr=truck?medRatio(DET[id],t,o.track_id,h/w):0, up=truck&&!out&&rr>=0.6, col=out?'#9AA0A6':truck?(up?'#F0A54A':'#5BD38F'):'#FF5A6E';
+    ctx.lineWidth=lw*1.2; ctx.strokeStyle=col; ctx.strokeRect(b[0],b[1],w,h);
+    const lab=(OV.id?'#'+o.track_id+' · ':'')+(out?'구역 밖':truck?(up?'적재함↑ '+rr.toFixed(2):'트럭 '+rr.toFixed(2)):'사람')+(inZ&&!small?' · '+inZ.name.split(' ')[0]+' '+(inZ.name.split(' ')[1]||''):'');
+    const tw2=ctx.measureText(lab).width+10; ctx.fillStyle=col; ctx.fillRect(b[0],Math.max(0,b[1]-fs-8),tw2,fs+8); ctx.fillStyle='#141414'; ctx.fillText(lab,b[0]+5,Math.max(fs,b[1]-6)); });
+}
+function medRatio(d,t,tid,now){ // 같은 추적 ID의 최근 1초 세로/가로 중앙값(한 프레임 흔들림 무시 · 변환기와 같은 규칙)
+  if(!d) return now; const F=d.frames, r=[]; let lo=0,hi=F.length-1; while(lo<hi){ const m=(lo+hi+1)>>1; if(F[m].t<=t) lo=m; else hi=m-1; }
+  for(let i=lo;i>=0&&t-F[i].t<=1;i--) F[i].objects.forEach(o=>{ if(o.track_id===tid&&o.cls==='truck'){ const b=o.bbox; r.push((b[3]-b[1])/Math.max(1,b[2]-b[0])); } });
+  if(!r.length) return now; r.sort((a,b)=>a-b); return r[r.length>>1]; }
+function ptIn(pt,poly){ let c=false; for(let i=0,j=poly.length-1;i<poly.length;j=i++){ const [xi,yi]=poly[i],[xj,yj]=poly[j]; if((yi>pt[1])!==(yj>pt[1])&&pt[0]<(xj-xi)*(pt[1]-yi)/((yj-yi)||1e-9)+xi) c=!c; } return c; }
+const mmss2=t=>String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');
+function liveVideo(id,cls){ const v=document.createElement('video'); v.src=VC[id].video_url; v.muted=true; v.loop=true; v.autoplay=true; v.playsInline=true; v.preload='auto'; if(cls) v.className=cls; v.setAttribute('aria-label',id+' 실제 영상'); return v; }
+$('#cams').innerHTML=S.cams.map(c=>'<div class="cam'+(isLive(c.id)?' live':'')+'" id="cam-'+c.id+'" role="button" tabindex="0" aria-label="'+esc(c.id+' '+c.name)+' 크게 보기"><div class="vwrap"><canvas width="640" height="330"></canvas></div><span class="srcb">'+(isLive(c.id)?'LIVE(영상)':'시뮬레이션')+'</span><div class="jd">영상 준비 중</div></div>').join('');
+S.cams.forEach(c=>{ if(!isLive(c.id)) return; const w=$('#cam-'+c.id+' .vwrap'); w.insertBefore(liveVideo(c.id),w.firstChild); });
+const nLive=S.cams.filter(c=>isLive(c.id)).length; if(nLive){ $('#camsSrc').textContent=nLive===S.cams.length?'영상 '+nLive+'채널 · 탐지 결과 재생':'영상 '+nLive+' · 시뮬레이션 '+(S.cams.length-nLive); $('#camsSrc').classList.replace('blue','live'); }
 S.cams.forEach(c=>{const b=$('#cam-'+c.id);b.addEventListener('click',()=>openCam(c.id));b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openCam(c.id);}});});
 const camOf=Object.fromEntries(S.cams.map(c=>[c.id,c]));
 
@@ -1058,6 +1113,7 @@ function drawCams(st){
   const byId=Object.fromEntries(st.vehicles.map(v=>[v.id,v])), clock=hhmm(st.clock);
   S.cams.forEach(c=>{
     const box=$('#cam-'+c.id), cv=box.querySelector('canvas');
+    if(isLive(c.id)){ box.querySelector('.jd').textContent=VC[c.id].limit?'탐지 안 됨 · 파인튜닝 필요':'판정 · 영상 탐지 결과 재생'; return; }
     if(c.sector_id){ const s=st.sectors.find(x=>x.id===c.sector_id); renderHopperCam(cv,c,s,byId,clock); box.classList.toggle('down',s.status==='down'); }
     else renderYardCam(cv,c,st,clock);
     box.querySelector('.jd').textContent='판정 · '+camSummary(c,st);
@@ -1071,12 +1127,13 @@ function drawBig(st){
   const sec=c.sector_id?st.sectors.find(x=>x.id===c.sector_id):null;
   $('#camTitle').textContent=(sec?sec.name+' 하역장 상세':'대기장 상세');
   $('#camName').textContent=c.id+' · '+c.name+(sec?' 측면':'');
-  $('#camChs').innerHTML=S.cams.map(x=>'<button class="pill-btn'+(x.id===camId?' dark':'')+'" data-cam="'+x.id+'" aria-pressed="'+(x.id===camId)+'">'+esc(x.id+' · '+x.name)+'</button>').join('');
+  $('#camChs').innerHTML=S.cams.map(x=>'<button class="pill-btn'+(x.id===camId?' dark':'')+'" data-cam="'+x.id+'" aria-pressed="'+(x.id===camId)+'">'+esc(x.id+' · '+x.name)+'<span class="srcd'+(isLive(x.id)?' on':'')+'">'+(isLive(x.id)?'LIVE':'시뮬')+'</span></button>').join('');
   if(sec){ const lv=sec.status==='down'?'down':sec.level;
     const nSafe=sec.working.filter(w=>w.safety).length;
     $('#camStat').innerHTML='<span class="chip '+lv+'">'+LV_TEXT[lv]+(sec.status==='down'?'':' '+sec.congestion_pct+'%')+'</span><span class="chip">하역 중 <b class="num">'+sec.working.length+'/'+sec.bays+'</b> · 대기 <b class="num">'+sec.queue.length+'</b></span>'+(nSafe?'<span class="chip crit">안전 경고 <b class="num">'+nSafe+'</b></span>':'')+'<a class="pill-btn" href="#settings" data-roi="1">구역(ROI) 다시 그리기</a>'; drawBays(st,sec); loadCamEv(sec.id,st.clock); }
   else { $('#camStat').innerHTML='<span class="chip">대기장 <b class="num">'+st.counts.yard+'대</b></span><span class="chip">호출 이동 <b class="num">'+st.counts.moving+'대</b></span>'; $('#camBays').innerHTML=''; loadCamEv(null,st.clock); }
-  const det=sec?renderHopperCam(cv,c,sec,byId,hhmm(st.clock)):renderYardCam(cv,c,st,hhmm(st.clock));
+  const live=isLive(camId); setBigLive(live);
+  const det=live?[]:(sec?renderHopperCam(cv,c,sec,byId,hhmm(st.clock)):renderYardCam(cv,c,st,hhmm(st.clock)));
   $('#dlgCount').textContent='이 프레임 · '+det.length+'대';
   $('#dlgRows').innerHTML=det.length?det.map(d=>'<tr><td class="num">#'+esc(d.id)+'</td><td class="plate">'+esc(d.veh)+'</td><td>'+esc(d.zone)+'</td><td class="r num">'+Math.floor(d.stay)+'분</td><td class="r num">'+(d.deg?d.deg+'°':'—')+'</td><td>'+esc(d.judge)+'</td></tr>').join(''):'<tr><td colspan="6" class="empty">이 채널에 잡힌 차량이 없습니다.</td></tr>';
 }
@@ -1113,6 +1170,26 @@ async function loadCamEv(sid,clock){
     :'<li class="cap">최근 10분 동안 이벤트가 없습니다.</li>';
 }
 $('#camStat').addEventListener('click',e=>{ if(e.target.closest('[data-roi]')) setTimeout(()=>{ const b=document.querySelector('[data-stab=roi]'); if(b) b.click(); },60); });
+
+/* 큰 화면 영상 재생 · 겹치기 · ×1/×4/×8 (시안 SectorCam) */
+let bigLiveId=null;
+function setBigLive(live){
+  const v=$('#bigVid'), cv=$('#bigCam'), id=camId;
+  $('#camSrc').textContent=live?(VC[id].limit?'영상 재생 · 탐지 없음':'영상 · 탐지 결과 재생'):'추론 결과 재생 (시뮬레이션)';
+  $('#vctl').hidden=!live; $('#ovToggles').hidden=!live; $('#bigWrap').classList.toggle('live',live);
+  if(!live){ if(bigLiveId){ v.pause(); v.hidden=true; v.removeAttribute('src'); v.load(); bigLiveId=null; } return; }
+  if(bigLiveId!==id){ bigLiveId=id; v.hidden=false; v.src=VC[id].video_url; v.playbackRate=Number(document.querySelector('[data-rate][aria-pressed=true]').dataset.rate); v.play().catch(()=>{}); loadDet(id); }
+  $('#vNote').textContent=VC[id].limit||('탐지: '+((DET[id]&&DET[id].model)||'YOLO')+' · 박스 아래 중심점이 구역 안 3초 이상 → 진입 · 세로/가로 ≥ 0.6 → 적재함 상승 · 이벤트는 영상 한 번 = 반입 한 번(반복 재생은 화면만)');
+}
+$('#vPlay').addEventListener('click',()=>{ const v=$('#bigVid'); if(v.paused){ v.play(); $('#vPlay').textContent='일시정지'; } else { v.pause(); $('#vPlay').textContent='재생'; } });
+document.querySelectorAll('[data-rate]').forEach(b=>b.addEventListener('click',()=>{ document.querySelectorAll('[data-rate]').forEach(x=>x.setAttribute('aria-pressed',String(x===b))); $('#bigVid').playbackRate=Number(b.dataset.rate); }));
+document.querySelectorAll('[data-ov]').forEach(b=>b.addEventListener('click',()=>{ OV[b.dataset.ov]=!OV[b.dataset.ov]; b.setAttribute('aria-pressed',String(OV[b.dataset.ov])); }));
+(function vloop(){
+  if(bigLiveId&&!$('#view-cam').hidden){ const v=$('#bigVid'); drawOv($('#bigCam'),bigLiveId,v.currentTime,false); $('#vTime').textContent=mmss2(v.currentTime)+' / '+mmss2(v.duration||0); }
+  if(!$('#view-monitor').hidden) Object.keys(VC).forEach(id=>{ const box=$('#cam-'+id); if(!box||!box.offsetParent) return; const v=box.querySelector('video'); drawOv(box.querySelector('canvas'),id,v?v.currentTime:0,true); });
+  const yt=document.querySelector('#sideR .ythumb'); if(yt&&yt.offsetParent){ const v=yt.querySelector('video'), cv=yt.querySelector('canvas'); if(v&&cv) drawOv(cv,'CAM-04',v.currentTime,true); }
+  requestAnimationFrame(vloop);
+})();
 $('#camChs').addEventListener('click',e=>{const b=e.target.closest('[data-cam]'); if(b) openCam(b.dataset.cam);});
 
 /* ---------- 가정값 탭 ---------- */
@@ -1233,12 +1310,17 @@ function yardCard(s){
     return vrow(r.vehicle_id,r.load_t+'t · '+r.cargo,ch,note,r.urgent?'#B8420A':null); }).join('');
   return '<a class="hpc yc" href="#dock" aria-label="차량 대기장 · 순번 보기">'+
     '<div class="top"><div><div class="nm">차량 대기장</div><div class="role">CAM-04(후보) · 순번은 순번·배정</div></div><span class="lvb" style="background:#F3F3F1;color:#3C4043">대기 '+c.yard+'대</span></div>'+
+    (isLive('CAM-04')?'<div class="ythumb" data-thumb="CAM-04"></div>':'')+
     '<div class="t3s">'+tile3('대기',c.yard,'대')+tile3('호출 이동',c.moving,'대')+tile3('평균 대기',k.yard_avg_wait||0,'분')+'</div>'+
     (li?'<ul class="vl">'+li+'</ul>':'<span class="cap">대기장에서 기다리는 차량이 없습니다.</span>')+'</a>';
 }
+let yThumb=null;
 function renderSides(s){
   $('#sideL').innerHTML='';
   $('#sideR').innerHTML='<div class="cards4">'+s.sectors.map(x=>sideCard(x,s)).join('')+yardCard(s)+'</div>';
+  const th=$('#sideR .ythumb');
+  if(th){ if(!yThumb){ yThumb=document.createElement('div'); yThumb.className='vwrap'; yThumb.appendChild(liveVideo('CAM-04')); yThumb.appendChild(Object.assign(document.createElement('canvas'),{width:1920,height:1080})); }
+    th.appendChild(yThumb); const v=yThumb.querySelector('video'); if(v.paused) v.play().catch(()=>{}); }
 }
 ['#sideL','#sideR'].forEach(id=>{
   $(id).addEventListener('click',e=>{const h=e.target.closest('[data-cam]'); if(h) openCam(h.dataset.cam);});

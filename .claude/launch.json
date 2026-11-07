@@ -28,6 +28,18 @@
         "--check"
       ],
       "port": 8001
+    },
+    {
+      "name": "dock-video",
+      "runtimeExecutable": "C:\\Users\\mypc\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+      "runtimeArgs": [
+        "D:\\내문서 및 바탕화면\\Desktop\\해커톤\\app\\server.py",
+        "--video",
+        "--check",
+        "--port",
+        "8002"
+      ],
+      "port": 8002
     }
   ]
 }
