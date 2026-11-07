@@ -17,17 +17,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect  # noqa: E402
+from fastapi import Body, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect  # noqa: E402
 from fastapi.responses import FileResponse, JSONResponse, Response  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 from app.runtime import REASONS, Runtime  # noqa: E402
 from app.sim import STEP, load  # noqa: E402
 from app.cams import cam_list  # noqa: E402
+from app import auth  # noqa: E402
 
 DATA = ROOT / "data"
 WEB = ROOT / "web"
-VERSION = "v9"
+VERSION = "v12"
 TICK = 0.1  # 실제 초
 
 rt = Runtime(seed=7, db_path=DATA / "events.db", assumptions_path=DATA / "assumptions.json")
@@ -376,6 +377,9 @@ async def ack(alert_id: str):
 
 @app.websocket("/ws")
 async def ws(socket: WebSocket):
+    if getattr(app.state, "ws_user", None) and not app.state.ws_user(socket):
+        await socket.close(code=4401)          # 로그인 안 함 · 운전자(관제 화면 실시간은 관제·현장만)
+        return
     await socket.accept()
     clients.add(socket)
     try:
@@ -389,6 +393,30 @@ async def ws(socket: WebSocket):
 @app.get("/")
 async def index():
     return FileResponse(WEB / "index.html")
+
+
+@app.get("/login")
+async def login_page():
+    return FileResponse(WEB / "login.html")
+
+
+@app.get("/signup")
+async def signup_page():
+    return FileResponse(WEB / "signup.html")
+
+
+@app.get("/m/")
+async def mobile_page():
+    return FileResponse(WEB / "m" / "index.html")
+
+
+@app.get("/api/driver/me")
+async def driver_me(request: Request):
+    """운전자: 자기 차량(가입한 차량번호)의 지금 상태만."""
+    u = getattr(request.state, "user", None) or {}
+    plate = (u.get("vehicle") or {}).get("plate")
+    v = next((x for x in rt.state()["vehicles"] if x["id"] == plate), None)
+    return {"plate": plate, "vehicle": v}
 
 
 app.mount("/web", StaticFiles(directory=WEB), name="web")
@@ -423,6 +451,7 @@ if __name__ == "__main__":
     ap.add_argument("--video", action="store_true", help="영상 모드: 차량 움직임은 /api/ingest 이벤트로만 (비전 결과 재생)")
     ap.add_argument("--check", action="store_true",
                     help="확인용 서버: 이벤트 DB·가정값 파일을 건드리지 않고 메모리에서만 돈다 (켜 둔 공유 서버와 같이 써도 됨)")
+    ap.add_argument("--no-auth", action="store_true", help="로그인 없이(지금처럼 관제 담당자로) — 시연용")
     args = ap.parse_args()
     if args.video:
         rt = Runtime(seed=7, video=True)    # 영상 모드: tools/replay_events.py 또는 비전 모듈이 /api/ingest로 이벤트를 보낸다
@@ -432,8 +461,12 @@ if __name__ == "__main__":
         sys.stdout.reconfigure(encoding="utf-8")   # 실행 창·로그에서 한글이 깨지지 않게
     except (AttributeError, ValueError):
         pass
+    import os
+    auth.install(app, None if args.no_auth else auth.AuthStore(":memory:" if args.check else DATA / "auth.db"),
+                 no_auth=args.no_auth, secure_cookie=False, ingest_token=os.environ.get("DOCK_INGEST_TOKEN"),
+                 shift_label=rt.rec.settings.get("shift", {}).get("label", "오후 교대"))
     host = "0.0.0.0" if args.lan else "127.0.0.1"
-    print(f"이 PC: http://127.0.0.1:{args.port}/")
+    print(f"이 PC: http://127.0.0.1:{args.port}/" + ("  (로그인 없이 --no-auth)" if args.no_auth else "  (로그인 필요 · 처음이면 /signup에서 관제 담당자로 가입 = 관리자)"))
     if args.lan:
         for ip in lan_ips():
             print(f"팀원 공유 주소: http://{ip}:{args.port}/")

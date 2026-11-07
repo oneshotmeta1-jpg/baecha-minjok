@@ -472,7 +472,8 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
 #sideR .vch{display:inline-flex;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:600}
 #sideR .vb{height:5px;border-radius:999px;background:#E4E4E1;margin-top:5px} #sideR .vb i{display:block;height:100%;border-radius:999px}
 @media (max-width:1280px){ #sideR .cards4{grid-template-columns:minmax(0,1fr);height:auto} }
-.who{display:inline-flex;align-items:center;gap:8px;font-size:13px;line-height:1.15;white-space:nowrap}
+.who{display:inline-flex;align-items:center;gap:8px;font-size:13px;line-height:1.15;white-space:nowrap;border:0;background:transparent;font:inherit;color:inherit;padding:2px 6px 2px 2px;border-radius:999px;cursor:pointer;text-align:left}
+.who:hover,.who[aria-expanded="true"]{background:var(--soft)} .mme{font-size:12.5px;color:var(--ink-2);line-height:1.6;padding:2px 4px 6px} .mme b{font-size:14px;color:var(--ink)}
 .who .av{width:34px;height:34px;border-radius:50%;background:var(--ink);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
 .who small{display:block;color:var(--muted);font-size:11.5px}
 /* R10 헤더: 시계 칩 · 시연 메뉴 · 폭이 모자라면 ① 부제 ② 담당자 이름 ③ 메뉴 간격 ④ "시뮬레이션" 순서로 줄임 */
@@ -543,7 +544,7 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
       <p class="mnote" id="demoState"></p>
     </div>
   </div>
-  <span class="who" title="관제 담당자 · 오후 교대 (로그인은 추후 구현 · 지금은 고정 표시)"><span class="av">관</span><span class="wn"><b>관제 담당자</b><small>오후 교대</small></span></span>
+  <div class="dd" id="whoDD"><button class="who" id="whoChip" aria-haspopup="true" aria-expanded="false" aria-controls="whoMenu" title="내 정보 · 로그아웃"><span class="av" id="whoAv">관</span><span class="wn"><b id="whoName">관제 담당자</b><small id="whoSub">오후 교대</small></span></button><div class="menu" id="whoMenu" role="menu" aria-label="내 계정" hidden><div class="mme" id="whoInfo"></div><button class="pill-btn" id="logoutBtn" role="menuitem">로그아웃</button></div></div>
   <button class="bell" id="bellBtn" aria-label="알림 패널 열기" aria-expanded="false" aria-controls="panel"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="cnt num" id="bellCnt" hidden></span></button>
 </header>
 
@@ -768,6 +769,10 @@ const LV_FILL={ok:'#DDF0E5',warn:'#FFE9DD',crit:'#FBD5DA'};
 const LV_TEXT={ok:'원활',warn:'주의',crit:'혼잡',down:'정지'};
 const PILE_COLOR={'분광':'#9C5B47','석회석':'#D8D4C8','사문암·규석':'#8FA58C','밀스케일·더스트':'#5A5856','분코크스·무연탄':'#2F2F2F'};
 
+/* R11 로그인: API가 401이면 로그인 화면으로 · 헤더 담당자 칩 = 로그인한 사람 */
+const _fetch=window.fetch.bind(window);
+window.fetch=async(u,o)=>{ const r=await _fetch(u,o); if(r.status===401&&String(u).startsWith('/api/')&&!String(u).startsWith('/api/auth/')) location.replace('/login'); return r; };
+const ME=await (await fetch('/api/me')).json().catch(()=>null);
 const cfg=await (await fetch('/api/config')).json();
 const S=cfg.sectors;
 if(S.site) $('#siteName').textContent=S.site.name+' · 시뮬레이션';
@@ -1238,12 +1243,17 @@ document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',
 /* 헤더 메뉴(시계 칩 · 시연): 버튼으로 열고 바깥 클릭 · Esc로 닫힘 */
 const cap99=n=>n>99?'99+':String(n);
 let BADGE=null; try{ const q=new URLSearchParams(location.search).get('badge'); if(q!=null&&q!=='') BADGE=Math.max(0,parseInt(q,10)||0); }catch(e){}   // 스크린샷 확인용(tools/capture_header.py)
-const DDS=[['#simChip','#simMenu'],['#demoChip','#demoMenu']];
+const DDS=[['#simChip','#simMenu'],['#demoChip','#demoMenu'],['#whoChip','#whoMenu']];
 function closeDD(except){ DDS.forEach(([b,m])=>{ if(b!==except){ $(m).hidden=true; $(b).setAttribute('aria-expanded','false'); } }); }
 DDS.forEach(([b,m])=>$(b).addEventListener('click',e=>{ e.stopPropagation(); const open=$(m).hidden; closeDD(b); $(m).hidden=!open; $(b).setAttribute('aria-expanded',String(open)); if(open){ const f=$(m).querySelector('button,select'); if(f) f.focus(); } }));
 document.addEventListener('click',e=>{ if(!e.target.closest('.dd')) closeDD(); });
 document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return; const o=DDS.find(([b,m])=>!$(m).hidden); if(o){ closeDD(); $(o[0]).focus(); } });
 ['#resetBtn','#urgentBtn','#safetyBtn'].forEach(id=>$(id).addEventListener('click',()=>setTimeout(()=>closeDD(),0)));
+if(ME&&ME.name){ $('#whoName').textContent=ME.name; $('#whoAv').textContent=(ME.name||'관').slice(0,1); $('#whoSub').textContent=ME.role_name+' · '+(ME.shift||'');
+  $('#whoChip').title=ME.name+' · '+ME.role_name+' · '+(ME.shift||'')+' — 내 정보 · 로그아웃';
+  $('#whoInfo').innerHTML='<b>'+esc(ME.name)+'</b><br>'+esc(ME.role_name)+(ME.is_admin?' · 관리자':'')+'<br>아이디 '+esc(ME.login_id)+(ME.dept?'<br>'+esc(ME.dept):'')+'<br>'+esc(ME.shift||'')+(ME.no_auth?'<br><span style="color:var(--muted)">로그인 없이 켠 서버(--no-auth)</span>':'');
+  if(ME.no_auth) $('#logoutBtn').hidden=true; }
+$('#logoutBtn').addEventListener('click',()=>fetch('/api/auth/logout',{method:'POST'}).then(()=>location.replace('/login')));
 let last=null;
 function render(s){
   last=s;
@@ -1949,7 +1959,7 @@ function connect(){
   const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws');
   ws.onopen=()=>{ $('#conn').classList.add('on'); $('#conn').title='실시간 연결됨'; if(poll){clearInterval(poll);poll=null;} };
   ws.onmessage=e=>render(JSON.parse(e.data));
-  ws.onclose=()=>{ $('#conn').classList.remove('on'); $('#conn').title='재연결 중'; if(!poll) poll=setInterval(refresh,1000); setTimeout(connect,2000); };
+  ws.onclose=e=>{ if(e.code===4401){ fetch('/api/me'); return; } $('#conn').classList.remove('on'); $('#conn').title='재연결 중'; if(!poll) poll=setInterval(refresh,1000); setTimeout(connect,2000); };
 }
 setMonMode(monMode); setMapView(mapView); route(); refresh(); connect();
 })();
