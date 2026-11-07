@@ -63,5 +63,9 @@
     "zone_hold_sec": 3,
     "stop_px_per_sec": 4,
     "dump_raised_ratio": 0.6
+  },
+  "shift": {
+    "label": "오후 교대",
+    "_note": "헤더 담당자 칩에 보이는 교대 이름(R11)"
   }
 }

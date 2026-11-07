@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>하역관제 · 모바일</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/web/auth.css">
+<style>
+.wrap{max-width:430px;margin:0 auto;min-height:100vh;padding:20px 16px 24px;display:flex;flex-direction:column;gap:16px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.who{font-size:13px;color:var(--muted);font-weight:600}
+.box{background:#fff;border-radius:28px;padding:22px;display:flex;flex-direction:column;gap:12px}
+.box h1{font-size:22px;margin:0} .box p{margin:0;font-size:14px;color:var(--ink-2);line-height:1.6}
+.dark{background:var(--ink);color:#fff} .dark p{color:#C9CDD1}
+ul{margin:0;padding-left:18px;font-size:13.5px;color:var(--ink-2);line-height:1.8}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="top"><div class="brandrow"><span class="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5h11v9.5h-11z"/><path d="M13.5 9.5h4.2l3.3 3.4v3.1h-7.5z"/><circle cx="6.5" cy="17.5" r="1.9"/><circle cx="17" cy="17.5" r="1.9"/></svg></span>하역관제</div><span class="who" id="who"></span></div>
+  <section class="box dark"><h1 id="hi">안녕하세요</h1><p id="role"></p></section>
+  <section class="box"><h1>모바일 화면 준비 중</h1><p>다음 단계(R12)에서 이 자리에 열려요.</p><ul id="next"></ul></section>
+  <button class="btn" id="out">로그아웃</button>
+</main>
+<script>
+const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+fetch('/api/me').then(r=>{ if(r.status===401){ location.replace('/login'); return null; } return r.json(); }).then(u=>{ if(!u) return;
+  $('#who').textContent=u.role_name; $('#hi').textContent=u.name+'님, 안녕하세요';
+  $('#role').textContent=u.role==='driver'?'차량 '+((u.vehicle||{}).plate||'')+' · '+((u.vehicle||{}).tonnage||'')+' · '+((u.vehicle||{}).carrier||''):'담당 하역장 '+(u.hoppers||[]).map(h=>h==='YARD'?'대기장':'호퍼 '+h).join(' · ');
+  $('#next').innerHTML=(u.role==='driver'?['운행 등록(싣고 온 원료 · 중량)','대기 — 내 순번 · 예상 호출','호출 — ○번 베이로 이동','도착 확인 · 덤프 하역 안전 경고']:['하역 현황 · 안전 경고 확인/오탐지','호출 순번 승인 · 변경','알림 · 내 정보']).map(x=>'<li>'+esc(x)+'</li>').join(''); });
+$('#out').onclick=()=>fetch('/api/auth/logout',{method:'POST'}).then(()=>location.replace('/login'));
+</script>
+</body>
+</html>

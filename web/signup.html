@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>회원가입 · 하역관제</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/web/auth.css">
+<style>
+.wrap{min-height:100vh;padding:28px 32px 24px;display:grid;grid-template-columns:560px minmax(0,1fr);gap:24px;align-items:start}
+.left{display:flex;flex-direction:column;gap:14px}
+.top{display:flex;justify-content:space-between;align-items:center} .top a{font-size:14px;font-weight:600;color:var(--ink-2);min-height:44px;display:inline-flex;align-items:center;text-decoration:none}
+h1{font-size:32px;margin:10px 0 0} .lead{font-size:14.5px;color:var(--muted);margin:6px 0 0}
+.steps{list-style:none;padding:0;margin:14px 0 4px;display:flex;align-items:center;gap:10px}
+.steps .st{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--muted)}
+.steps .st i{width:28px;height:28px;border-radius:999px;background:var(--soft);color:var(--muted);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:13px}
+.steps .st.on{color:var(--ink)} .steps .st.on i{background:var(--ink);color:#fff}
+.steps .bar{flex:1;min-width:20px;height:2px;background:var(--line)} .steps .bar.on{background:var(--ink)}
+.rolecards{display:flex;flex-direction:column;gap:12px}
+.rc{border:1px solid var(--line);border-radius:22px;padding:18px;color:var(--ink);display:flex;flex-direction:column;gap:6px;background:#fff;text-align:left;font:inherit;cursor:pointer;position:relative}
+.rc:hover{border-color:var(--ink)} .rc[aria-checked="true"]{border:2px solid var(--ink);padding:17px}
+.rc .ic{width:40px;height:40px;border-radius:14px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:18px}
+.rc .ck{position:absolute;top:18px;right:18px;width:24px;height:24px;border-radius:999px;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff}
+.rc[aria-checked="true"] .ck{background:var(--ink);border-color:var(--ink)}
+.rc b{font-size:17px;margin-top:4px} .rc .w{font-size:12.5px;color:var(--muted)} .rc .d{font-size:13px;color:var(--ink-2);line-height:1.5}
+.card{background:#fff;border-radius:32px;padding:32px 36px;display:flex;flex-direction:column;gap:22px;min-height:620px}
+.card h2{font-size:20px;margin:0}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.ph{display:flex;gap:8px} .ph input{flex:1}
+fieldset{border:0;padding:0;margin:0} legend{padding:0;font-size:16px;font-weight:700} fieldset p{font-size:13px;color:var(--muted);margin:4px 0 10px}
+.tg{display:flex;flex-wrap:wrap;gap:8px} .tg button{min-height:44px;padding:0 18px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink-2);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.tg button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.consent{display:flex;flex-direction:column;gap:12px;background:var(--soft-2);border-radius:20px;padding:18px}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;flex-wrap:wrap} .foot span{font-size:13px;color:var(--muted)} .foot div{display:flex;gap:8px}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);text-align:center;font-size:14px}
+.done{flex:1;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:14px}
+.done .big{font-size:26px;font-weight:700} .done .who{font-size:14px;color:var(--ink-2)}
+.mstep{display:none}
+@media (max-width:900px){
+  .wrap{grid-template-columns:minmax(0,1fr);padding:20px 16px 24px;gap:16px}
+  h1{font-size:24px} .steps{display:none} .mstep{display:block;font-size:13px;color:var(--muted);font-weight:600}
+  .rolecards{flex-direction:row;gap:8px} .rc{flex:1;padding:12px 10px;border-radius:16px;align-items:center;text-align:center;gap:2px}
+  .rc[aria-checked="true"]{padding:11px 9px} .rc .ic,.rc .d,.rc .chip,.rc .ck,.rc .w{display:none} .rc b{font-size:15px;margin:0} .rc .w{font-size:11px}
+  .card{border-radius:28px;padding:20px;gap:16px;min-height:0} .grid{grid-template-columns:minmax(0,1fr)} .foot div{width:100%} .foot .btn{flex:1}
+}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="left" aria-label="역할 선택">
+    <div class="top"><div class="brandrow"><span class="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5h11v9.5h-11z"/><path d="M13.5 9.5h4.2l3.3 3.4v3.1h-7.5z"/><circle cx="6.5" cy="17.5" r="1.9"/><circle cx="17" cy="17.5" r="1.9"/></svg></span>하역관제</div><a href="/login">로그인</a></div>
+    <div><span class="mstep" id="mstep">1 / 3 · 역할 선택</span><h1>회원가입</h1><p class="lead">역할에 따라 보이는 화면과 받는 알림이 달라져요.</p>
+      <ol class="steps" aria-label="가입 단계"><li class="st" data-s="1"><i>1</i>역할 선택</li><li class="bar" data-b="1"></li><li class="st" data-s="2"><i>2</i>정보 입력</li><li class="bar" data-b="2"></li><li class="st" data-s="3"><i>3</i>승인 대기</li></ol></div>
+    <div class="rolecards" role="radiogroup" aria-label="역할">
+      <button class="rc" role="radio" aria-checked="false" data-role="control"><span class="ic" aria-hidden="true">🖥</span><span class="ck" aria-hidden="true">✓</span><b>관제 담당자</b><span class="w">관제실 · PC</span><span class="d">관제 화면, 호출 순번 승인, 기준값 설정, 운영 분석</span><span><span class="chip">관리자 승인 필요</span></span></button>
+      <button class="rc" role="radio" aria-checked="false" data-role="field"><span class="ic" aria-hidden="true">🦺</span><span class="ck" aria-hidden="true">✓</span><b>현장 담당자</b><span class="w">하역 현장 · 모바일 앱</span><span class="d">담당 하역장의 안전 경고와 운영 알림, 순번 승인·변경</span><span><span class="chip">관리자 승인 필요</span></span></button>
+      <button class="rc" role="radio" aria-checked="false" data-role="driver"><span class="ic" aria-hidden="true">🚚</span><span class="ck" aria-hidden="true">✓</span><b>운전자</b><span class="w">운송사 기사 · 모바일 앱</span><span class="d">원료 운행 등록, 호출 알림, 경로 안내, 덤프 하역 위험 경고</span><span><span class="chip blue">차량 확인 후 바로 사용</span></span></button>
+    </div>
+  </section>
+  <section class="card" id="card" aria-live="polite"></section>
+</main>
+<script>
+const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const RN={control:'관제 담당자',field:'현장 담당자',driver:'운전자'};
+let role=null, step=1, hop=new Set();
+function setStep(n){ step=n; document.querySelectorAll('.steps .st').forEach(e=>e.classList.toggle('on',+e.dataset.s<=n)); document.querySelectorAll('.steps .bar').forEach(e=>e.classList.toggle('on',+e.dataset.b<n));
+  $('#mstep').textContent=n+' / 3 · '+['','역할 선택','정보 입력','승인 대기'][n]; }
+const fld=(id,label,attrs,extra)=>'<label class="fld" data-f="'+id+'">'+label+(extra||'<input id="'+id+'" '+(attrs||'')+'>')+'<span class="err" id="e_'+id+'"></span></label>';
+const sel=(id,label,opts)=>fld(id,label,'','<select id="'+id+'"><option value="">'+label+' 선택</option>'+opts.map(o=>'<option>'+esc(o)+'</option>').join('')+'</select>');
+function form(){
+  setStep(2);
+  const phone='<label class="fld" data-f="phone">휴대폰 번호<span class="ph"><input id="phone" inputmode="numeric" autocomplete="tel" placeholder="010-0000-0000"><button type="button" class="btn sm" id="verify">인증</button></span><span class="err" id="e_phone"></span></label>';
+  const pw=fld('password','비밀번호','type="password" autocomplete="new-password" placeholder="영문·숫자 8자 이상"')+fld('password2','비밀번호 확인','type="password" autocomplete="new-password"');
+  let h='<h2>'+RN[role]+' 정보</h2><div class="grid">';
+  if(role==='driver') h+=fld('name','이름','autocomplete="name"')+phone+fld('plate','차량번호','placeholder="82가 1234"')+sel('tonnage','톤급',['15t','25t'])+sel('carrier','소속 운송사',['운송사 A','운송사 B'])+'<span></span>'+pw;
+  else h+=fld('name','이름','autocomplete="name"')+fld('emp_no','사번','placeholder="영문·숫자"')+sel('dept','소속 부서',role==='control'?['관제실','원료입고팀','물류운영팀']:['원료입고팀','물류운영팀'])+phone+pw;
+  h+='</div>';
+  if(role==='field') h+='<fieldset><legend>담당 하역장</legend><p>고른 하역장의 안전 경고와 운영 알림을 앱으로 받아요.</p><div class="tg" id="hop">'+[['A','호퍼 A'],['B','호퍼 B'],['C','호퍼 C'],['YARD','대기장']].map(([k,n])=>'<button type="button" data-h="'+k+'" aria-pressed="'+hop.has(k)+'">'+n+'</button>').join('')+'</div><span class="err" id="e_hoppers" style="color:var(--red);font-size:12px;font-weight:600"></span></fieldset>';
+  h+='<div class="consent">'+
+    '<label class="chk"><input type="checkbox" id="c_terms"><span>[필수] 서비스 이용약관 동의<small class="err" id="e_terms" style="color:var(--red)"></small></span></label>'+
+    (role!=='control'?'<label class="chk"><input type="checkbox" id="c_safety" checked><span>[필수] '+(role==='driver'?'호출·안전 알림 받기':'안전 경고 앱 푸시 수신')+'<small>'+(role==='driver'?'끄면 호출을 놓칠 수 있어요':'끄면 덤프 하역 반경 경고를 받을 수 없어요')+'</small><small class="err" id="e_safety" style="color:var(--red)"></small></span></label>':'')+
+    (role==='driver'?'<label class="chk"><input type="checkbox" id="c_location"><span>[선택] 위치 신호 공유<small>블루투스 비콘으로 호출·위험 구역 경고에 써요</small></span></label>'
+                    :'<label class="chk"><input type="checkbox" id="c_ops"><span>[선택] 운영 알림도 '+(role==='control'?'받기':'앱 푸시로 받기')+'<small>혼잡·작업 지연·대기 초과 알림</small></span></label>')+'</div>';
+  h+='<div class="msg" id="msg" role="alert"></div><div class="foot"><span>'+(role==='driver'?'차량번호를 확인하면 바로 쓸 수 있어요.':'신청하면 관리자가 사번과 부서를 확인한 뒤 승인해요.')+'</span><div><button type="button" class="btn" id="prev">이전</button><button type="button" class="btn dark" id="submit">'+(role==='driver'?'가입하고 시작하기':'가입 신청')+'</button></div></div>';
+  $('#card').innerHTML=h;
+  $('#prev').onclick=()=>{ role=null; document.querySelectorAll('.rc').forEach(b=>b.setAttribute('aria-checked','false')); empty(); };
+  $('#verify').onclick=()=>{ $('#msg').className='msg info'; $('#msg').textContent='휴대폰 인증은 다음 단계에서 붙여요(시연에선 생략). 번호만 확인해요.'; };
+  if($('#hop')) $('#hop').onclick=e=>{ const b=e.target.closest('[data-h]'); if(!b) return; hop.has(b.dataset.h)?hop.delete(b.dataset.h):hop.add(b.dataset.h); b.setAttribute('aria-pressed',String(hop.has(b.dataset.h))); };
+  $('#submit').onclick=submit;
+  $('#name').focus();
+}
+function empty(){ setStep(1); $('#card').innerHTML='<div class="empty"><b style="font-size:18px;color:var(--ink)">먼저 역할을 골라 주세요</b><span>관제 담당자는 PC 관제 화면, 현장 담당자와 운전자는 모바일 앱 화면이 열려요.</span></div>'; }
+async function submit(){
+  const v=id=>{ const e=$('#'+id); return e?e.value:undefined; }, ck=id=>!!($('#'+id)&&$('#'+id).checked);
+  const body={role,name:v('name'),phone:v('phone'),password:v('password'),password2:v('password2'),emp_no:v('emp_no'),dept:v('dept'),
+    plate:v('plate'),tonnage:v('tonnage'),carrier:v('carrier'),hoppers:[...hop],consent:{terms:ck('c_terms'),safety:role==='control'?false:ck('c_safety'),ops:ck('c_ops'),location:ck('c_location')}};
+  document.querySelectorAll('.err').forEach(e=>e.textContent=''); document.querySelectorAll('.fld').forEach(e=>e.classList.remove('bad')); $('#msg').textContent='';
+  $('#submit').disabled=true;
+  try{
+    const r=await fetch('/api/auth/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}), d=await r.json().catch(()=>({}));
+    if(r.ok){ done(d); return; }
+    if(d.errors){ let first=null; Object.entries(d.errors).forEach(([k,m])=>{ const e=$('#e_'+k); if(e) e.textContent=m; const f=document.querySelector('[data-f="'+k+'"]'); if(f){ f.classList.add('bad'); first=first||f.querySelector('input,select'); } });
+      $('#msg').className='msg bad'; $('#msg').textContent=d.detail||'입력을 확인해 주세요.'; if(first) first.focus(); }
+    else { $('#msg').className='msg bad'; $('#msg').textContent=d.detail||'가입하지 못했어요.'; }
+  }catch(e){ $('#msg').className='msg bad'; $('#msg').textContent='서버에 연결하지 못했어요.'; }
+  $('#submit').disabled=false;
+}
+function done(d){
+  setStep(3);
+  $('#card').innerHTML='<div class="done"><span class="chip '+(d.status==='active'?'blue':'')+'">'+(d.status==='active'?'사용 가능':'승인 대기')+'</span><div class="big">'+(d.status==='active'?'가입됐어요':'가입 신청을 받았어요')+'</div>'+
+    '<div class="who">'+RN[d.role]+' · 아이디 <b>'+esc(d.login_id)+'</b></div><div class="msg '+(d.status==='active'?'ok':'info')+'">'+esc(d.message)+'</div>'+
+    '<a class="btn dark" href="/login">로그인하러 가기</a></div>';
+}
+document.querySelectorAll('.rc').forEach(b=>b.addEventListener('click',()=>{ role=b.dataset.role; document.querySelectorAll('.rc').forEach(x=>x.setAttribute('aria-checked',String(x===b))); hop=new Set(); form(); }));
+const q=new URLSearchParams(location.search).get('role'); if(q&&RN[q]) document.querySelector('.rc[data-role="'+q+'"]').click(); else empty();   // ?role= 로 바로 ② (링크 · 스크린샷용)
+</script>
+</body>
+</html>
