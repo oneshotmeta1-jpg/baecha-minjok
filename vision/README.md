@@ -15,3 +15,12 @@
 `python vision/dump_state.py <사진> --weights yolo11n.pt --out web/assets/dump_sample.jpg`
 — 트럭 박스들을 합친 전체 박스의 세로/가로 비율이 0.6 이상이면 적재함 상승(하차 중). 팀 제공 사진: 0.79 → 하차 중.
 카메라는 호퍼 옆에서 차량 측면을 보게 둔다(가정). 영상이 생기면 프레임마다 이 판정을 내고 `CRANE_START`(상승 시작)·`CRANE_DONE`(내림 완료)을 `source: "cam"`으로 보낸다.
+
+## 실제 영상 (R9)
+
+```bash
+py vision/detect_video.py          # 영상/ 4개 → <이름>.det.json (가중치 vision/yolo11n.pt, git 제외)
+py tools/ingest_videos.py          # det.json → 이벤트 → 서버(--video) /api/ingest, 한 번만
+```
+- CAM-01·03(측면)은 사전학습으로 된다. CAM-02(후면 실내)는 트럭을 못 잡는다 → 파인튜닝 필요.
+- 적재함 상승: 박스 세로/가로 최근 1초 중앙값 ≥ 0.6이 1초 유지. 결과는 [docs/vision_check.md](../docs/vision_check.md).

@@ -483,6 +483,34 @@ check("비전 변환: 대기장 도착 → 베이 진입 → 덤프 반경 경�
       ty.index("ZONE_ARRIVE") < ty.index("BAY_ENTER") < ty.index("SAFETY_ALERT") < ty.index("BAY_EXIT")
       and next(e for e in cv if e["type"] == "BAY_ENTER")["payload"]["bay"] == 1, " → ".join(ty))
 
+# 11) R9 영상 채널: 영상 없으면 시뮬레이션 · 추적 ID 바뀜 합치기 · 영상 한 번 = 반입 한 번
+import tempfile  # noqa: E402
+from app.cams import cam_list  # noqa: E402
+cfg9 = json.loads((ROOT / "data" / "cams.json").read_text(encoding="utf-8"))
+with tempfile.TemporaryDirectory() as td:
+    cl = cam_list(cfg9, Path(td))
+check("영상 채널: 영상 파일이 없으면 4채널 모두 시뮬레이션으로", len(cl) == 4 and all(c["source"] == "sim" and c["video_url"] is None for c in cl))
+from to_events import convert as conv9, video_rois  # noqa: E402
+TRK = lambda tid, b: {"track_id": tid, "cls": "truck", "bbox": b}
+fr9 = [{"t": t / 4, "cam_id": "CAM-01", "objects": [TRK(1, [240, 200, 890, 570])]} for t in range(0, 20)]            # 0~5초: ID 1
+fr9 += [{"t": 5 + t / 4, "cam_id": "CAM-01", "objects": [TRK(5, [245, 10, 900, 572])]} for t in range(0, 24)]      # 5~11초: 같은 트럭이 ID 5로(적재함 올림)
+fr9 += [{"t": 11 + t / 4, "cam_id": "CAM-01", "objects": [TRK(5, [240, 200, 890, 570]), TRK(9, [300, 260, 700, 560])]} for t in range(0, 8)]  # 큰 박스 안 중복 박스
+ev9 = conv9({"size": [1280, 720], "frames": fr9}, "2026-11-09T08:00:00", video_rois(cfg9, "CAM-01"), scale=40, flush=True)
+ty9 = [e["type"] for e in ev9]
+check("영상 변환: 추적 ID가 바뀌거나 박스가 겹쳐도 반입 1건(베이 진입 1 · 이탈 1) · 클립 끝에서 닫음",
+      ty9.count("BAY_ENTER") == 1 and ty9.count("BAY_EXIT") == 1 and ev9[-2]["payload"].get("closed_at_clip_end"), " → ".join(ty9))
+check("영상 변환: 영상 시각 ×40 (3초 → 2분)", next(e for e in ev9 if e["type"] == "BAY_ENTER")["ts"] == "2026-11-09T08:02:00")
+sys.path.insert(0, str(ROOT / "tools"))
+import ingest_videos  # noqa: E402
+rv = Runtime(7, video=True)
+ev_a = [dict(e, event_id="x" + str(i)) for i, e in enumerate([{"ts": "2026-11-09T08:00:30", "type": "GATE_IN", "vehicle_id": "CAM-01-T1", "payload": {"cargo": "석회석", "load_t": 22}}] + ev9)]
+r1, r2 = rv.ingest(ev_a), rv.ingest(ev_a)
+check("영상 한 번 = 반입 한 번: 같은 이벤트를 다시 넣으면 duplicate", "ok" in r1 and set(r2) == {"duplicate"} and len(rv.rec.done_trips) == 1, f"{r1} / {set(r2)}")
+k1 = ingest_videos.eid({"ts": "2026-11-09T08:02:00", "type": "BAY_ENTER", "vehicle_id": "A"}, "2026-11-09T08:00:00", "1호퍼 영상.mp4", 1)
+k2 = ingest_videos.eid({"ts": "2026-11-09T09:02:00", "type": "BAY_ENTER", "vehicle_id": "A"}, "2026-11-09T09:00:00", "1호퍼 영상.mp4", 1)
+k3 = ingest_videos.eid({"ts": "2026-11-09T09:02:00", "type": "BAY_ENTER", "vehicle_id": "A"}, "2026-11-09T09:00:00", "1호퍼 영상.mp4", 2)
+check("중복 키는 넣는 시각과 무관 · 재생 회차(--play)가 다르면 새 반입", k1 == k2 and k1 != k3)
+
 if "--samples" in sys.argv:
     out = ROOT / "docs" / "sample_events.jsonl"
     out.write_text("\n".join(json.dumps(e, ensure_ascii=False) for e in s.events) + "\n", encoding="utf-8")
