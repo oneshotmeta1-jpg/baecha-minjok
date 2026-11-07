@@ -38,16 +38,17 @@ button:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px s
 .pill-btn:disabled{opacity:.45;cursor:not-allowed}
 select.pill-btn{padding-right:8px}
 
-header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;background:var(--card);border-radius:999px;padding:8px 10px 8px 12px}
+header{display:flex;flex-wrap:nowrap;align-items:center;gap:12px;background:var(--card);border-radius:999px;padding:8px 10px 8px 12px;height:60px;box-sizing:border-box;white-space:nowrap;min-width:0}
+header>*{flex:none} header>nav{flex:0 1 auto;min-width:0} header>.sp{flex:1 1 0;min-width:0}
 .brand{display:flex;align-items:center;gap:10px}
 .logo{width:40px;height:40px;border-radius:14px;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center}
 .brand b{display:block;font-size:15px}
 .brand small{font-size:12px;color:var(--muted)}
-nav{display:flex;gap:4px;background:var(--soft);border-radius:999px;padding:4px}
-nav a,nav span{display:inline-flex;align-items:center;min-height:36px;padding:0 16px;border-radius:999px;font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none}
+nav{display:flex;gap:4px;background:var(--soft);border-radius:999px;padding:4px;overflow-x:auto;scrollbar-width:none} nav::-webkit-scrollbar{display:none}
+nav a,nav span{position:relative;flex:none;display:inline-flex;align-items:center;min-height:36px;padding:0 16px;border-radius:999px;font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none}
 nav a[aria-current]{background:var(--ink);color:#fff}
 nav a:not([aria-current]):hover{background:var(--card)}
-nav .cnt{margin-left:6px;min-width:18px;height:18px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+nav a[href="#alerts"]{padding-right:48px} nav .cnt{position:absolute;top:50%;right:6px;transform:translateY(-50%);min-width:18px;height:18px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
 nav .cnt[hidden]{display:none}
 .view{flex:1;min-height:0;display:flex;flex-direction:column;gap:var(--gap)}
 .view[hidden]{display:none}
@@ -474,7 +475,23 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
 .who{display:inline-flex;align-items:center;gap:8px;font-size:13px;line-height:1.15;white-space:nowrap}
 .who .av{width:34px;height:34px;border-radius:50%;background:var(--ink);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
 .who small{display:block;color:var(--muted);font-size:11.5px}
-@media (max-width:1500px){ .who{display:none} }
+/* R10 헤더: 시계 칩 · 시연 메뉴 · 폭이 모자라면 ① 부제 ② 담당자 이름 ③ 메뉴 간격 ④ "시뮬레이션" 순서로 줄임 */
+.dd{position:relative}
+.hchip{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 12px 0 14px;border-radius:999px;border:0;background:var(--soft);font:inherit;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer}
+.hchip:hover,.hchip[aria-expanded="true"]{background:#E8E8E5} .hchip .hl{color:var(--muted);font-weight:600}
+.hchip .clock{font-size:20px;padding:0} .hchip .spd{color:var(--ink-2)} .hchip .car{font-size:11px;color:var(--muted)}
+.hchip .run{width:0;height:0;border-left:7px solid var(--muted);border-top:5px solid transparent;border-bottom:5px solid transparent}
+.hchip .run.on{width:8px;height:10px;border:0;border-left:3px solid var(--green);border-right:3px solid var(--green)}
+.ddot{width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block} .ddot[hidden]{display:none}
+.menu{position:absolute;top:calc(100% + 8px);right:0;z-index:60;background:var(--card);border-radius:18px;box-shadow:0 12px 32px rgba(0,0,0,.16);padding:10px;display:flex;flex-direction:column;gap:6px;min-width:220px;white-space:nowrap}
+.menu[hidden]{display:none} .menu .pill-btn{justify-content:center;width:100%} .menu .mrow{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);font-weight:600}
+.menu .mrow select{flex:1} .menu .mnote{margin:2px 4px 0;font-size:11.5px;color:var(--muted);white-space:normal;max-width:240px}
+.menu .mnote:empty{display:none}
+.bell .cnt{min-width:18px}
+@media (max-width:1520px){ .brand small{display:none} }
+@media (max-width:1440px){ .who .wn{display:none} }
+@media (max-width:1360px){ nav a,nav span{padding:0 11px} nav a[href="#alerts"]{padding-right:46px} header{gap:8px} }
+@media (max-width:1300px){ .hchip .hl{display:none} }
 #camBays.bays3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
 #camBays .bay{background:#F6F6F4;border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:13px}
 #camBays .bay.safe{background:#FFF4F5;box-shadow:inset 0 0 0 1.5px #D7263D} #camBays .bay.late{background:#FFF6EF}
@@ -506,21 +523,27 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
   </div>
   <nav aria-label="주 메뉴"><a href="#monitor" data-view="monitor">관제 화면</a><a href="#dock" data-view="dock">순번·배정</a><a href="#analysis" data-view="analysis">운영 분석</a><a href="#alerts" data-view="alerts">알림 이력<span class="cnt num" id="navAlert" hidden></span></a><a href="#settings" data-view="settings">설정</a></nav>
   <span class="sp"></span>
-  <div class="grp" aria-label="시뮬레이션">
-    <span class="conn" id="conn" title="연결 중"></span>
-    <span class="clock num" id="clock">--:--</span>
-    <button class="pill-btn dark" id="runBtn">시작</button>
-    <select class="pill-btn" id="speedSel" aria-label="배속"><option value="30">×30</option><option value="60" selected>×60</option><option value="120">×120</option><option value="300">×300</option></select>
-    <button class="pill-btn" id="resetBtn">초기화</button>
+  <div class="dd" id="simDD">
+    <button class="hchip" id="simChip" aria-haspopup="true" aria-expanded="false" aria-controls="simMenu" title="시뮬레이션 시계 · 시작/일시정지 · 배속 · 초기화">
+      <span class="conn" id="conn" title="연결 중"></span><span class="hl">시뮬레이션</span><span class="clock num" id="clock">--:--</span><span class="spd num" id="spdTxt">×60</span><span class="run" id="runDot" aria-hidden="true"></span><span class="car" aria-hidden="true">▾</span>
+    </button>
+    <div class="menu" id="simMenu" role="menu" aria-label="시뮬레이션" hidden>
+      <button class="pill-btn dark" id="runBtn" role="menuitem">시작</button>
+      <label class="mrow"><span>배속</span><select class="pill-btn" id="speedSel" aria-label="배속"><option value="30">×30</option><option value="60" selected>×60</option><option value="120">×120</option><option value="300">×300</option></select></label>
+      <button class="pill-btn" id="resetBtn" role="menuitem">초기화</button>
+    </div>
   </div>
-  <div class="grp" aria-label="시연용 돌발 이벤트">
-    <span class="lbl">시연</span>
-    <select class="pill-btn" id="downSel" aria-label="정지할 호퍼"></select>
-    <button class="pill-btn danger" id="downBtn">하역장 정지</button>
-    <button class="pill-btn" id="urgentBtn">긴급 입고 넣기</button>
-    <button class="pill-btn danger" id="safetyBtn" title="고른 호퍼에서 하차 중인 차에 덤프 반경 작업자 경고를 만든다(시연)">안전 경고</button>
+  <div class="dd" id="demoDD">
+    <button class="hchip" id="demoChip" aria-haspopup="true" aria-expanded="false" aria-controls="demoMenu" title="시연용 돌발 이벤트">시연<span class="ddot" id="demoDot" hidden title="시연 중인 동작이 있음"></span><span class="car" aria-hidden="true">▾</span></button>
+    <div class="menu" id="demoMenu" role="menu" aria-label="시연용 돌발 이벤트" hidden>
+      <label class="mrow"><span>호퍼</span><select class="pill-btn" id="downSel" aria-label="시연할 호퍼"></select></label>
+      <button class="pill-btn danger" id="downBtn" role="menuitem">하역장 정지</button>
+      <button class="pill-btn" id="urgentBtn" role="menuitem">긴급 입고 넣기</button>
+      <button class="pill-btn danger" id="safetyBtn" role="menuitem" title="고른 호퍼에서 하차 중인 차에 덤프 반경 작업자 경고를 만든다(시연)">안전 경고</button>
+      <p class="mnote" id="demoState"></p>
+    </div>
   </div>
-  <span class="who" title="로그인은 추후 구현 · 지금은 고정 표시"><span class="av">관</span><span><b>관제 담당자</b><small>오후 교대</small></span></span>
+  <span class="who" title="관제 담당자 · 오후 교대 (로그인은 추후 구현 · 지금은 고정 표시)"><span class="av">관</span><span class="wn"><b>관제 담당자</b><small>오후 교대</small></span></span>
   <button class="bell" id="bellBtn" aria-label="알림 패널 열기" aria-expanded="false" aria-controls="panel"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="cnt num" id="bellCnt" hidden></span></button>
 </header>
 
@@ -1212,11 +1235,22 @@ document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',
 }));
 
 /* ---------- 상태 그리기 ---------- */
+/* 헤더 메뉴(시계 칩 · 시연): 버튼으로 열고 바깥 클릭 · Esc로 닫힘 */
+const cap99=n=>n>99?'99+':String(n);
+let BADGE=null; try{ const q=new URLSearchParams(location.search).get('badge'); if(q!=null&&q!=='') BADGE=Math.max(0,parseInt(q,10)||0); }catch(e){}   // 스크린샷 확인용(tools/capture_header.py)
+const DDS=[['#simChip','#simMenu'],['#demoChip','#demoMenu']];
+function closeDD(except){ DDS.forEach(([b,m])=>{ if(b!==except){ $(m).hidden=true; $(b).setAttribute('aria-expanded','false'); } }); }
+DDS.forEach(([b,m])=>$(b).addEventListener('click',e=>{ e.stopPropagation(); const open=$(m).hidden; closeDD(b); $(m).hidden=!open; $(b).setAttribute('aria-expanded',String(open)); if(open){ const f=$(m).querySelector('button,select'); if(f) f.focus(); } }));
+document.addEventListener('click',e=>{ if(!e.target.closest('.dd')) closeDD(); });
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return; const o=DDS.find(([b,m])=>!$(m).hidden); if(o){ closeDD(); $(o[0]).focus(); } });
+['#resetBtn','#urgentBtn','#safetyBtn'].forEach(id=>$(id).addEventListener('click',()=>setTimeout(()=>closeDD(),0)));
 let last=null;
 function render(s){
   last=s;
   $('#clock').textContent=hhmm(s.clock);
-  $('#runBtn').textContent=s.running?'일시정지':'시작';
+  $('#runBtn').textContent=s.running?'일시정지':'시작'; $('#spdTxt').textContent='×'+s.speed; $('#runDot').classList.toggle('on',!!s.running);
+  $('#simChip').setAttribute('aria-label','시뮬레이션 '+hhmm(s.clock)+' ×'+s.speed+(s.running?' 진행 중':' 멈춤')+' · 메뉴 열기');
+  const downs=s.sectors.filter(x=>x.status==='down'); $('#demoDot').hidden=!downs.length; $('#demoState').textContent=downs.length?'진행 중: '+downs.map(x=>x.name+' 정지').join(' · '):'';
   $('#speedSel').value=String(s.speed);
   const sel=s.sectors.find(x=>x.id===$('#downSel').value);
   $('#downBtn').textContent=sel&&sel.status==='down'?'하역장 복구':'하역장 정지';
@@ -1233,9 +1267,9 @@ function render(s){
     sh.pct.textContent=x.status==='down'?'정지':x.congestion_pct+'%';
   });
   const openN=s.alerts.filter(a=>!a.ack&&a.kind!=='호출').length;
-  $('#navAlert').hidden=!openN; $('#navAlert').textContent=openN;
+  const B=BADGE!=null?BADGE:openN; $('#navAlert').hidden=!B; $('#navAlert').textContent=cap99(B);
   const so=s.safety_open||[], bn=(s.panel_open||0)+so.length;
-  $('#bellCnt').hidden=!bn; $('#bellCnt').textContent=bn; $('#bellCnt').style.background=so.length?'var(--red)':'';
+  const BB=BADGE!=null?BADGE:bn; $('#bellCnt').hidden=!BB; $('#bellCnt').textContent=cap99(BB); $('#bellCnt').style.background=so.length?'var(--red)':'';
   const ss=$('#sstrip');
   if(so.length&&view==='monitor'){ const x=so[0];
     ss.innerHTML='<span class="l3">L3 자동 실행</span><b>'+esc(sname(x.sector_id))+' · '+esc(x.cargo)+' 덤프 하차 반경 진입</b><span>'+esc(x.cam_id)+' · 적재함 올린 '+esc(x.vehicle_id)+' 뒤 '+x.dist_m+'m 안 작업자 1명 · 운전자 하차 중지 요청됨(가상) · '+esc(x.ts)+(x.repeat?' · 다시 감지':'')+(so.length>1?' · 외 '+(so.length-1)+'건':'')+'</span><span class="sp"></span>'+
