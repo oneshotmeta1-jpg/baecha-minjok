@@ -96,6 +96,7 @@ class Runtime:
 
     def reset(self):
         self.actions = []        # 시뮬레이션에 영향을 주는 행동 {t, kind, ...} — 재계산 때 다시 넣는다
+        self.driver_stops = {}   # 안전 경고 id → 운전자 [멈췄어요] 시각
         self.approved = set()    # "차량#회차"
         self.changes = []        # 순번 변경 기록
         self.ignored = set()     # 무시한 제안
@@ -133,7 +134,7 @@ class Runtime:
                     break
 
     def _ui(self, type_, vehicle_id=None, sector_id=None, payload=None):
-        """담당자 행동 이벤트 기록 (ORDER_APPROVED · ORDER_CHANGED · ALERT_ACK · ASSUMPTIONS_UPDATED)."""
+        """담당자 행동 이벤트 기록 (ORDER_APPROVED · ORDER_CHANGED · ALERT_ACK · ASSUMPTIONS_UPDATED · DRIVER_STOPPED)."""
         u = {"t": self.rec.t, "type": type_, "vehicle_id": vehicle_id, "sector_id": sector_id, "payload": payload or {}}
         self.ui_events.append(u)
         self._emit_ui(u)
@@ -162,6 +163,8 @@ class Runtime:
             self.rec.force_safety(a["sector_id"]); self.fifo.force_safety(a["sector_id"])
         elif k == "safety":
             self.rec.safety_resolve(a["id"], a["how"], self.safety_acks.get(a["id"], {}).get("ack_sec"))
+        elif k == "ingest":
+            self._ingest_one(a["ev"])
         self.rec.replan(); self.fifo.replan()
 
     def step(self):
@@ -262,27 +265,147 @@ class Runtime:
                 self.step()
             ev = {"source": "cam", "vehicle_id": None, "sector_id": None, "zone": None, "payload": {}, **ev,
                   "ts": ev.get("ts") or self.rec.clock().isoformat(timespec="seconds")}
-            r = self.rec.ingest(ev)
+            r = self._ingest_one(ev)
             if r in ("ok", "ignored") and ev.get("event_id"):
                 seen_ids.add(ev["event_id"])
             if r == "ok":
-                self.store.event(ev)
-                if getattr(self, "ingested", None) is not None:
-                    self.ingested.append(ev)
-                if ev["type"] == "GATE_IN" and ev.get("vehicle_id"):
-                    v = self.rec.vehicles[ev["vehicle_id"]]
-                    a = {k: v[k] for k in ("id", "trip", "type", "cargo", "arr_t", "due_t", "urgent", "load_t")}
-                    a["work_factor"] = trip(self.seed, {"plate": v["id"], "cargo": v["cargo"]}, v["trip"], v["arr_t"], self.fifo.fc)["work_factor"]
-                    self.fifo.truck.setdefault(v["id"], {"plate": v["id"], "cargo": v["cargo"], "first_t": v["arr_t"], "extra": True})
-                    self.fifo.pending_arrivals.append(a)
-                    self.fifo.pending_arrivals.sort(key=lambda x: (x["arr_t"], x["id"]))
-                elif ev["type"] == "URGENT_IN":
-                    pass
-                elif ev["type"] in ("YARD_DOWN", "YARD_UP") and ev.get("sector_id") in self.fifo.sec_cfg:
-                    (self.fifo.sector_down if ev["type"] == "YARD_DOWN" else self.fifo.sector_up)(ev["sector_id"])
+                self.actions.append({"kind": "ingest", "t": self.rec.t, "ev": ev})   # 재계산(가정값 변경) 때도 같은 시각에 다시 넣는다
             out.append(r)
         self.store.commit()
         return out
+
+    def _ingest_one(self, ev):
+        """이벤트 한 건을 추천 시뮬레이션에 넣고, GATE_IN · 하역장 정지/복구는 FIFO 기준선에도 같은 시각으로 넣는다."""
+        r = self.rec.ingest(ev)
+        if r != "ok":
+            return r
+        self.store.event(ev)
+        if getattr(self, "ingested", None) is not None:
+            self.ingested.append(ev)
+        if ev["type"] == "GATE_IN" and ev.get("vehicle_id"):
+            v = self.rec.vehicles[ev["vehicle_id"]]
+            a = {k: v[k] for k in ("id", "trip", "type", "cargo", "arr_t", "due_t", "urgent", "load_t")}
+            a["work_factor"] = trip(self.seed, {"plate": v["id"], "cargo": v["cargo"]}, v["trip"], v["arr_t"], self.fifo.fc)["work_factor"]
+            self.fifo.truck.setdefault(v["id"], {"plate": v["id"], "cargo": v["cargo"], "first_t": v["arr_t"], "extra": True})
+            self.fifo.pending_arrivals.append(a)
+            self.fifo.pending_arrivals.sort(key=lambda x: (x["arr_t"], x["id"]))
+        elif ev["type"] in ("YARD_DOWN", "YARD_UP") and ev.get("sector_id") in self.fifo.sec_cfg:
+            (self.fifo.sector_down if ev["type"] == "YARD_DOWN" else self.fifo.sector_up)(ev["sector_id"])
+        return r
+
+    # ---------- 모바일 (R12): 운전자 = 내 차만 · 현장 담당자 = 담당 하역장만 ----------
+    def app_event(self, typ, vid, sector_id=None, payload=None):
+        """기사 앱 · 현장 앱 신호(source app)를 지금 시각 이벤트로 넣는다."""
+        ev = {"ts": self.rec.clock().isoformat(timespec="seconds"), "type": typ, "source": "app", "cam_id": None,
+              "sector_id": sector_id, "zone": None, "track_id": None, "vehicle_id": vid, "payload": payload or {}}
+        return self.ingest([ev])[0]
+
+    def driver_view(self, plate, st=None):
+        st = st or self.state()
+        v = self.rec.vehicles.get(plate)
+        trips = [d for d in self.rec.done_trips if d["id"] == plate]
+        out = {"plate": plate, "clock": st["clock"], "trips_today": len(trips), "vehicle": None, "queue": None, "safety": None,
+               "accept": [], "steps": [], "last_trip": trips[-1] if trips else None, "sim_truck": plate in self.rec.truck and not self.rec.truck[plate].get("extra")}
+        if not v or v["gone"]:
+            return out
+        sv = next((x for x in st["vehicles"] if x["id"] == plate), None)
+        names = {x["id"]: x["name"] for x in st["sectors"]}
+        work = next((w for x in st["sectors"] for w in x["working"] if w["vehicle_id"] == plate), None)
+        out["vehicle"] = {"state": v["state"], "cargo": v["cargo"], "load_t": v["load_t"], "trip": v["trip"], "app": bool(v.get("app")),
+                          "sector_id": v["sector"], "sector": names.get(v["sector"]), "bay": (v["bay"] + 1) if v.get("bay") is not None else None,
+                          "eta_min": sv.get("eta_min") if sv else None, "acked": v.get("acked"), "order": v.get("order"),
+                          "progress_pct": work["progress_pct"] if work else None, "remain_min": work["remain_min"] if work else None,
+                          "dump_deg": work["dump_deg"] if work else None, "travel_min": None}
+        if v["sector"]:
+            out["vehicle"]["travel_min"] = next((x["travel_min"] for x in st["sectors"] if x["id"] == v["sector"]), None)
+        q = next((r for r in st["queue"] if r["vehicle_id"] == plate), None)
+        if q:          # PC 순번표의 같은 행 그대로 (새 숫자를 만들지 않음)
+            out["queue"] = {"rank": q["rank"], "ahead": q["rank"] - 1, "call_at": q["call_at"], "wait_min": q["wait_min"], "status": q["status"],
+                            "sector_id": q["sector_id"], "sector": names.get(q["sector_id"]), "awaiting": q.get("awaiting"), "reason": q["reason"]}
+        x = next((x for x in self.rec.safety if x["status"] == "open" and x["vehicle_id"] == plate), None)
+        if x:
+            out["safety"] = {"id": x["id"], "rule": x.get("rule_text"), "sector": names.get(x["sector_id"]), "bay": (v["bay"] + 1) if v.get("bay") is not None else None,
+                             "dist_m": x.get("dist_m"), "radius_m": x.get("radius_m", 5), "ts": x.get("ts"), "stopped": self.driver_stops.get(x["id"])}
+        hm = self.rec.hhmm
+        out["steps"] = [{"k": "도착 · 게이트 통과", "t": hm(v["arr_t"])},
+                        {"k": "대기", "t": hm(v["yard_t"]) if v.get("yard_t") is not None else None},
+                        {"k": "호출 · 이동", "t": hm(v["call_t"]) if v.get("call_t") is not None and v["state"] != "yard" else None},
+                        {"k": "진입 · 하역중", "t": hm(v["work_start"]) if v.get("work_start") is not None and v["state"] in ("working", "done") else None},
+                        {"k": "이탈", "t": hm(v["done_t"]) if v.get("done_t") is not None and v["state"] == "done" else None}]
+        return out
+
+    def accept_bays(self, cargo):
+        """원료 → 받을 수 있는 하역장 · 베이 (sectors.json bay_cargo)"""
+        return [{"sector_id": sid, "name": c["name"], "bay": i + 1}
+                for sid, c in self.rec.sec_cfg.items() for i, bc in enumerate(c.get("bay_cargo") or []) if bc == cargo]
+
+    def driver_trip(self, plate, cargo, load_t, order=None):
+        v = self.rec.vehicles.get(plate)
+        if v and not v["gone"]:
+            return None, "이미 진행 중인 운행이 있어요(하역이 끝나면 다음 운행을 등록해요)."
+        if cargo not in self.rec.pred:
+            return None, "원료를 골라 주세요."
+        try:
+            load_t = float(load_t)
+        except (TypeError, ValueError):
+            return None, "중량을 숫자로 넣어 주세요."
+        if not 1 <= load_t <= 30:
+            return None, "중량은 1~30t 사이로 넣어 주세요."
+        r = self.app_event("GATE_IN", plate, payload={"cargo": cargo, "load_t": load_t, "order": order or None, "vehicle_type": "덤프 25.5t"})
+        return (r, None) if r == "ok" else (None, "등록하지 못했어요(" + r + ").")
+
+    def driver_ack(self, plate):
+        v = self.rec.vehicles.get(plate)
+        if not v or v["state"] != "moving":
+            return None, "호출을 받은 뒤에 출발할 수 있어요."
+        return self.app_event("CALL_ACK", plate, sector_id=v["sector"]), None
+
+    def driver_arrive(self, plate):
+        v = self.rec.vehicles.get(plate)
+        if not v or v["state"] not in ("moving", "queue", "working"):
+            return None, "호출받은 하역장으로 가는 중일 때 도착을 알릴 수 있어요."
+        if v["state"] == "moving" and v.get("app") and not v.get("acked"):
+            return None, "먼저 [이동 시작]을 눌러 주세요."
+        if v.get("bay") is None:
+            return None, "배정된 베이가 아직 없어요."
+        return self.app_event("BAY_ENTER", plate, sector_id=v["sector"], payload={"bay": v["bay"] + 1, "cargo": v["cargo"], "manual": True}), None
+
+    def driver_stopped(self, plate):
+        x = next((x for x in self.rec.safety if x["status"] == "open" and x["vehicle_id"] == plate), None)
+        if not x:
+            return None
+        self.driver_stops[x["id"]] = self.rec.hhmm(self.rec.t)
+        self._ui("DRIVER_STOPPED", plate, x["sector_id"], {"id": x["id"]})
+        return x["id"]
+
+    def field_view(self, hoppers, st=None, p2=None):
+        st, p2 = st or self.state(), p2 or self.panel2()
+        mine = set(hoppers or [])
+        secs = [x for x in st["sectors"] if x["id"] in mine]
+        return {"clock": st["clock"], "hoppers": sorted(mine),
+                "sectors": [{k: x[k] for k in ("id", "name", "status", "level", "congestion_pct", "cargo", "bays")} | {"working": len(x["working"]), "queue": len(x["queue"])} for x in secs],
+                "yard": st["counts"]["yard"] if "YARD" in mine else None,
+                "safety": [dict(x, sector_name=self.rec.sec_cfg[x["sector_id"]]["name"], driver_stopped=self.driver_stops.get(x["id"]))
+                           for x in p2["safety_open"] if x.get("sector_id") in mine],
+                "safety_done": [x for x in p2.get("safety_done", []) if x.get("sector_id") in mine][:5],
+                "approvals": [x for x in p2["approvals"] if x.get("sector_id") in mine],
+                "checks": [g for g in p2["checks"] if g.get("sector_id") in mine],
+                "auto_approve": p2["auto_approve"], "effect_total": st.get("effect_total")}
+
+    def field_owns(self, hoppers, vehicle_id=None, safety_id=None, alert_id=None):
+        """현장 담당자가 이 차 · 안전 경고 · 알림을 처리해도 되는지(담당 하역장 기준)"""
+        mine = set(hoppers or [])
+        if vehicle_id is not None:
+            p = next((p for p in self.rec.plan if p["vehicle_id"] == vehicle_id), None)
+            v = self.rec.vehicles.get(vehicle_id)
+            return bool((p and p["sector_id"] in mine) or (v and v["sector"] in mine))
+        if safety_id is not None:
+            x = next((x for x in self.rec.safety if x["id"] == safety_id), None)
+            return bool(x and x["sector_id"] in mine)
+        if alert_id is not None:
+            a = next((a for a in self.rec.alerts_all if a["id"] == alert_id), None)
+            return bool(a and a.get("sector_id") in mine)
+        return False
 
     # ---------- 시연 버튼 ----------
     def _record(self, kind, **kw):

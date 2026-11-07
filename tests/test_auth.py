@@ -97,7 +97,8 @@ st.set_status("F2001", "active")       # 관리자 승인 (I8/I9 전에는 tools
 r = c.post("/api/auth/login", json={"login_id": "F2001", "password": "abcd1234"})
 ck = r.headers.get("set-cookie", "")
 check("승인 뒤 현장 담당자 로그인 → /m/, 로그인 유지 안 하면 브라우저 세션 쿠키", r.status_code == 200 and r.json()["home"] == "/m/" and "Max-Age" not in ck)
-check("현장: 순번 승인 · 안전 확인 · 화면 조회 됨", all(x.status_code == 200 for x in (c.post("/api/order/approve"), c.post("/api/safety/S1/ack"), c.get("/api/state"))))
+check("현장: 관제 화면 API(순번 승인 · 안전 확인 · 화면 조회)는 403 — 현장은 /api/field/*로만(R12, 담당 하역장 기준)",
+      all(x.status_code == 403 for x in (c.post("/api/order/approve"), c.post("/api/safety/S1/ack"), c.get("/api/state"))))
 check("현장: 시연(시작 · 긴급 입고) · 기준값 저장은 403",
       all(x.status_code == 403 for x in (c.post("/api/sim/start"), c.post("/api/events/urgent"), c.post("/api/assumptions"))))
 check("현장이 관제 화면(/)을 열면 /m/으로", c.get("/", follow_redirects=False).headers.get("location") == "/m/")

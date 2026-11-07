@@ -20,6 +20,7 @@ STEP = 0.25            # 시뮬레이션 한 걸음(분)
 PRED_MIN_N = 3         # 예측 하차시간을 실측 평균으로 바꾸는 최소 건수 (그 전에는 기본 표준시간)
 PRED_EVERY = 5         # 예측값 다시 계산 간격(분)
 GATE_HOLD = 1.0        # 계근·등록에 걸리는 시간(분)
+ACK_WAIT = 3.0         # 기사 앱 차량: 호출 뒤 [이동 시작](CALL_ACK)을 기다리는 시간(분) — 넘으면 알림 후 출발(시연이 멈추지 않게)
 VEHICLE = "덤프 25.5t"
 PLATE_HEAD = ["80", "81", "82", "83", "85", "86", "87", "88"]
 PLATE_MID = "사아바자"
@@ -400,7 +401,8 @@ class Sim:
                   "state": "arrived", "sector": None, "std": self.pred_of(cargo), "base": self.base_of(cargo),
                   "target": self.std_of(VEHICLE, cargo), "xy": center(self.zone["GATE"]["poly"]), "yard_t": None,
                   "track_id": ev.get("track_id"), "path": None, "work_elapsed": 0.0, "flags": set(), "rerouted": False,
-                  "gone": False, "call_t": None, "wait_min": None, "safety_plan": None}
+                  "gone": False, "call_t": None, "wait_min": None, "safety_plan": None,
+                  "app": ev.get("source") == "app", "order": p.get("order")}
             self.vehicles[vid] = nv
             self.truck.setdefault(vid, {"plate": vid, "cargo": cargo, "first_t": t, "extra": True})
             self.events.append(ev)
@@ -429,7 +431,14 @@ class Sim:
                 q_idx = sum(1 for o in self.vehicles.values() if o["state"] == "queue" and o["sector"] == sid)
                 v.update(state="queue", sector=sid, queue_idx=q_idx, xy=self.queue_xy(sid, q_idx))
             return "ok"
+        if typ == "CALL_ACK":
+            if v["state"] == "moving" and not v.get("acked"):
+                v["acked"] = True
+                return "ok"
+            return "ignored"                                  # 이미 출발 처리됨
         if typ == "BAY_ENTER" and sid in self.sec_cfg:
+            if v["state"] in ("working", "done"):
+                return "ignored"                              # 영상·다른 신호가 이미 진입을 잡음(수동 [도착했어요] 중복)
             b = int(p.get("bay", 1)) - 1
             if v["state"] == "yard":
                 self.yard_slots.pop(v["id"], None)
@@ -605,6 +614,11 @@ class Sim:
                 self.emit("ZONE_ARRIVE", "iot", vehicle=v, zone="yard", payload={"stand_in": "app"})
                 self.emit("ZONE_ENTER", "sim", vehicle=v, zone="yard", cam_id=self.zone["YARD"]["cam_id"],
                           payload={"stand_in": "cam"})
+            elif v["state"] == "moving" and v.get("app") and not v.get("acked"):
+                if t - (v["call_t"] or t) >= ACK_WAIT:              # 응답 없음 → 알림 남기고 출발(대신 응답)
+                    v["acked"] = "timeout"
+                    self.alert("warn", "호출 응답 없음", f"{v['id']} 호출 {ACK_WAIT:g}분 동안 [이동 시작] 없음 → 출발 처리",
+                               "운전자에게 전화 확인", sector_id=s_id, vehicle=v)
             elif v["state"] == "moving":
                 if self.walk(v) and not self.driven:
                     q_idx = sum(1 for o in self.vehicles.values() if o["state"] == "queue" and o["sector"] == s_id)
@@ -749,7 +763,11 @@ class Sim:
             "rank": p["rank"], "reason": p["reason"], "bay": (p["bay"] + 1) if p.get("bay") is not None else None,
             "route_m": v["path_m"], "travel_min": round(v["path_dur"], 1),
             "speed_limit_kmh": self.settings["road"]["speed_limit_kmh"], "approval": how})
-        self.emit("CALL_ACK", "iot", vehicle=v, sector_id=sid)     # 기사 '출발' (모바일 화면 전까지는 자동 응답)
+        if v.get("app"):
+            v["acked"] = False                                    # 기사 앱 차량: 운전자가 [이동 시작]을 눌러야 출발(CALL_ACK source app)
+        else:
+            v["acked"] = True
+            self.emit("CALL_ACK", "iot", vehicle=v, sector_id=sid)     # 기사 '출발' — 앱 없는 시뮬레이션 차는 자동 응답
         self.alert("info", "호출", f"{v['id']} {v['cargo']} → {sc['name']}" + (f" {p['bay'] + 1}번 베이" if p.get("bay") is not None else ""), "기사 앱으로 호출 전송(가상)", sector_id=sid, vehicle=v)
 
     def replan(self):

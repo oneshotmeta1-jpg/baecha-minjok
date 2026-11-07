@@ -32,16 +32,11 @@ RULES = [
     ("*", r"^/api/auth/", {"public"}),
     ("GET", r"^/api/health$", {"public"}),
     ("GET", r"^/api/me$", {"control", "field", "driver"}),
-    ("GET", r"^/api/driver/me$", {"driver"}),                                   # 운전자 = 자기 차량만
-    ("POST", r"^/api/order/(approve|approve_all|change|request_approval)$", {"control", "field"}),
-    ("POST", r"^/api/approval$", {"control", "field"}),
-    ("POST", r"^/api/safety/[^/]+/(ack|dismiss)$", {"control", "field"}),
-    ("POST", r"^/api/alerts/[^/]+/(ack|ignore)$", {"control", "field"}),
-    ("POST", r"^/api/preview$", {"control", "field"}),
-    ("GET", r"^/api/export/", {"control"}),
+    ("*", r"^/api/driver/", {"driver"}),                                        # 운전자 = 자기 차량만 (서버가 로그인한 차량번호로 고름)
+    ("*", r"^/api/field/", {"field", "control"}),                               # 현장 = 담당 하역장만 (서버가 담당 하역장으로 거름)
     ("POST", r"^/api/ingest$", {"control", "ingest"}),                          # 영상 모듈: 이 PC에서 또는 토큰
-    ("GET", r"^/media/", {"control", "field"}),
-    ("WS", r"^/ws$", {"control", "field"}),
+    ("WS", r"^/ws$", {"control"}),                                              # 관제 화면 실시간 = 전체 상태
+    ("WS", r"^/ws/m$", {"field", "driver"}),                                    # 모바일 실시간 = 역할별로 걸러 보냄
 ]
 
 
@@ -49,8 +44,8 @@ def allowed_roles(method, path):
     for m, pat, roles in RULES:
         if (m == "*" or m == method) and re.search(pat, path):
             return roles
-    if path.startswith("/api/"):
-        return {"control", "field"} if method == "GET" else {"control"}
+    if path.startswith("/api/") or path.startswith("/media/"):
+        return {"control"}                      # 관제 화면 API는 관제만 (현장 · 운전자는 /api/field · /api/driver)
     return {"public"}
 
 
@@ -271,11 +266,11 @@ def install(app, store, no_auth=False, secure_cookie=False, ingest_token=None, s
         request.state.user = u
         return await call_next(request)
 
-    def ws_user(socket):
+    def ws_user(socket, path="/ws"):
         if off:
             return GUEST
         u = store.session_user(socket.cookies.get(COOKIE))
-        return u if u and u["role"] in allowed_roles("WS", "/ws") else None
+        return u if u and u["role"] in allowed_roles("WS", path) else None
 
     app.state.ws_user = ws_user
 
