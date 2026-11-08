@@ -31,8 +31,12 @@ WEB = ROOT / "web"
 VERSION = "v12"
 TICK = 0.1  # 실제 초
 
-rt = Runtime(seed=7, db_path=DATA / "events.db", assumptions_path=DATA / "assumptions.json")
+import os  # noqa: E402
+# DOCK_MEMORY=1: 테스트에서 이 모듈을 가져와도 이벤트 DB · 가정값 파일을 건드리지 않게 메모리에서만
+rt = Runtime(seed=7) if os.environ.get("DOCK_MEMORY") else Runtime(seed=7, db_path=DATA / "events.db", assumptions_path=DATA / "assumptions.json")
 clients: set = set()
+mobiles: dict = {}   # 모바일 실시간 연결 → 로그인한 사람
+mobile_sent: dict = {}
 
 
 async def ticker():
@@ -52,14 +56,32 @@ async def ticker():
 
 
 async def broadcast():
-    if not clients:
+    if not clients and not mobiles:
         return
-    msg = json.dumps(rt.state(), ensure_ascii=False)
+    st = rt.state()
+    msg = json.dumps(st, ensure_ascii=False)
     for ws in list(clients):
         try:
             await ws.send_text(msg)
         except Exception:
             clients.discard(ws)
+    now = time.monotonic()
+    due = [(ws, u) for ws, u in list(mobiles.items()) if now - mobile_sent.get(ws, 0) >= 1.0]   # 모바일은 1초에 한 번
+    p2 = rt.panel2() if any(u["role"] != "driver" for _, u in due) else None
+    for ws, u in due:
+        mobile_sent[ws] = now           # 모바일: 사람마다 걸러서(운전자 = 내 차, 현장 = 담당 하역장)
+        try:
+            await ws.send_text(json.dumps(mobile_view(u, st, p2), ensure_ascii=False))
+        except Exception:
+            mobiles.pop(ws, None)
+            mobile_sent.pop(ws, None)
+
+
+def mobile_view(u, st=None, p2=None):
+    if u["role"] == "driver":
+        return {"role": "driver", **rt.driver_view((u.get("vehicle") or {}).get("plate"), st)}
+    hop = ["A", "B", "C", "YARD"] if u["role"] == "control" else (u.get("hoppers") or [])
+    return {"role": "field", **rt.field_view(hop, st, p2)}
 
 
 @asynccontextmanager
@@ -375,6 +397,22 @@ async def ack(alert_id: str):
     return a
 
 
+@app.websocket("/ws/m")
+async def ws_mobile(socket: WebSocket):
+    u = app.state.ws_user(socket, "/ws/m") if getattr(app.state, "ws_user", None) else None
+    if not u:
+        await socket.close(code=4401)
+        return
+    await socket.accept()
+    mobiles[socket] = u
+    try:
+        await socket.send_text(json.dumps(mobile_view(u), ensure_ascii=False))
+        while True:
+            await socket.receive_text()
+    except WebSocketDisconnect:
+        mobiles.pop(socket, None)
+
+
 @app.websocket("/ws")
 async def ws(socket: WebSocket):
     if getattr(app.state, "ws_user", None) and not app.state.ws_user(socket):
@@ -410,13 +448,112 @@ async def mobile_page():
     return FileResponse(WEB / "m" / "index.html")
 
 
+# ---------- 모바일 (R12): 운전자 = 내 차만 · 현장 담당자 = 담당 하역장만 ----------
+def me_of(request):
+    return getattr(request.state, "user", None) or (app.state.auth_current(request) if hasattr(app.state, "auth_current") else None) or {}
+
+
+def my_plate(request):
+    plate = (me_of(request).get("vehicle") or {}).get("plate")
+    if not plate:
+        raise HTTPException(403, "차량이 등록된 운전자 계정이 아니에요.")
+    return plate
+
+
+def my_hoppers(request):
+    u = me_of(request)
+    return ["A", "B", "C", "YARD"] if u.get("role") == "control" else (u.get("hoppers") or [])
+
+
 @app.get("/api/driver/me")
 async def driver_me(request: Request):
-    """운전자: 자기 차량(가입한 차량번호)의 지금 상태만."""
-    u = getattr(request.state, "user", None) or {}
-    plate = (u.get("vehicle") or {}).get("plate")
-    v = next((x for x in rt.state()["vehicles"] if x["id"] == plate), None)
-    return {"plate": plate, "vehicle": v}
+    """운전자: 자기 차량(가입한 차량번호)의 지금 상태 · 순번(PC 순번표의 같은 행) · 안전 경고만."""
+    return rt.driver_view(my_plate(request))
+
+
+@app.get("/api/driver/accept")
+async def driver_accept(cargo: str = ""):
+    return {"cargo": cargo, "bays": rt.accept_bays(cargo) if cargo else [], "cargos": list(rt.rec.pred)}
+
+
+@app.post("/api/driver/trip")
+async def driver_trip(request: Request, body: dict = Body(...)):
+    plate = my_plate(request)
+    r, err = rt.driver_trip(plate, body.get("cargo"), body.get("load_t"), body.get("order"))
+    if err:
+        raise HTTPException(409, err)
+    return rt.driver_view(plate)
+
+
+@app.post("/api/driver/ack")
+async def driver_ack(request: Request):
+    r, err = rt.driver_ack(my_plate(request))
+    if err:
+        raise HTTPException(409, err)
+    return {"result": r}
+
+
+@app.post("/api/driver/arrive")
+async def driver_arrive(request: Request):
+    r, err = rt.driver_arrive(my_plate(request))
+    if err:
+        raise HTTPException(409, err)
+    return {"result": r, "message": "도착 확인됨" if r == "ignored" else "도착했어요"}
+
+
+@app.post("/api/driver/stopped")
+async def driver_stopped(request: Request):
+    x = rt.driver_stopped(my_plate(request))
+    if not x:
+        raise HTTPException(409, "지금 내 차에 열린 안전 경고가 없어요.")
+    return {"safety_id": x}
+
+
+@app.get("/api/field/home")
+async def field_home(request: Request):
+    return rt.field_view(my_hoppers(request))
+
+
+def need_own(request, **kw):
+    if not rt.field_owns(my_hoppers(request), **kw):
+        raise HTTPException(403, "담당 하역장이 아니에요.")
+
+
+@app.post("/api/field/approve")
+async def field_approve(request: Request, vehicle_id: str):
+    need_own(request, vehicle_id=vehicle_id)
+    if not rt.approve(vehicle_id):
+        raise HTTPException(409, "순번에 없는 차량이에요.")
+    return {"ok": True}
+
+
+@app.post("/api/field/change")
+async def field_change(request: Request, body: dict = Body(...)):
+    vid, sid = body.get("vehicle_id"), body.get("sector_id")
+    need_own(request, vehicle_id=vid)
+    if sid not in my_hoppers(request):
+        raise HTTPException(403, "담당 하역장으로만 바꿀 수 있어요.")
+    need_sector(sid)
+    c, err = rt.change(vid, sid, body.get("reason", "현장 판단"), body.get("memo", ""))
+    if err:
+        raise HTTPException(409, err)
+    return c
+
+
+@app.post("/api/field/safety/{sid}/{how}")
+async def field_safety(request: Request, sid: str, how: str):
+    need_own(request, safety_id=sid)
+    if how not in ("ack", "dismiss") or not rt.safety_resolve(sid, how):
+        raise HTTPException(409, "이미 처리된 안전 경고예요.")
+    return {"ok": True}
+
+
+@app.post("/api/field/alerts/{aid}/ack")
+async def field_alert_ack(request: Request, aid: str):
+    need_own(request, alert_id=aid)
+    if not rt.ack(aid):
+        raise HTTPException(404, "알림이 없습니다")
+    return {"ok": True}
 
 
 app.mount("/web", StaticFiles(directory=WEB), name="web")

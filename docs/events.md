@@ -77,12 +77,13 @@
 | `VEHICLE_STOPPED` | 영상 | 구역 안에서 멈춤 → 대기 또는 작업 시작 |
 | `CALL` | 배정 엔진 | 차량 호출 (payload: rank, reason, route_m, travel_min, speed_limit_kmh, approval = auto · approved · changed) → 기사 화면 알림 |
 | `CALL_PENDING` | 배정 엔진 | 호출 시각이 됐지만 현장 담당자 승인을 기다림 (자동 승인 꺼짐 · L2). payload: rank, reason, since |
-| `CALL_ACK` | 기사 모바일 화면 | 기사가 ‘출발’을 누름 |
-| `BAY_ENTER` / `BAY_EXIT` | 영상(베이 구역 3초 이상) | 하역 시작 · 끝 (payload: bay 1~3, cargo / load_t, unload_min). 진입→이탈 = 건별 작업 기록 · 예측 하역시간의 근거 |
+| `CALL_ACK` | 기사 모바일 화면(`source: app`) · 시뮬레이터 대신 응답(`iot`) | 기사가 [확인했어요 · 이동 시작]을 누름. 앱으로 등록한 차는 이걸 받아야 출발하고, 3분 동안 없으면 `호출 응답 없음` 알림 뒤 출발(대신 응답). 이미 출발한 차의 CALL_ACK는 `ignored` |
+| `BAY_ENTER` / `BAY_EXIT` | 영상(베이 구역 3초 이상) · 기사 앱 [도착했어요](`source: app`, payload.manual) | 하역 시작 · 끝 (payload: bay 1~3, cargo / load_t, unload_min). 진입→이탈 = 건별 작업 기록 · 예측 하역시간의 근거. 이미 하역 중인 차의 BAY_ENTER(영상과 수동이 겹침)는 `ignored` — 중복 진입 없음 |
 | `YARD_DOWN` / `YARD_UP` | 시연 버튼 | 하역장 정지 · 복구 → 영향 차량 재배정 |
 | `URGENT_IN` | 시연 버튼 | 긴급 입고(소결 재고 부족) → 순번 맨 앞 |
 | `SAFETY_ALERT` | 영상(합성) · 시뮬레이터 | 안전 경고: 적재함 상승 중 덤프 반경(가정 5m, rois.json REAR 구역) 안 작업자 → L3 자동 실행(기사 앱 경고 · 하차 중지 요청, 가상). 하차 진행이 멈춤 (payload: id, level=L3, rule, dist_m, bay, dump_deg, repeat, action, stand_in) |
 | `SAFETY_ACK` | 맵 위 안전 띠 · 알림 패널 안전 탭 | 관제·현장 담당자가 안전 경고 확인 또는 오탐지 → 하차 재개 (payload: id, how = 확인/오탐지, ack_sec = 뜬 뒤 확인까지 실제 초, repeat). 같은 위험이 계속 감지되면 SAFETY_ALERT(repeat=1)가 다시 온다 |
+| `DRIVER_STOPPED` | 기사 앱 안전 경고 화면 [멈췄어요] | 운전자가 하역을 멈췄다고 알림 (payload: id = 안전 경고). 하역 재개는 여전히 관제·현장의 SAFETY_ACK |
 | `ALERT` | 배정 엔진 | 알림 발생 (payload: level, kind, text, action, related = 제안이 영향을 주는 반입 "차량#회차" 목록) |
 | `ORDER_APPROVED` | 통합하역작업 탭 | 담당자가 추천 순번 승인 (payload: rank, reason) |
 | `ORDER_CHANGED` | 통합하역작업 탭 | 담당자가 보낼 호퍼 변경 (payload: from, to, reason, memo, delta_min, cost_won) |
@@ -252,3 +253,24 @@ py tools/replay_events.py events.jsonl --speed 60
 - **영상 한 번 = 반입 한 번**: 이벤트마다 `event_id`(영상 파일 · 재생 회차 · 영상 안 시각 · 종류 · 차량). 같은 것을 다시 넣으면 결과 `duplicate`. 다음 반입으로 넣으려면 `--play 2`.
   화면의 반복 재생은 이벤트를 넣지 않는다.
 - 판정 규칙 확인 기록: [vision_check.md](vision_check.md).
+
+## 모바일 앱 (R12) — 운전자 · 현장 담당자
+
+서버가 로그인한 사람으로 걸러 준다: 운전자 = 가입한 차량번호의 차만, 현장 담당자 = 담당 하역장만. 실시간은 `/ws/m`(1초마다, 사람마다 다른 내용).
+
+| 화면 버튼 | API | 들어가는 이벤트 |
+|---|---|---|
+| 운전자 · 운행 등록 [등록하고 게이트로] | `POST /api/driver/trip` {cargo, load_t, order} | `GATE_IN` (source app, payload cargo · load_t · order) |
+| 운전자 · 호출 [확인했어요 · 이동 시작] | `POST /api/driver/ack` | `CALL_ACK` (source app) |
+| 운전자 · 도착 확인 [도착했어요] | `POST /api/driver/arrive` | `BAY_ENTER` (source app, payload bay · cargo · manual) |
+| 운전자 · 안전 경고 [멈췄어요] | `POST /api/driver/stopped` | `DRIVER_STOPPED` |
+| 현장 · 순번 [승인] / [변경] | `POST /api/field/approve` · `/api/field/change` | `ORDER_APPROVED` / `ORDER_CHANGED` |
+| 현장 · 안전 [확인] / [취소 · 오탐지] | `POST /api/field/safety/{id}/ack · dismiss` | `SAFETY_ACK` |
+| 현장 · 알림 [확인] | `POST /api/field/alerts/{id}/ack` | `ALERT_ACK` |
+
+운전자 대기 화면의 순번 · 예상 호출 · 대기 분은 PC 순번표(`/api/state` queue)의 같은 행을 그대로 쓴다(앞 차량 = 순번 − 1).
+
+```json
+{"ts": "2026-11-09T08:30:10", "type": "CALL_ACK", "source": "app", "cam_id": null, "sector_id": "C", "zone": null, "track_id": null, "vehicle_id": "82가 1234", "payload": {}}
+{"ts": "2026-11-09T08:33:40", "type": "BAY_ENTER", "source": "app", "cam_id": null, "sector_id": "C", "zone": null, "track_id": null, "vehicle_id": "82가 1234", "payload": {"bay": 3, "cargo": "석회석", "manual": true}}
+```

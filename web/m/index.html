@@ -2,34 +2,213 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#EDEDEB">
 <title>하역관제 · 모바일</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/web/auth.css">
 <style>
-.wrap{max-width:430px;margin:0 auto;min-height:100vh;padding:20px 16px 24px;display:flex;flex-direction:column;gap:16px}
-.top{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.who{font-size:13px;color:var(--muted);font-weight:600}
-.box{background:#fff;border-radius:28px;padding:22px;display:flex;flex-direction:column;gap:12px}
-.box h1{font-size:22px;margin:0} .box p{margin:0;font-size:14px;color:var(--ink-2);line-height:1.6}
-.dark{background:var(--ink);color:#fff} .dark p{color:#C9CDD1}
-ul{margin:0;padding-left:18px;font-size:13.5px;color:var(--ink-2);line-height:1.8}
+body{-webkit-tap-highlight-color:transparent}
+.app{max-width:430px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 16px 8px;font-size:13px;color:var(--muted);font-weight:600}
+.bar b{color:var(--ink);font-size:15px} .live{display:inline-flex;align-items:center;gap:6px} .live i{width:8px;height:8px;border-radius:50%;background:#B0B4B8} .live.on i{background:#1F7A4F}
+.body{flex:1;padding:4px 16px 120px;display:flex;flex-direction:column;gap:12px}
+.card{background:#fff;border-radius:24px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.card.dark{background:var(--ink);color:#fff} .card.dark .cap{color:#C9CDD1}
+.card.red{background:var(--red);color:#fff} .card.blue{background:#1D47B8;color:#fff}
+h1{font-size:24px;line-height:1.3;margin:0;letter-spacing:-.01em} h2{font-size:17px;margin:0}
+.cap{font-size:13px;color:var(--muted);line-height:1.5} .big{font-size:30px;font-weight:700;line-height:1.1}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.tile{background:var(--soft-2);border-radius:16px;padding:12px 14px} .tile .k{font-size:12px;color:var(--muted);font-weight:600} .tile .v{font-size:24px;font-weight:700;margin-top:2px}
+.tile .v small{font-size:13px;color:var(--muted);font-weight:600}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.steps li{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:14px;color:var(--muted);border-top:1px solid #EFEFEC}
+.steps li:first-child{border-top:0} .steps li i{width:12px;height:12px;border-radius:50%;border:2px solid #C9CDD1;flex:none}
+.steps li.on{color:var(--ink);font-weight:600} .steps li.on i{background:var(--ink);border-color:var(--ink)} .steps li.now i{background:#1D47B8;border-color:#1D47B8;box-shadow:0 0 0 4px #E6EDFF}
+.steps li span{margin-left:auto;font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:8px} .chips button{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:#fff;font:inherit;font-size:14px;font-weight:600;color:var(--ink-2)}
+.chips button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.dock{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 30%);display:flex;flex-direction:column;gap:8px;max-width:430px;margin:0 auto}
+.dock .btn{width:100%;min-height:56px;font-size:16px}
+.btn.white{background:#fff;color:var(--ink);border-color:#fff} .btn.red{background:var(--red);border-color:var(--red);color:#fff}
+.tabs{position:fixed;left:0;right:0;bottom:0;max-width:430px;margin:0 auto;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom)}
+.tabs button{min-height:60px;border:0;background:transparent;font:inherit;font-size:12.5px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative}
+.tabs button[aria-selected="true"]{color:var(--ink)} .tabs button i{font-style:normal;font-size:18px}
+.tabs .n{position:absolute;top:8px;left:55%;min-width:18px;height:18px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.hops{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.hop{background:#fff;border-radius:18px;padding:14px} .hop b{font-size:15px} .hop .pct{font-size:24px;font-weight:700}
+.lv{display:inline-flex;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:700}
+.lv.ok{background:#E6EDFF;color:#1D47B8} .lv.warn{background:#FFF1D6;color:#8A5A00} .lv.crit,.lv.down{background:#FFE9DD;color:#B8420A}
+.ap{background:#fff;border-radius:20px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.ap .t{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700} .ap .rk{width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+.ap .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px} .ap .btns .btn{min-height:48px}
+.eff{display:inline-flex;padding:2px 8px;border-radius:999px;background:#DDF0E5;color:#1F7A4F;font-size:12px;font-weight:700} .eff.bad{background:#FBDDE1;color:var(--red)}
+.al{background:#fff;border-radius:18px;padding:12px 14px;display:flex;gap:10px;align-items:center;font-size:13.5px} .al div{flex:1}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center;z-index:20} .sheet[hidden]{display:none}
+.sheet .in{background:#fff;border-radius:24px 24px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom));width:100%;max-width:430px;display:flex;flex-direction:column;gap:10px}
+.toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:999px;padding:10px 16px;font-size:13.5px;font-weight:600;z-index:30;max-width:90vw} .toast[hidden]{display:none}
+.alarm{min-height:100vh;background:var(--red);color:#fff;display:flex;flex-direction:column;padding:20px 16px 160px;gap:16px}
+.alarm .k{font-size:13px;opacity:.85;font-weight:600} .alarm h1{font-size:34px} .alarm .facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px} .alarm{overflow-x:hidden} .alarm .facts div{min-width:0;font-size:12.5px} .alarm .facts b{font-size:17px!important;word-break:keep-all;overflow-wrap:anywhere}
+.alarm .facts div{background:rgba(255,255,255,.14);border-radius:16px;padding:12px} .alarm .facts b{display:block;font-size:20px;margin-top:2px}
 </style>
 </head>
 <body>
-<main class="wrap">
-  <div class="top"><div class="brandrow"><span class="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5h11v9.5h-11z"/><path d="M13.5 9.5h4.2l3.3 3.4v3.1h-7.5z"/><circle cx="6.5" cy="17.5" r="1.9"/><circle cx="17" cy="17.5" r="1.9"/></svg></span>하역관제</div><span class="who" id="who"></span></div>
-  <section class="box dark"><h1 id="hi">안녕하세요</h1><p id="role"></p></section>
-  <section class="box"><h1>모바일 화면 준비 중</h1><p>다음 단계(R12)에서 이 자리에 열려요.</p><ul id="next"></ul></section>
-  <button class="btn" id="out">로그아웃</button>
-</main>
+<div class="app" id="app"><div class="body"><div class="card"><h1>불러오는 중…</h1></div></div></div>
+<div class="toast" id="toast" role="status" hidden></div>
 <script>
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-fetch('/api/me').then(r=>{ if(r.status===401){ location.replace('/login'); return null; } return r.json(); }).then(u=>{ if(!u) return;
-  $('#who').textContent=u.role_name; $('#hi').textContent=u.name+'님, 안녕하세요';
-  $('#role').textContent=u.role==='driver'?'차량 '+((u.vehicle||{}).plate||'')+' · '+((u.vehicle||{}).tonnage||'')+' · '+((u.vehicle||{}).carrier||''):'담당 하역장 '+(u.hoppers||[]).map(h=>h==='YARD'?'대기장':'호퍼 '+h).join(' · ');
-  $('#next').innerHTML=(u.role==='driver'?['운행 등록(싣고 온 원료 · 중량)','대기 — 내 순번 · 예상 호출','호출 — ○번 베이로 이동','도착 확인 · 덤프 하역 안전 경고']:['하역 현황 · 안전 경고 확인/오탐지','호출 순번 승인 · 변경','알림 · 내 정보']).map(x=>'<li>'+esc(x)+'</li>').join(''); });
-$('#out').onclick=()=>fetch('/api/auth/logout',{method:'POST'}).then(()=>location.replace('/login'));
+let ME=null, D=null, tab='home', busy=false, live=false, cargoSel=null, toastT=null;
+const HN=h=>h==='YARD'?'대기장':'호퍼 '+h;
+function toast(m){ $('#toast').textContent=m; $('#toast').hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>$('#toast').hidden=true,2600); }
+async function api(u,o){ const r=await fetch(u,o); if(r.status===401){ location.replace('/login'); throw new Error('login'); } const d=await r.json().catch(()=>({})); if(!r.ok) throw new Error(d.detail||('오류 '+r.status)); return d; }
+const post=(u,b)=>api(u,{method:'POST',headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined});
+function bar(){ return '<div class="bar"><span><b>'+esc(ME.role_name)+'</b> · '+esc(ME.name)+'</span><span class="live'+(live?' on':'')+'" title="실시간 연결"><i></i>'+(D&&D.clock?esc(D.clock.slice(11,16)):'')+'</span></div>'; }
+
+/* ---------- 운전자 ---------- */
+function driver(){
+  const v=D.vehicle, q=D.queue, sf=D.safety;
+  if(sf) return alarm(sf);
+  if(!v) return register();
+  if(v.state==='arrived'||v.state==='yard') return waiting(v,q);
+  if(v.state==='moving'&&v.app&&!v.acked) return called(v);
+  if(v.state==='moving'||v.state==='queue') return arrive(v);
+  if(v.state==='working') return working(v);
+  return finished(v);
+}
+function steps(cur){ const S=D.steps||[]; let now=S.findIndex(s=>!s.t); if(now<0) now=S.length;
+  return '<div class="card"><h2>진행 상황</h2><ul class="steps">'+S.map((s,i)=>'<li class="'+(s.t?'on':'')+(i===now?' now':'')+'"><i></i>'+esc(s.k)+'<span>'+esc(s.t||'')+'</span></li>').join('')+'</ul></div>'; }
+function vline(v){ return esc(v.cargo)+' '+v.load_t+'t'+(v.order?' · 오더 '+esc(v.order):''); }
+function register(){
+  const cargos=(window.CARGOS||[]), top=['석회석','분코크스','밀스케일'], rest=cargos.filter(c=>!top.includes(c));
+  const car=ME.vehicle||{};
+  let h=bar()+'<div class="body">';
+  if(D.trips_today) h+='<div class="card" style="background:#DDF0E5"><b style="color:#1F7A4F">하역 완료 · 오늘 운행 '+D.trips_today+'회</b><span class="cap">'+(D.last_trip?esc(D.last_trip.cargo)+' '+D.last_trip.load_t+'t · '+esc(HN(D.last_trip.sector||''))+' · 대기 '+D.last_trip.wait_min+'분':'')+'</span></div>';
+  h+='<div><h1>오늘 운행 등록</h1><p class="cap" style="margin:4px 0 0">운행할 때마다 싣고 온 원료를 등록해요. 가입 정보와 별개예요.</p></div>'+
+    '<div class="card"><span class="cap">내 차량 · 가입 정보</span><b style="font-size:17px">'+esc(car.plate)+' · '+esc(car.tonnage||'')+' 덤프</b><span class="cap">'+esc(car.carrier||'')+'</span></div>'+
+    '<div class="card"><h2>원료</h2><div class="chips" id="cg">'+top.map(c=>'<button data-c="'+esc(c)+'" aria-pressed="'+(cargoSel===c)+'">'+esc(c)+'</button>').join('')+
+    '</div><label class="fld">기타 원료 '+rest.length+'종<select id="cgx"><option value="">고르기</option>'+rest.map(c=>'<option'+(cargoSel===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select></label>'+
+    '<label class="fld">중량 (t)<input id="wt" inputmode="decimal" placeholder="예: 24.5"></label><label class="fld">입고 오더 번호<input id="od" placeholder="선택 입력"></label></div>'+
+    '<div class="card"><h2>받을 수 있는 하역장</h2><span class="cap" id="acc">원료를 고르면 보여요 · 베이는 호출 때 지정</span></div>'+
+    '<p class="cap">게이트를 지나면 도착이 기록되고 대기장 순번이 정해져요. (위치 신호는 가정)</p></div>'+
+    '<div class="dock"><button class="btn dark" id="reg">등록하고 게이트로</button></div>';
+  return h;
+}
+function waiting(v,q){
+  return bar()+'<div class="body"><div class="card dark"><span class="cap">'+vline(v)+'</span><h1>'+esc(D.plate)+' · 대기장</h1><span class="cap">'+(v.state==='arrived'?'게이트 통과 · 대기장으로 이동 중':'대기 중 · '+esc(D.clock.slice(11,16))+' 기준')+'</span></div>'+
+    (q?'<div class="tiles"><div class="tile"><div class="k">내 순번</div><div class="v">'+q.rank+'<small> 번째</small></div></div><div class="tile"><div class="k">예상 호출</div><div class="v">'+esc(q.call_at||'—')+'</div></div>'+
+      '<div class="tile"><div class="k">앞 차량</div><div class="v">'+q.ahead+'<small>대</small></div></div><div class="tile"><div class="k">하역장</div><div class="v" style="font-size:20px">'+esc(q.sector||'—')+'</div></div>'+
+      '<div class="tile" style="grid-column:1/-1"><div class="k">대기</div><div class="v">'+Math.floor(q.wait_min)+'<small>분</small></div><div class="cap">'+esc(q.status||'')+'</div></div></div>'
+     :'<div class="card"><span class="cap">순번을 계산하고 있어요…</span></div>')+
+    '<p class="cap">예상 시각은 하역 진척도로 계산해서 바뀔 수 있어요. 현장 담당자가 승인하면 호출 알림이 와요.</p>'+steps()+'</div>';
+}
+function called(v){
+  return bar()+'<div class="body"><div class="card blue"><span style="font-size:13px;opacity:.85">호출 '+esc((D.steps[2]||{}).t||'')+' · '+vline(v)+'</span><h1>'+esc(v.sector)+' '+v.bay+'번 베이로 이동하세요</h1>'+
+    '<span style="opacity:.9;font-size:14px">도로로 나가 직진 · 약 '+(v.travel_min??'—')+'분 · 후진 진입</span></div>'+steps()+'</div>'+
+    '<div class="dock"><button class="btn dark" id="ack">확인했어요 · 이동 시작</button></div>';
+}
+function arrive(v){
+  return bar()+'<div class="body"><div class="card dark"><span class="cap">'+esc(D.plate)+' · 이동 중'+(v.eta_min!=null?' · 약 '+v.eta_min+'분 남음':'')+'</span><h1>'+esc(v.sector)+' '+v.bay+'번 베이에 도착했나요?</h1>'+
+    '<span class="cap">위치 신호(가정)·영상으로 자동 확인되지만, 신호가 약하면 버튼으로 알려 주세요.</span></div>'+
+    '<div class="card"><h2>도착하면 진입 → 하역중</h2><span class="cap">'+v.bay+'번 베이('+esc(v.cargo)+')로 유도선을 따라 후진 진입한 뒤 적재함을 올리세요. 뒤에 사람이 있으면 경고가 와요.</span></div>'+steps()+'</div>'+
+    '<div class="dock"><button class="btn dark" id="arr">도착했어요</button></div>';
+}
+function working(v){
+  return bar()+'<div class="body"><div class="card dark"><span class="cap">'+esc(v.sector)+' '+v.bay+'번 베이 · '+vline(v)+'</span><h1>하역 중 '+(v.progress_pct??0)+'%</h1>'+
+    '<div style="height:8px;border-radius:999px;background:rgba(255,255,255,.2)"><div style="height:100%;width:'+Math.min(100,v.progress_pct||0)+'%;border-radius:999px;background:#fff"></div></div>'+
+    '<span class="cap">약 '+Math.ceil(v.remain_min||0)+'분 남음'+(v.dump_deg>=15?' · 적재함 상승 '+v.dump_deg+'°':'')+'</span></div>'+steps()+'</div>';
+}
+function finished(v){ return bar()+'<div class="body"><div class="card" style="background:#DDF0E5"><h1 style="color:#1F7A4F">하역 완료</h1><span class="cap">계근대(출)로 나가세요 · 오늘 운행 '+(D.trips_today+1)+'회째</span></div>'+steps()+'</div>'; }
+function alarm(sf){
+  return '<div class="alarm" role="alertdialog" aria-labelledby="alt"><div class="row k"><span>'+esc(D.plate)+' · 운전자</span><span>'+esc(sf.ts||'')+'</span></div>'+
+    '<span class="k">안전 경고 · 자동</span><h1 id="alt">하역을 멈추세요</h1><p style="margin:0;font-size:16px;line-height:1.5">트럭 '+(sf.rule&&sf.rule.includes('후진')?'후진 경로':'뒤 '+sf.radius_m+'m')+' 안에 작업자가 있어요. 적재함을 그대로 두고 기다리세요.</p>'+
+    '<div class="facts"><div>위치<b>'+esc(sf.sector||'')+' 베이 '+(sf.bay||'')+'</b></div><div>위험 반경<b>'+sf.radius_m+'m</b></div><div>작업자 거리<b>약 '+(sf.dist_m??'—')+'m</b></div></div>'+
+    '<p style="margin:0;font-size:13px;opacity:.9">관제실도 보고 있어요 · 오탐지면 관제실이 해제해요'+(sf.stopped?' · '+esc(sf.stopped)+' 멈춤 알림 보냄':'')+'</p></div>'+
+    '<div class="dock" style="background:var(--red)"><button class="btn white" id="stop"'+(sf.stopped?' disabled':'')+'>'+(sf.stopped?'멈춤을 알렸어요':'멈췄어요')+'</button><a class="btn" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.6)" href="tel:">관제실 연결</a></div>';
+}
+
+/* ---------- 현장 담당자 ---------- */
+function field(){
+  const n=(D.checks||[]).reduce((a,g)=>a+g.n,0);
+  let h=bar()+'<div class="body">';
+  if(tab==='home'){
+    h+='<div class="row"><h1>하역 현황</h1><span class="cap">'+esc((ME.shift||''))+'</span></div>';
+    (D.safety||[]).forEach(x=>{ h+='<div class="card red"><span style="font-size:13px;opacity:.9">안전 경고 L3 자동 실행 '+esc(x.ts||'')+'</span><h2>'+esc(x.sector_name||x.sector_id)+' · '+esc(x.cargo||'')+' '+esc(x.rule_text||'덤프 반경')+' 진입</h2>'+
+      '<span style="font-size:13.5px;opacity:.95">'+esc(x.vehicle_id)+' 뒤에 작업자 · 약 '+(x.dist_m??'—')+'m. 경고와 하역 중지 요청이 자동으로 나갔어요.'+(x.driver_stopped?' 운전자 멈춤 확인 '+esc(x.driver_stopped)+'.':'')+'</span>'+
+      '<div class="btns" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn white" data-sa="'+esc(x.id)+'" data-how="ack">확인</button><button class="btn" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.6)" data-sa="'+esc(x.id)+'" data-how="dismiss">취소 · 오탐지</button></div></div>'; });
+    h+='<div class="hops">'+(D.sectors||[]).map(s=>{ const lv=s.status==='down'?'down':s.level; return '<div class="hop"><div class="row"><b>'+esc(s.name)+'</b><span class="lv '+lv+'">'+({ok:'원활',warn:'주의',crit:'혼잡',down:'정지'}[lv])+'</span></div><div class="pct">'+(s.status==='down'?'정지':s.congestion_pct+'%')+'</div><span class="cap">하역 중 '+s.working+'/'+s.bays+' · 대기 '+s.queue+'</span></div>'; }).join('')+
+      (D.yard!=null?'<div class="hop"><b>대기장</b><div class="pct">'+D.yard+'<small style="font-size:14px">대</small></div><span class="cap">대기</span></div>':'')+'</div>';
+    h+=approvals((D.approvals||[]).slice(0,2),true);
+  } else if(tab==='seq'){ h+='<h1>호출 순번</h1>'+approvals(D.approvals||[],false); }
+  else if(tab==='alert'){
+    h+='<h1>알림</h1><span class="cap">담당 하역장 운영 알림 · 확인하면 목록에서 빠져요</span>';
+    const items=(D.checks||[]).flatMap(g=>g.items.map(i=>({...i,kind:g.kind,sector:g.sector_id})));
+    h+=items.length?items.map(i=>'<div class="al"><div><b>'+esc(HN(i.sector))+' · '+esc(i.kind)+'</b><br><span class="cap">'+esc(i.ts)+' · '+esc(i.text)+'</span></div><button class="btn sm" data-ack="'+esc(i.id)+'">확인</button></div>').join(''):'<div class="card"><span class="cap">확인할 알림이 없어요.</span></div>';
+  } else {
+    h+='<h1>내 정보</h1><div class="card"><b style="font-size:17px">'+esc(ME.name)+'</b><span class="cap">'+esc(ME.role_name)+' · 아이디 '+esc(ME.login_id)+(ME.dept?' · '+esc(ME.dept):'')+'</span><span class="cap">담당 하역장 '+(D.hoppers||[]).map(HN).join(' · ')+'</span><span class="cap">'+esc(ME.shift||'')+'</span></div><button class="btn" id="out">로그아웃</button>';
+  }
+  h+='</div><nav class="tabs" role="tablist">'+[['home','⌂','홈'],['seq','≡','순번'],['alert','🔔','알림'],['me','☺','내 정보']].map(([k,i,l])=>'<button role="tab" data-tab="'+k+'" aria-selected="'+(tab===k)+'"><i aria-hidden="true">'+i+'</i>'+l+(k==='alert'&&n?'<span class="n">'+(n>99?'99+':n)+'</span>':'')+(k==='seq'&&(D.approvals||[]).length?'<span class="n">'+D.approvals.length+'</span>':'')+'</button>').join('')+'</nav>';
+  return h;
+}
+function approvals(list,short){
+  let h='<div class="row"><h2>호출 순번 <span class="cap">L2 · 승인해야 호출돼요</span></h2>'+(short&&(D.approvals||[]).length>2?'<button class="btn sm" data-tab="seq">전체 '+D.approvals.length+'</button>':'')+'</div>';
+  if(D.auto_approve) h+='<div class="card"><span class="cap">지금은 자동 승인이 켜져 있어 호출 시각이 되면 자동으로 가요(관제실 설정).</span></div>';
+  else if(!list.length) h+='<div class="card"><span class="cap">승인을 기다리는 순번이 없어요.</span></div>';
+  return h+list.map(a=>'<div class="ap"><div class="t"><span class="rk">'+a.rank+'</span>'+esc(a.vehicle_id)+' → '+esc(a.name)+' 베이 '+(a.bay??'—')+(a.urgent?' <span class="lv crit">긴급</span>':'')+'</div>'+
+    '<span class="cap">'+esc(a.call_at)+' 호출 · 대기 '+Math.floor(a.wait||0)+'분'+(a.travel?' · 이동 '+a.travel+'분':'')+'</span><span class="cap">'+esc(a.why||'')+'</span>'+
+    (a.effect!=null&&Math.abs(a.effect)>=0.05?'<span><span class="eff'+(a.effect>0?' bad':'')+'" title="'+(a.effect_confirmed?'확정':'예상')+' · PC 알림 패널과 같은 값">FIFO 대비 '+(a.effect>0?'+':'−')+Math.abs(a.effect).toFixed(1)+'분</span></span>':'')+
+    '<div class="btns"><button class="btn" data-chg="'+esc(a.vehicle_id)+'">변경</button><button class="btn dark" data-ok="'+esc(a.vehicle_id)+'">승인</button></div></div>').join('');
+}
+function changeSheet(vid){
+  const opts=(D.hoppers||[]).filter(h=>h!=='YARD');
+  const s=document.createElement('div'); s.className='sheet'; s.innerHTML='<div class="in" role="dialog" aria-label="하역장 바꾸기"><h2>'+esc(vid)+' 하역장 바꾸기</h2><span class="cap">담당 하역장으로만 바꿀 수 있어요.</span>'+
+    opts.map(h=>'<button class="btn" data-to="'+h+'">호퍼 '+h+'</button>').join('')+'<button class="btn" data-x="1">닫기</button></div>';
+  s.onclick=async e=>{ const b=e.target.closest('[data-to],[data-x]'); if(!b&&e.target!==s) return; s.remove(); if(b&&b.dataset.to){ try{ await post('/api/field/change',{vehicle_id:vid,sector_id:b.dataset.to,reason:'현장 판단'}); toast('호퍼 '+b.dataset.to+'로 바꿨어요'); load(); }catch(err){ toast(err.message); } } };
+  document.body.appendChild(s);
+}
+
+/* ---------- 그리기 · 동작 ---------- */
+let lastKey='', lastHtml='';
+function draw(){ if(!D||!ME) return;
+  const key=ME.role==='driver'&&!D.safety&&!D.vehicle?'register:'+D.trips_today:'';
+  if(key&&key===lastKey){ const c=document.querySelector('.bar .live'); if(c){ c.classList.toggle('on',live); c.lastChild.textContent=D.clock?D.clock.slice(11,16):''; } return; }   // 입력 중인 등록 화면은 다시 그리지 않음
+  const html=ME.role==='driver'?driver():field(); lastKey=key; if(html===lastHtml) return; lastHtml=html;
+  const y=window.scrollY; $('#app').innerHTML=html; window.scrollTo(0,y); if(key) accFor(cargoSel); }
+async function accFor(c){ if(!c||!$('#acc')) return; try{ const r=await api('/api/driver/accept?cargo='+encodeURIComponent(c)); $('#acc').textContent=r.bays.length?r.bays.map(b=>b.name+' '+b.bay+'번 베이').join(' · ')+' · 베이는 호출 때 지정':'받는 하역장이 없어요'; }catch(e){} }
+$('#app').addEventListener('click',async e=>{
+  const t=e.target.closest('button,a'); if(!t||busy) return;
+  try{
+    if(t.dataset.c){ cargoSel=t.dataset.c; if($('#cgx')) $('#cgx').value=''; document.querySelectorAll('#cg button').forEach(b=>b.setAttribute('aria-pressed',String(b===t))); accFor(cargoSel); return; }
+    if(t.dataset.tab){ tab=t.dataset.tab; draw(); window.scrollTo(0,0); return; }
+    busy=true;
+    if(t.id==='reg'){ const wt=$('#wt').value.trim(); if(!cargoSel){ toast('원료를 골라 주세요'); return; } if(!wt){ toast('중량을 넣어 주세요'); $('#wt').focus(); return; }
+      D=Object.assign({role:'driver'},await post('/api/driver/trip',{cargo:cargoSel,load_t:wt,order:$('#od').value.trim()})); toast('등록했어요 · 게이트로 가세요'); draw(); }
+    else if(t.id==='ack'){ await post('/api/driver/ack'); toast('이동 시작 · 안전 운행하세요'); }
+    else if(t.id==='arr'){ const r=await post('/api/driver/arrive'); toast(r.message); }
+    else if(t.id==='stop'){ await post('/api/driver/stopped'); toast('관제실에 멈춤을 알렸어요'); }
+    else if(t.dataset.ok){ await post('/api/field/approve?vehicle_id='+encodeURIComponent(t.dataset.ok)); toast('승인했어요 · 운전자에게 호출이 가요'); }
+    else if(t.dataset.chg){ busy=false; changeSheet(t.dataset.chg); return; }
+    else if(t.dataset.sa){ await post('/api/field/safety/'+encodeURIComponent(t.dataset.sa)+'/'+t.dataset.how); toast(t.dataset.how==='ack'?'확인했어요 · 하역 재개':'오탐지로 해제했어요'); }
+    else if(t.dataset.ack){ await post('/api/field/alerts/'+encodeURIComponent(t.dataset.ack)+'/ack'); toast('확인했어요'); }
+    else if(t.id==='out'){ await post('/api/auth/logout'); location.replace('/login'); return; }
+    await load();
+  }catch(err){ if(err.message!=='login') toast(err.message); } finally{ busy=false; }
+});
+$('#app').addEventListener('change',e=>{ if(e.target.id==='cgx'&&e.target.value){ cargoSel=e.target.value; document.querySelectorAll('#cg button').forEach(b=>b.setAttribute('aria-pressed','false')); accFor(cargoSel); } });
+async function load(){ D=Object.assign({role:ME.role},await api(ME.role==='driver'?'/api/driver/me':'/api/field/home')); draw(); }
+function connect(){
+  const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws/m');
+  ws.onopen=()=>{ live=true; }; ws.onmessage=e=>{ const d=JSON.parse(e.data);
+    D=d; draw(); };
+  ws.onclose=e=>{ live=false; if(e.code===4401){ api('/api/me'); return; } setTimeout(connect,2000); };
+}
+(async()=>{
+  try{ ME=await api('/api/me'); }catch(e){ return; }
+  if(ME.role==='control'&&!ME.no_auth){ /* 관제 담당자가 열면 현장 담당자 화면(전체 하역장)으로 미리보기 */ ME=Object.assign({},ME,{role:'field',role_name:'현장 화면 미리보기'}); }
+  if(ME.no_auth) ME=Object.assign({},ME,{role:'field',role_name:'현장 화면 미리보기'});
+  if(ME.role==='driver'){ try{ window.CARGOS=(await api('/api/driver/accept')).cargos; }catch(e){ window.CARGOS=[]; } }
+  await load(); if(!(ME.no_auth||ME.role_name==='현장 화면 미리보기')) connect(); else setInterval(load,2000);
+})();
 </script>
 </body>
 </html>

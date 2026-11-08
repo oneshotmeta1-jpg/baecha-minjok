@@ -303,6 +303,7 @@ rx_.advance(60)
 for sid_ in "ABC":
     x_ = rx_.force_safety(sid_)
     if x_:
+        rx_.driver_stopped(x_["vehicle_id"])          # 기사 앱 [멈췄어요] (R12)
         rx_.safety_resolve(x_["id"], "ack" if not any(e["type"] == "SAFETY_ACK" for e in rx_.rec.events) else "dismiss")
 types_r4 = {e["type"] for e in ra.rec.events} | {e["type"] for e in rx_.rec.events}
 check("CALL_PENDING · APPROVAL_MODE 이벤트가 나옴", {"CALL_PENDING", "APPROVAL_MODE"} <= types_r4)
