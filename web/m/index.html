@@ -48,6 +48,16 @@ h1{font-size:24px;line-height:1.3;margin:0;letter-spacing:-.01em} h2{font-size:1
 .sheet{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center;z-index:20} .sheet[hidden]{display:none}
 .sheet .in{background:#fff;border-radius:24px 24px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom));width:100%;max-width:430px;display:flex;flex-direction:column;gap:10px}
 .toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:999px;padding:10px 16px;font-size:13.5px;font-weight:600;z-index:30;max-width:90vw} .toast[hidden]{display:none}
+.nb{position:fixed;left:50%;top:10px;transform:translateX(-50%);width:calc(100% - 24px);max-width:406px;z-index:40;border-radius:20px;padding:14px 16px;color:#fff;box-shadow:0 12px 30px rgba(0,0,0,.25);display:flex;gap:12px;align-items:flex-start;cursor:pointer}
+.nb[hidden]{display:none} .nb b{display:block;font-size:16px;line-height:1.3} .nb span{font-size:13px;opacity:.92} .nb .k{font-size:11.5px;font-weight:700;opacity:.85;letter-spacing:.02em}
+.nb.p0{background:var(--red)} .nb.p1{background:#1D47B8} .nb.p2{background:#B8420A} .nb.p3{background:var(--ink)}
+.snd{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#FFF1D6;color:#8A5A00;border-radius:16px;padding:10px 12px;font-size:13px;font-weight:600}
+.snd button{min-height:40px;border-radius:999px;border:0;background:#8A5A00;color:#fff;font:inherit;font-weight:700;padding:0 14px}
+.bell{position:relative;border:0;background:transparent;font-size:18px;min-width:44px;min-height:40px;cursor:pointer}
+.bell .n{position:absolute;top:2px;right:2px;min-width:18px;height:18px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.ib{background:#fff;border-radius:18px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;font-size:13.5px;cursor:pointer;border:0;width:100%;text-align:left;font:inherit;color:var(--ink)}
+.ib i{width:10px;height:10px;border-radius:50%;margin-top:6px;flex:none} .ib.unread b{font-weight:800} .ib:not(.unread){color:var(--muted)} .ib:not(.unread) b{font-weight:500}
+.ib .t{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap}
 .alarm{min-height:100vh;background:var(--red);color:#fff;display:flex;flex-direction:column;padding:20px 16px 160px;gap:16px}
 .alarm .k{font-size:13px;opacity:.85;font-weight:600} .alarm h1{font-size:34px} .alarm .facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px} .alarm{overflow-x:hidden} .alarm .facts div{min-width:0;font-size:12.5px} .alarm .facts b{font-size:17px!important;word-break:keep-all;overflow-wrap:anywhere}
 .alarm .facts div{background:rgba(255,255,255,.14);border-radius:16px;padding:12px} .alarm .facts b{display:block;font-size:20px;margin-top:2px}
@@ -56,6 +66,7 @@ h1{font-size:24px;line-height:1.3;margin:0;letter-spacing:-.01em} h2{font-size:1
 <body>
 <div class="app" id="app"><div class="body"><div class="card"><h1>불러오는 중…</h1></div></div></div>
 <div class="toast" id="toast" role="status" hidden></div>
+<div class="nb" id="nb" role="alert" aria-live="assertive" hidden></div>
 <script>
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let ME=null, D=null, tab='home', busy=false, live=false, cargoSel=null, toastT=null;
@@ -63,7 +74,10 @@ const HN=h=>h==='YARD'?'대기장':'호퍼 '+h;
 function toast(m){ $('#toast').textContent=m; $('#toast').hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>$('#toast').hidden=true,2600); }
 async function api(u,o){ const r=await fetch(u,o); if(r.status===401){ location.replace('/login'); throw new Error('login'); } const d=await r.json().catch(()=>({})); if(!r.ok) throw new Error(d.detail||('오류 '+r.status)); return d; }
 const post=(u,b)=>api(u,{method:'POST',headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined});
-function bar(){ return '<div class="bar"><span><b>'+esc(ME.role_name)+'</b> · '+esc(ME.name)+'</span><span class="live'+(live?' on':'')+'" title="실시간 연결"><i></i>'+(D&&D.clock?esc(D.clock.slice(11,16)):'')+'</span></div>'; }
+function bar(){ const u=(D&&D.notes&&D.notes.unread)||0;
+  return '<div class="bar"><span><b>'+esc(ME.role_name)+'</b> · '+esc(ME.name)+'</span><span style="display:flex;align-items:center;gap:6px"><span class="live'+(live?' on':'')+'" title="실시간 연결"><i></i>'+(D&&D.clock?esc(D.clock.slice(11,16)):'')+'</span>'+
+    (ME.role==='driver'?'<button class="bell" id="inboxBtn" aria-label="알림함 · 안 읽음 '+u+'">🔔'+(u?'<span class="n">'+(u>99?'99+':u)+'</span>':'')+'</button>':'')+'</span></div>'+sndRow(); }
+function sndRow(){ return audioOn()?'':'<div style="padding:0 16px 6px"><div class="snd"><span>🔊 알림 소리 · 진동을 켜 주세요</span><button id="sndOn">켜기</button></div></div>'; }
 
 /* ---------- 운전자 ---------- */
 function driver(){
@@ -129,7 +143,7 @@ function alarm(sf){
 
 /* ---------- 현장 담당자 ---------- */
 function field(){
-  const n=(D.checks||[]).reduce((a,g)=>a+g.n,0);
+  const n=(D.notes&&D.notes.unread)||0;
   let h=bar()+'<div class="body">';
   if(tab==='home'){
     h+='<div class="row"><h1>하역 현황</h1><span class="cap">'+esc((ME.shift||''))+'</span></div>';
@@ -141,7 +155,8 @@ function field(){
     h+=approvals((D.approvals||[]).slice(0,2),true);
   } else if(tab==='seq'){ h+='<h1>호출 순번</h1>'+approvals(D.approvals||[],false); }
   else if(tab==='alert'){
-    h+='<h1>알림</h1><span class="cap">담당 하역장 운영 알림 · 확인하면 목록에서 빠져요</span>';
+    h+=inboxHtml();
+    h+='<h2 style="margin-top:8px">운영 알림 확인</h2><span class="cap">담당 하역장 운영 알림 · 확인하면 목록에서 빠져요</span>';
     const items=(D.checks||[]).flatMap(g=>g.items.map(i=>({...i,kind:g.kind,sector:g.sector_id})));
     h+=items.length?items.map(i=>'<div class="al"><div><b>'+esc(HN(i.sector))+' · '+esc(i.kind)+'</b><br><span class="cap">'+esc(i.ts)+' · '+esc(i.text)+'</span></div><button class="btn sm" data-ack="'+esc(i.id)+'">확인</button></div>').join(''):'<div class="card"><span class="cap">확인할 알림이 없어요.</span></div>';
   } else {
@@ -175,11 +190,53 @@ function draw(){ if(!D||!ME) return;
   const html=ME.role==='driver'?driver():field(); lastKey=key; if(html===lastHtml) return; lastHtml=html;
   const y=window.scrollY; $('#app').innerHTML=html; window.scrollTo(0,y); if(key) accFor(cargoSel); }
 async function accFor(c){ if(!c||!$('#acc')) return; try{ const r=await api('/api/driver/accept?cargo='+encodeURIComponent(c)); $('#acc').textContent=r.bays.length?r.bays.map(b=>b.name+' '+b.bay+'번 베이').join(' · ')+' · 베이는 호출 때 지정':'받는 하역장이 없어요'; }catch(e){} }
+
+/* ---------- 알림 (R13): 배너 · 소리 · 진동 · 알림함 ---------- */
+const KC={'안전':'p0','호출':'p1','승인':'p2','운영':'p3'}, KI={'안전':'⚠','호출':'🚚','승인':'✔','운영':'ⓘ'};
+let AC=null, shown=new Set(), nbTimer=null, beepTimer=null;
+function audioOn(){ return !!(AC&&AC.state==='running'); }
+function unlockAudio(){ try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); if(AC.state!=='running') AC.resume(); }catch(e){} }
+document.addEventListener('pointerdown',()=>{ const was=audioOn(); unlockAudio(); if(!was) setTimeout(()=>{ if(audioOn()){ lastHtml=''; lastKey=''; draw(); } },200); },{passive:true});
+function beep(pri){ if(!audioOn()) return; const seq=pri===0?[880,660,880,660]:pri===1?[660,880]:[740];
+  seq.forEach((f,i)=>{ const o=AC.createOscillator(), g=AC.createGain(); o.frequency.value=f; o.type='square'; g.gain.value=0.08; o.connect(g); g.connect(AC.destination); const t=AC.currentTime+i*0.22; o.start(t); o.stop(t+0.18); }); }
+function buzz(pri){ try{ if(navigator.vibrate) navigator.vibrate(pri===0?[400,150,400,150,400]:pri===1?[250,100,250]:[150]); }catch(e){} }
+function showBanner(n){
+  const b=$('#nb'); b.className='nb '+(KC[n.kind]||'p3'); b.dataset.id=n.id; b.dataset.link=n.link||'';
+  b.innerHTML='<span style="font-size:22px;line-height:1">'+(KI[n.kind]||'ⓘ')+'</span><div><span class="k">'+esc(n.kind)+(n.repeat?' · 다시 알림 '+n.repeat:'')+' · '+esc(n.at)+'</span><b>'+esc(n.title)+'</b><span>'+esc(n.body||'')+'</span></div>';
+  b.hidden=false; beep(n.priority); buzz(n.priority); clearTimeout(nbTimer); nbTimer=setTimeout(()=>{ b.hidden=true; },n.priority===0?12000:7000);
+}
+$('#nb').addEventListener('click',async()=>{ const b=$('#nb'); b.hidden=true; const id=+b.dataset.id, link=b.dataset.link;
+  try{ await post('/api/notify/read',{ids:[id]}); }catch(e){}
+  if(ME.role!=='driver'&&link&&link!=='safety'&&link!=='call'&&link!=='wait'){ tab=link; lastHtml=''; lastKey=''; draw(); window.scrollTo(0,0); } else load(); });
+function handleNotes(){
+  const N=D&&D.notes; if(!N) return;
+  const fresh=(N.new||[]).filter(n=>!shown.has(n.id+':'+n.repeat));
+  if(fresh.length){ fresh.forEach(n=>shown.add(n.id+':'+n.repeat)); showBanner(fresh[0]); post('/api/notify/seen',{ids:fresh.map(n=>n.id)}).catch(()=>{}); }
+  const alarm=(ME.role==='driver'&&D.safety&&!D.safety.stopped)||(ME.role!=='driver'&&(D.safety||[]).length);   // 안전: 확인될 때까지 반복 소리
+  if(alarm&&!beepTimer) beepTimer=setInterval(()=>{ beep(0); buzz(0); },4000); else if(!alarm&&beepTimer){ clearInterval(beepTimer); beepTimer=null; }
+}
+function inboxHtml(){
+  const N=(D&&D.notes)||{items:[],unread:0};
+  return '<div class="row"><h1>내 알림함</h1>'+(N.unread?'<button class="btn sm" id="readAll">모두 읽음</button>':'')+'</div><span class="cap">최근 '+N.items.length+'건 · 안 읽음 '+N.unread+'건 · 누르면 읽음으로</span>'+
+    (N.items.length?N.items.map(n=>'<button class="ib'+(n.read_at?'':' unread')+'" data-nid="'+n.id+'" data-link="'+esc(n.link||'')+'"><i style="background:'+({'안전':'#D7263D','호출':'#1D47B8','승인':'#B8420A','운영':'#141414'}[n.kind]||'#999')+'"></i><span><b>'+esc(n.title)+'</b><br><span class="cap">'+esc(n.body||'')+(n.action?' · '+esc(n.action):'')+'</span></span><span class="t">'+esc(n.at)+'</span></button>').join('')
+     :'<div class="card"><span class="cap">받은 알림이 없어요.</span></div>');
+}
+function inboxSheet(){
+  const s=document.createElement('div'); s.className='sheet'; s.innerHTML='<div class="in" role="dialog" aria-label="알림함" style="max-height:80vh;overflow:auto">'+inboxHtml()+'<button class="btn" data-x="1">닫기</button></div>';
+  s.onclick=async e=>{ const b=e.target.closest('[data-nid],[data-x],#readAll'); if(e.target===s||(b&&b.dataset.x)){ s.remove(); return; } if(!b) return;
+    if(b.id==='readAll') await post('/api/notify/read',{ids:'all'}).catch(()=>{}); else await post('/api/notify/read',{ids:[+b.dataset.nid]}).catch(()=>{});
+    s.remove(); await load(); inboxSheet(); };
+  document.body.appendChild(s);
+}
 $('#app').addEventListener('click',async e=>{
   const t=e.target.closest('button,a'); if(!t||busy) return;
   try{
     if(t.dataset.c){ cargoSel=t.dataset.c; if($('#cgx')) $('#cgx').value=''; document.querySelectorAll('#cg button').forEach(b=>b.setAttribute('aria-pressed',String(b===t))); accFor(cargoSel); return; }
     if(t.dataset.tab){ tab=t.dataset.tab; draw(); window.scrollTo(0,0); return; }
+    if(t.id==='sndOn'){ unlockAudio(); setTimeout(()=>{ beep(1); buzz(1); lastHtml=''; lastKey=''; draw(); toast(audioOn()?'알림 소리 · 진동을 켰어요':'소리를 켜지 못했어요 — 화면을 한 번 더 눌러 주세요'); },150); return; }
+    if(t.id==='inboxBtn'){ inboxSheet(); return; }
+    if(t.dataset.nid){ await post('/api/notify/read',{ids:[+t.dataset.nid]}).catch(()=>{}); const l=t.dataset.link; if(ME.role!=='driver'&&['home','seq','alert'].includes(l)&&l!=='alert'){ tab=l; } await load(); window.scrollTo(0,0); return; }
+    if(t.id==='readAll'){ await post('/api/notify/read',{ids:'all'}).catch(()=>{}); await load(); return; }
     busy=true;
     if(t.id==='reg'){ const wt=$('#wt').value.trim(); if(!cargoSel){ toast('원료를 골라 주세요'); return; } if(!wt){ toast('중량을 넣어 주세요'); $('#wt').focus(); return; }
       D=Object.assign({role:'driver'},await post('/api/driver/trip',{cargo:cargoSel,load_t:wt,order:$('#od').value.trim()})); toast('등록했어요 · 게이트로 가세요'); draw(); }
@@ -195,11 +252,11 @@ $('#app').addEventListener('click',async e=>{
   }catch(err){ if(err.message!=='login') toast(err.message); } finally{ busy=false; }
 });
 $('#app').addEventListener('change',e=>{ if(e.target.id==='cgx'&&e.target.value){ cargoSel=e.target.value; document.querySelectorAll('#cg button').forEach(b=>b.setAttribute('aria-pressed','false')); accFor(cargoSel); } });
-async function load(){ D=Object.assign({role:ME.role},await api(ME.role==='driver'?'/api/driver/me':'/api/field/home')); draw(); }
+async function load(){ D=Object.assign({role:ME.role},await api(ME.role==='driver'?'/api/driver/me':'/api/field/home')); draw(); handleNotes(); }
 function connect(){
   const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws/m');
   ws.onopen=()=>{ live=true; }; ws.onmessage=e=>{ const d=JSON.parse(e.data);
-    D=d; draw(); };
+    D=d; draw(); handleNotes(); };
   ws.onclose=e=>{ live=false; if(e.code===4401){ api('/api/me'); return; } setTimeout(connect,2000); };
 }
 (async()=>{
