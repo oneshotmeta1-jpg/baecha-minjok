@@ -641,7 +641,7 @@ function candidateHtml(round){
 const archiveUrl = r => state.site.repo ? state.site.repo+'/blob/main/'+r.archived : '';
 const archivedNote = r => '이 라운드의 회의 대화와 개선안 상세, 후보 보고 전체는 저장소 '+
   (archiveUrl(r) ? '<a href="'+esc(archiveUrl(r))+'" target="_blank" rel="noopener">'+esc(r.archived)+'</a>' : '<b>'+esc(r.archived)+'</b>')+
-  '로 옮겼습니다. 여기에는 승인한 개선안과 결과만 남겼습니다.';
+  '에 옮겨 두었습니다. 여기에는 승인한 개선안과 결과만 남겼습니다.';
 let lastStepKey='';
 function renderStep(){
   const s=state.status, latest=latestRound(), r=shownRound();
@@ -707,7 +707,7 @@ function renderRounds(){
     const res = r.applied ? (r.candidate && r.applied===r.candidate.version ? r.applied+' 적용' : '반려') : r.decision ? '반영 대기' : r.candidate ? '후보 검토' : r.plan_at ? '작업 대기' : '선택 중';
     const ok = r.applied && r.candidate && r.applied===r.candidate.version;
     return '<button class="vitem'+(r.n===cur?' sel':'')+'" data-r="'+r.n+'"><span class="v">R'+r.n+'</span><span class="t">'+esc(r.goal)+'</span>'+
-      '<span class="st'+(ok?' ok':'')+'">'+esc(res)+'</span><span class="fb">개선안 '+(r.items_total||(r.items||[]).length)+'개 중'+(r.selected||[]).length+'개 승인</span></button>';
+      '<span class="st'+(ok?' ok':'')+'">'+esc(res)+'</span><span class="fb">개선안 '+(r.items_total||(r.items||[]).length)+'개 중 '+(r.selected||[]).length+'개 승인</span></button>';
   }).join('') : '<div class="empty">목표마다 한 줄씩 쌓입니다.</div>';
 }
 let lastLog='';
