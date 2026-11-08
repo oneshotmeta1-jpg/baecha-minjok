@@ -82,6 +82,7 @@
 | `YARD_DOWN` / `YARD_UP` | 시연 버튼 | 하역장 정지 · 복구 → 영향 차량 재배정 |
 | `URGENT_IN` | 시연 버튼 | 긴급 입고(소결 재고 부족) → 순번 맨 앞 |
 | `SAFETY_ALERT` | 영상(합성) · 시뮬레이터 | 안전 경고: 적재함 상승 중 덤프 반경(가정 5m, rois.json REAR 구역) 안 작업자 → L3 자동 실행(기사 앱 경고 · 하차 중지 요청, 가상). 하차 진행이 멈춤 (payload: id, level=L3, rule, dist_m, bay, dump_deg, repeat, action, stand_in) |
+| `NEAR_MISS` | 영상(R15, vision/near_miss.py) | 아차사고 한 건: 사람 발끝이 위험 구역에 있고 규칙 조건(① 적재함 상승 중 덤프 반경 · ② 베이 진입 30초 안 후진 경로)이 이어진 동안을 한 건으로, 끝날 때 한 번. 단계 L1 주의 → 1초 L2 경고 → 2초 L3(그 순간 `SAFETY_ALERT`로 하차 중지 요청). payload: id, rule, rule_no, level, duration_s, min_dist_m, zone_id, bay, person_track, snapshot_t, clip[시작, 끝](영상 초), source = video · stand_in(합성 사람), assumed |
 | `SAFETY_ACK` | 맵 위 안전 띠 · 알림 패널 안전 탭 | 관제·현장 담당자가 안전 경고 확인 또는 오탐지 → 하차 재개 (payload: id, how = 확인/오탐지, ack_sec = 뜬 뒤 확인까지 실제 초, repeat). 같은 위험이 계속 감지되면 SAFETY_ALERT(repeat=1)가 다시 온다 |
 | `DRIVER_STOPPED` | 기사 앱 안전 경고 화면 [멈췄어요] | 운전자가 하역을 멈췄다고 알림 (payload: id = 안전 경고). 하역 재개는 여전히 관제·현장의 SAFETY_ACK |
 | `ALERT` | 배정 엔진 | 알림 발생 (payload: level, kind, text, action, related = 제안이 영향을 주는 반입 "차량#회차" 목록) |
@@ -187,6 +188,24 @@ R2에서 팀이 제안한 `order_approved` 등 소문자 이름은 기존 형식
  "dump_deg": 50, "repeat": 0, "action": "앱 경고 · 하차 중지 요청 (가상)", "stand_in": "cam"}}
 ```
 
+### 아차사고 (R15)
+
+- 판정: `vision/near_miss.py`, 규칙·단계 기준은 `data/cams.json` `near_miss`(가정값). ③ 접근 거리 · ④ 출입 금지 · ⑤ 대기선 넘음은 설정 항목만 있고 꺼져 있다.
+- 거리: 사람 발끝 ↔ 트럭 박스 가장 가까운 점 × 카메라별 `m_per_px`(가정). 시간은 영상 초(time_scale 곱하기 전).
+- 합성 사람: 호퍼 영상에는 사람이 없어 `data/stand_in.json`의 손으로 둔 궤적을 섞는다 → `source: "stand_in"`, 화면에 "합성" 표시. 실제 사람 영상이 생기면 이 파일을 비운다.
+- 기록: 서버는 `NEAR_MISS`를 차가 나간 뒤에 와도 받고(같은 id는 `ignored`), `GET /api/state`의 `near_miss`(최근 30건)로 준다. 단계 L3만 하차를 멈춘다(SAFETY_ALERT).
+
+```json
+{"ts": "2026-11-09T08:08:10", "type": "NEAR_MISS", "source": "cam", "cam_id": "CAM-01", "sector_id": "A", "zone": "rear", "track_id": 1, "vehicle_id": "CAM-01-T1", "payload": {"id": "NM-CAM-01-901-84", "rule": "덤프 반경", "rule_no": 1, "level": "L3", "duration_s": 3.83, "min_dist_m": 1.8, "zone_id": "A-REAR-1", "bay": 1, "person_track": 901, "snapshot_t": 8.79, "clip": [6.42, 14.25], "source": "stand_in", "assumed": ["m_per_px", "level_sec"]}}
+```
+
+### 구역(ROI) 편집 (R15)
+
+- `GET /api/rois/edit`: 영상 채널 구역(cams.json, 영상 픽셀) + 시뮬레이션 구역(rois.json, 1920×1080)을 함께 준다(읽기 통합). `can_edit` = 관리자 여부, `history` = 최근 구역 저장 기록.
+- `POST /api/admin/rois/{camera}` body `{"zones": [...]}`: 관리자만(아니면 403). 검사에 걸리면 422와 이유 문장. 저장하면 cams.json을 고쳐 쓰고 처리 기록(auth_log, action `roi`)에 누가 · 언제 · 무엇(추가/삭제/수정 구역 ID)을 남긴다.
+- 구역 ID 모양(판정이 ID로 베이를 찾음): 하차 `A-BAY-1` · 위험 `A-REAR-1`(덤프 반경 5m) / `A-BACK-1`(후진 경로) · 대기 `*-WAIT-n` · 보행 통로 `*-WALK-n` · 출입 금지 `*-NOGO-n`(판정은 다음 라운드).
+- 저장하면 화면 겹쳐 그리기는 바로 바뀌고, 판정 이벤트는 다음 영상 수집(`tools/ingest_videos.py`)부터 바뀐다. rois.json(시뮬레이션 그림)은 이번에 보기만.
+
 ## 차량 상태
 
 `arrived`(도착) → `yard`(대기장 대기) → `moving`(호출 후 이동) → `queue`(섹터 대기) → `working`(작업 중) → `done`(완료·출차)
@@ -237,10 +256,11 @@ py tools/replay_events.py events.jsonl --speed 60
 | `ZONE_ENTER` zone=queue | CAM-01~03 대기선 | 대기선 |
 | `BAY_ENTER` / `BAY_EXIT` (payload `bay` 1~3) | CAM-01~03 하차장 | 하역 중 → 완료, 건별 작업 기록 1건 |
 | `SAFETY_ALERT` (payload `rule` 덤프 반경 5m · 후진 경로) | CAM | 안전 탭 · 베이 안전 중지 · 이후 호출 보류 |
+| `NEAR_MISS` (payload `level` L1~L3, `source` video · stand_in) | CAM | 아차사고 기록 · CAM 크게 보기 목록 (L3는 위 SAFETY_ALERT가 함께 옴) |
 | `YARD_DOWN` / `YARD_UP` | 현장 | 하역장 정지·복구 |
 
 `vision/to_events.py` 판정 규칙: 박스 아래 중심점(접지점)이 `data/rois.json` 구역 안에 3초 이상 → 진입, 3초 이상 밖·화면에서 사라짐 → 이탈.
-사람이 REAR-n(덤프 반경)에 들어오고 그 베이 트럭 박스가 세로/가로 ≥ 0.6(적재함 상승) → 덤프 반경 경고, BACK-n(후진 경로)에 진입 30초 안 → 후진 경로 경고.
+사람 발끝이 REAR-n(덤프 반경)에 있고 그 베이 트럭 박스가 세로/가로 ≥ 0.6(적재함 상승), 또는 BACK-n(후진 경로)에 있고 그 베이 진입 30초 안 → 아차사고(R15): 이어진 시간으로 L1 → L2(1초) → L3(2초, 이때 SAFETY_ALERT), 끝날 때 NEAR_MISS 한 건.
 
 ## 실제 영상 채널 (R9)
 

@@ -305,6 +305,7 @@ for sid_ in "ABC":
     if x_:
         rx_.driver_stopped(x_["vehicle_id"])          # 기사 앱 [멈췄어요] (R12)
         rx_.safety_resolve(x_["id"], "ack" if not any(e["type"] == "SAFETY_ACK" for e in rx_.rec.events) else "dismiss")
+rx_.ingest({"type": "NEAR_MISS", "source": "cam", "cam_id": "CAM-01", "sector_id": "A", "payload": {"id": "NM-test", "rule": "덤프 반경", "level": "L1"}})   # 아차사고(R15, 영상)
 types_r4 = {e["type"] for e in ra.rec.events} | {e["type"] for e in rx_.rec.events}
 check("CALL_PENDING · APPROVAL_MODE 이벤트가 나옴", {"CALL_PENDING", "APPROVAL_MODE"} <= types_r4)
 check("이벤트 종류가 events.md 표와 일대일 (시뮬레이션 + 담당자 행동 + 승인 흐름)", (seen | types_after | types_r4) == types,

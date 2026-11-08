@@ -13,14 +13,17 @@
     - 위치 = 박스 아래 중심점(바퀴 접지점). 구역 안에 3초 이상 있어야 진입, 3초 이상 밖이어야 이탈(흔들림 무시).
     - 하역 구역 BAY-n 진입/이탈 → BAY_ENTER/BAY_EXIT(bay=n) · 대기선 → ZONE_ENTER(zone=queue) · 대기장 카메라 → ZONE_ARRIVE
     - 3초 동안 접지점이 거의 안 움직이면 VEHICLE_STOPPED
-    - 사람이 REAR-n(덤프 반경)에 들어오고 그 베이 트럭의 적재함이 올라가 있으면(박스 세로/가로 ≥ 0.6) SAFETY_ALERT(덤프 반경)
-    - 사람이 BACK-n(후진 경로)에 들어오고 그 베이 트럭이 진입한 지 30초 안이면 SAFETY_ALERT(후진 경로)
+    - 아차사고(R15, vision/near_miss.py): 사람 발끝이 위험 구역(덤프 반경 · 후진 경로)에 있고 그 베이 트럭 조건이 맞으면
+      L1 → (1초) L2 → (2초) L3. 위험이 끝날 때 NEAR_MISS 한 건, L3에 오르는 순간 SAFETY_ALERT(하차 중지 요청).
 """
 import argparse
 import json
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import near_miss  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 HOLD = 3.0          # 초
@@ -57,10 +60,10 @@ def iou(a, b):
 def video_rois(cams_cfg, cam_id):
     """data/cams.json의 영상 구역(영상 픽셀) → convert()가 읽는 rois 모양"""
     c = next(c for c in cams_cfg["cams"] if c["camera"] == cam_id)
-    return {"frame": c["size"], "cams": [{"camera": c["camera"], "sector_id": c["sector_id"], "zones": c["zones"]}]}
+    return {"frame": c["size"], "m_per_px": c.get("m_per_px"), "cams": [{"camera": c["camera"], "sector_id": c["sector_id"], "zones": c["zones"]}]}
 
 
-def convert(data, start, rois=None, scale=1.0, flush=False):
+def convert(data, start, rois=None, scale=1.0, flush=False, nm_cfg=None):
     rois = rois or json.loads((ROOT / "data" / "rois.json").read_text(encoding="utf-8"))
     cams = {c["camera"]: c for c in rois["cams"]}
     fw, fh = data.get("size", rois["frame"])
@@ -68,7 +71,7 @@ def convert(data, start, rois=None, scale=1.0, flush=False):
     t0 = datetime.fromisoformat(start)
     out = []
     trk = {}            # (cam, track) → {zone, cand, since, last_pt, pt_since, stopped, bay_t}
-    person_in = set()   # (cam, track, zone_id)
+    nm = near_miss.Tracker(nm_cfg or near_miss.config(), lambda *a: ev(*a), m_per_px=rois.get("m_per_px"))
     alias = {}          # (cam, 추적 ID) → 같은 트럭으로 본 처음 ID
     seen = {}           # (cam, 대표 ID) → (마지막 시각, 마지막 박스)
     area0 = rois["frame"][0] * rois["frame"][1]
@@ -135,6 +138,7 @@ def convert(data, start, rois=None, scale=1.0, flush=False):
                 elif c_up != s.get("up", False) and t - s["up_since"] >= RAISE_WIN:   # 1초 유지돼야 상승/내림으로 바꿈
                     s["up"] = c_up
                 raised = s.get("up", False)
+                s["box"] = b
                 trucks[k] = (zid, raised, s)
                 move(t, fr["cam_id"], sid, o["track_id"], s, zid)
                 d = ((pt[0] - s["pt"][0]) ** 2 + (pt[1] - s["pt"][1]) ** 2) ** 0.5
@@ -147,29 +151,12 @@ def convert(data, start, rois=None, scale=1.0, flush=False):
             if k[0] == fr["cam_id"] and k not in trucks and t - seen.get(k, (s["since"],))[0] > 1.0:   # 1초 넘게 안 보이면 구역 밖
                 move(t, k[0], sid, k[1], s, None)
         for o in fr["objects"]:
-            if o["cls"] != "person" or sid is None:
+            if o["cls"] != "person":
                 continue
             b = [o["bbox"][0] * kx, o["bbox"][1] * ky, o["bbox"][2] * kx, o["bbox"][3] * ky]
-            pt = foot(b)
-            for z in zones:
-                if z["type"] != "위험":
-                    continue
-                key = (fr["cam_id"], o["track_id"], z["id"])
-                if not inside(pt, z["points"]):
-                    person_in.discard(key)
-                    continue
-                if key in person_in:
-                    continue
-                n = z["id"].rsplit("-", 1)[1]
-                bay_id = f"{sid}-BAY-{n}"
-                hit = next(((k, s) for k, (zid, raised, s) in trucks.items() if zid == bay_id and (
-                    (z.get("rule") != "후진 경로" and raised) or (z.get("rule") == "후진 경로" and s["bay_t"] is not None and t - s["bay_t"] <= 30))), None)
-                if hit:
-                    person_in.add(key)
-                    (k, s) = hit
-                    ev(t, "SAFETY_ALERT", fr["cam_id"], s["vid"], k[1], sid, "back" if z.get("rule") == "후진 경로" else "rear",
-                       {"level": "L3", "rule": z.get("rule", "덤프 반경 5m"), "zone_id": z["id"], "person_track": o["track_id"],
-                        "bay": int(n), "dist_m": None, "action": "앱 경고 · 하차 중지 요청"})
+            nm.see(t, fr["cam_id"], sid, o, b, zones, trucks, px_scale=kx)
+        nm.end_frame(t, fr["cam_id"])
+    nm.close_all()
     if flush and data["frames"]:            # 영상 한 번 = 반입 한 번: 끝날 때 하차장에 남은 차는 이탈로 닫는다
         t_end = max(f["t"] for f in data["frames"])
         for (cam_id, tid), s in trk.items():

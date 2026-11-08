@@ -346,6 +346,22 @@ textarea.sin{width:100%;text-align:left;min-height:54px;resize:vertical}
 .zl{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;align-items:center;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--line)}
 .zt{font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px}
 .zt.하차{background:var(--green-bg);color:var(--green)} .zt.대기{background:var(--orange-bg);color:var(--orange)} .zt.위험{background:var(--red-bg);color:var(--red)}
+.zt.walk{background:var(--blue-bg);color:var(--blue)} .zt.nogo{background:#F1E4FF;color:#7A2DB8}
+/* R15 구역 편집 · 아차사고 */
+[hidden]{display:none!important}   /* display를 준 요소(.adm · .roi-grid · .pill-btn)도 hidden이면 숨김 — 설정 탭마다 다른 탭 내용이 같이 보이던 문제 */
+.roi-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.roi-tools .sp{flex:1}
+#roiCanvas{cursor:crosshair;outline:none}
+#roiCanvas.ro{cursor:default}
+.zl{cursor:pointer;border-radius:8px;padding:6px 6px} .zl.sel{background:var(--soft);box-shadow:inset 3px 0 0 var(--ink)}
+.roi-form{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;font-size:12.5px}
+.roi-form label{display:grid;gap:4px;color:var(--ink-2);font-weight:600}
+.roi-form input,.roi-form select{font:inherit;font-weight:500;color:var(--ink);border:1px solid var(--line-2);border-radius:10px;padding:6px 8px;background:#fff;min-width:0}
+.roi-form .full{grid-column:1/-1}
+.roi-msg{margin-top:8px;font-size:12.5px;border-radius:10px;padding:8px 10px;background:var(--soft)} .roi-msg.err{background:var(--red-bg);color:var(--red)} .roi-msg.ok{background:var(--green-bg);color:var(--green)}
+.nm-row{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;gap:4px 8px;align-items:center;font-size:12.5px;padding:7px 0;border-bottom:1px solid var(--line)}
+.nm-lv{font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px} .nm-lv.L1{background:#FFF4CC;color:#8A6400} .nm-lv.L2{background:var(--orange-bg);color:var(--orange)} .nm-lv.L3{background:var(--red);color:#fff}
+.stand{font-size:10.5px;font-weight:700;border-radius:999px;padding:0 6px;background:#F1E4FF;color:#7A2DB8;margin-left:4px}
 /* 운영 분석 (2탭) */
 .ana2{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);grid-template-rows:auto minmax(0,1.15fr) minmax(0,1fr);grid-template-areas:"hero times" "src chart" "src fb";gap:var(--gap)}
 .ana2 .a-hero{grid-area:hero} .ana2 .a-src{grid-area:src} .ana2 .a-times{grid-area:times} .ana2 .a-chart{grid-area:chart} .ana2 .a-fb{grid-area:fb}
@@ -701,13 +717,16 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
   </div>
   <div class="sheet-pc" id="admDlg" hidden role="dialog" aria-modal="true" aria-labelledby="admDlgT"><div class="in"><h2 id="admDlgT"></h2><div id="admDlgB"></div><div class="msg-err" id="admDlgE"></div><div class="row-btns" id="admDlgF"></div></div></div>
   <div class="roi-grid" id="setRoi" hidden>
-    <section class="card" aria-label="구역 그림"><div class="hd"><h2 id="roiTitle">구역(ROI)</h2><span class="sub">카메라 첫 프레임 위 다각형 · 이번에는 보기 전용</span><span class="sp"></span><span class="chs" id="roiChs" role="group" aria-label="카메라"></span></div>
-      <div class="bd"><canvas id="roiCanvas" width="1280" height="720" role="img" aria-label="카메라 첫 프레임 위 하차·대기·위험 구역"></canvas>
-        <div class="lg2" style="margin-top:8px"><span><i style="background:rgba(91,211,143,.3);border-color:#1F7A4F"></i>하차 구간</span><span><i style="background:rgba(240,165,74,.3);border-color:#B8420A"></i>대기 구간</span><span><i style="background:rgba(215,38,61,.25);border-color:#D7263D"></i>위험 구간 · 적재함이 올라갈 때만 켜짐</span></div>
-        <p class="cap">트럭 박스 아래 중심점이 구간 안에 3초 이상 있으면 진입. 실제 영상이 붙으면 첫 프레임 위에서 다시 그립니다. 지금 배경은 합성 화면입니다.</p></div></section>
+    <section class="card" aria-label="구역 편집"><div class="hd"><h2 id="roiTitle">구역(ROI)</h2><span class="sub" id="roiSub">영상 첫 프레임 위 다각형</span><span class="sp"></span><span class="chs" id="roiChs" role="group" aria-label="카메라"></span></div>
+      <div class="bd"><div class="roi-tools" id="roiTools"><button class="pill-btn" id="roiAdd">+ 새 구역</button><button class="pill-btn dark" id="roiDone" hidden>그리기 끝</button><button class="pill-btn danger" id="roiDel">선택 구역 삭제</button><span class="sp"></span><span class="cap" id="roiDirty"></span><button class="pill-btn" id="roiReset">되돌리기</button><button class="pill-btn dark" id="roiSave">저장</button></div>
+        <canvas id="roiCanvas" width="1280" height="720" tabindex="0" role="img" aria-label="영상 첫 프레임 위 구역 편집 화면"></canvas>
+        <div class="lg2" style="margin-top:8px"><span><i style="background:rgba(91,211,143,.3);border-color:#1F7A4F"></i>하차</span><span><i style="background:rgba(240,165,74,.3);border-color:#B8420A"></i>대기</span><span><i style="background:rgba(215,38,61,.25);border-color:#D7263D"></i>위험(덤프 반경 · 후진 경로)</span><span><i style="background:rgba(76,141,255,.25);border-color:#1D47B8"></i>보행 통로</span><span><i style="background:rgba(176,76,255,.22);border-color:#7A2DB8"></i>출입 금지</span></div>
+        <p class="cap" id="roiHelp">구역을 누르면 선택 · 흰 점을 끌면 이동 · 선 위를 더블클릭하면 점 추가 · 점을 오른쪽 클릭(또는 Alt+클릭)하면 점 삭제. 새 구역은 [+ 새 구역] → 화면을 눌러 점을 찍고 [그리기 끝] 또는 첫 점 클릭. Esc = 그리기 취소.</p>
+        <div id="roiMsg"></div></div></section>
     <div class="set-col">
       <section class="card" aria-label="구간 목록"><div class="hd"><h2>구간 목록</h2><span class="cap" id="roiCount"></span></div><div class="bd" id="roiList"></div></section>
-      <section class="card" aria-label="JSON 미리보기" style="flex:1"><div class="hd"><h2>JSON 미리보기</h2><span class="cap num" id="roiFile"></span><span class="sp"></span><button class="pill-btn" id="roiDl">JSON 내려받기</button></div><div class="bd"><pre class="json" id="roiJson"></pre></div></section>
+      <section class="card" aria-label="선택 구역"><div class="hd"><h2>선택 구역</h2><span class="cap" id="roiSelId"></span></div><div class="bd" id="roiForm"></div></section>
+      <section class="card" aria-label="저장 기록" style="flex:1;min-height:0"><div class="hd"><h2>저장 기록</h2><span class="cap">누가 · 언제 · 무엇</span><span class="sp"></span><button class="pill-btn" id="roiDl">JSON 내려받기</button></div><div class="bd" id="roiHist" style="overflow-y:auto"></div></section>
     </div>
   </div>
 </div>
@@ -771,12 +790,16 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
       <div class="hd"><h2 id="camName">CAM</h2><span class="chip blue" id="camSrc">추론 결과 재생 (시뮬레이션)</span><span class="sp"></span><span class="ovt" id="ovToggles" role="group" aria-label="겹쳐 그리기"><button data-ov="box" aria-pressed="true">박스</button><button data-ov="id" aria-pressed="true">추적 ID</button><button data-ov="zone" aria-pressed="true">구역 선</button><button data-ov="radius" aria-pressed="true">덤프 하역 반경</button></span></div>
       <div class="bd"><div class="vwrap" id="bigWrap"><video id="bigVid" muted loop playsinline preload="auto" hidden></video><canvas id="bigCam" width="1280" height="720"></canvas></div><div class="vctl" id="vctl" hidden><span class="chip live">LIVE(영상)</span><span class="num" id="vTime">00:00 / 00:00</span><button class="pill-btn" id="vPlay">일시정지</button><span class="seg" role="group" aria-label="재생 속도"><button data-rate="1" aria-pressed="true">×1</button><button data-rate="4" aria-pressed="false">×4</button><button data-rate="8" aria-pressed="false">×8</button></span><span class="cap" id="vNote"></span></div>
         <div class="bays3" id="camBays"></div>
-        <p class="cap">판정 규칙: 박스 아래 중심점이 베이·대기선 구역 안에 3초 이상 있으면 진입으로 본다. 덤프트럭 전체 박스의 세로/가로 비율이 0.6 이상이면 적재함 상승(하차 중)으로 판정한다. 지금 화면의 차량·각도는 시뮬레이터가 만든 합성 화면이다(실제 영상 연결 전).</p></div>
+        <p class="cap">판정 규칙: 박스 아래 중심점이 베이·대기선 구역 안에 3초 이상 있으면 진입으로 본다. 덤프트럭 전체 박스의 세로/가로 비율이 0.6 이상이면 적재함 상승(하차 중)으로 판정한다. 아차사고: 사람 발끝이 위험 구역(덤프 반경 · 후진 경로)에 있고 그 베이 트럭 조건이 맞으면 빨간 강조 — 이어진 시간 1초 L2 경고, 2초 L3 하차 중지(가정값). 영상이 없는 채널은 시뮬레이터가 만든 합성 화면이다.</p></div>
     </section>
     <div class="cam-side">
       <section class="card" aria-label="탐지 목록" style="flex:1">
         <div class="hd"><h2>탐지 목록</h2><span class="cap" id="dlgCount"></span></div>
         <div class="bd"><table><thead><tr><th>ID</th><th>차량</th><th>구역</th><th class="r">체류</th><th class="r">적재함</th><th>판정</th></tr></thead><tbody id="dlgRows"></tbody></table></div>
+      </section>
+      <section class="card" aria-label="아차사고 기록">
+        <div class="hd"><h2>아차사고 기록</h2><span class="cap" id="nmCount"></span></div>
+        <div class="bd" id="nmList" style="max-height:220px;overflow-y:auto"></div>
       </section>
       <section class="card" aria-label="이벤트 기록" style="flex:1;min-height:0">
         <div class="hd"><h2>이벤트 기록</h2><span class="cap">최근 10분</span></div>
@@ -1052,7 +1075,11 @@ async function loadDet(id){ if(id in DET) return DET[id]; DET[id]=null; const c=
 Object.keys(VC).forEach(loadDet);
 function detAt(d,t){ if(!d||!d.frames.length) return null; const F=d.frames; let lo=0,hi=F.length-1; while(lo<hi){ const m=(lo+hi+1)>>1; if(F[m].t<=t) lo=m; else hi=m-1; } return F[lo]; }
 const OV={box:true,id:true,zone:true,radius:true};
-const ZCOL={하차:'#5BD38F',대기:'#F0A54A',위험:'#FF5A6E'};
+const ZCOL={하차:'#5BD38F',대기:'#F0A54A',위험:'#FF5A6E','보행 통로':'#6FA2FF','출입 금지':'#C38BFF'};
+/* 합성 사람(R15, data/stand_in.json) — 서버 판정(vision/near_miss.py)과 같은 직선 보간 */
+function standAt(tracks,t){ const out=[]; (tracks||[]).forEach(tr=>{ const k=tr.keys; if(!k||!k.length||t<k[0][0]||t>k[k.length-1][0]) return;
+  let i=0; for(let j=0;j<k.length;j++) if(k[j][0]<=t) i=j; const a=k[i], b=k[Math.min(i+1,k.length-1)], r=b[0]===a[0]?0:(t-a[0])/(b[0]-a[0]);
+  const v=[1,2,3,4].map(n=>a[n]+(b[n]-a[n])*r); out.push({track_id:tr.track_id,cls:'person',bbox:[v[0]-v[2]/2,v[1]-v[3],v[0]+v[2]/2,v[1]],stand_in:true}); }); return out; }
 function drawOv(cv,id,t,small){
   const c=VC[id], ctx=cv.getContext('2d'); if(!c) return; const [fw,fh]=c.size;
   if(cv.width!==fw||cv.height!==fh){ cv.width=fw; cv.height=fh; }
@@ -1061,17 +1088,30 @@ function drawOv(cv,id,t,small){
   if(OV.zone||OV.radius) (c.zones||[]).forEach(z=>{ if(z.type==='위험'?!OV.radius:!OV.zone) return;
     ctx.setLineDash([lw*4,lw*3]); ctx.lineWidth=lw; ctx.strokeStyle=ZCOL[z.type]||'#fff'; ctx.beginPath(); z.points.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.closePath(); ctx.stroke();
     if(z.type==='위험'){ ctx.fillStyle='rgba(255,90,110,.12)'; ctx.fill(); } ctx.setLineDash([]);
-    if(!small){ ctx.fillStyle=ZCOL[z.type]; ctx.fillText(z.name,z.points[0][0]+6,z.points[0][1]+fs+4); } });
-  const f=detAt(DET[id],t); if(!f||!OV.box) return;
-  const zs=(c.zones||[]).filter(z=>z.type!=='위험');
+    if(!small){ ctx.fillStyle=ZCOL[z.type]||'#fff'; const xs=z.points.map(p=>p[0]), ys=z.points.map(p=>p[1]);   // 위험 구역 이름은 아래쪽에(베이 이름과 겹치지 않게)
+      if(z.type==='위험') ctx.fillText(z.name,Math.min(...xs)+6,Math.max(...ys)-8); else ctx.fillText(z.name,z.points[0][0]+6,z.points[0][1]+fs+4); } });
+  const f0=detAt(DET[id],t); if(!f0) return;
+  const f={objects:f0.objects.concat(standAt(c.stand_in,t))};
+  const zs=(c.zones||[]).filter(z=>z.type==='하차'||z.type==='대기');
+  // 아차사고 위험(R15): 사람 발끝이 위험 구역 안 + 그 베이 트럭 조건(덤프 반경 = 적재함 상승 · 후진 경로 = 베이에 트럭) → 빨간 강조
+  const trucksNow=f.objects.filter(o=>o.cls==='truck').map(o=>{ const b=o.bbox, ft=[(b[0]+b[2])/2,b[3]], bz=zs.find(z=>z.type==='하차'&&ptIn(ft,z.points)); return {o,bz,up:bz&&medRatio(DET[id],t,o.track_id,(b[3]-b[1])/Math.max(1,b[2]-b[0]))>=0.6}; });
+  const danger=new Map();
+  f.objects.filter(o=>o.cls==='person').forEach(o=>{ const b=o.bbox, ft=[(b[0]+b[2])/2,b[3]];
+    (c.zones||[]).filter(z=>z.type==='위험'&&ptIn(ft,z.points)).forEach(z=>{ const n=z.id.split('-').pop(), rev=/후진/.test(z.rule||'');
+      const hit=trucksNow.find(x=>x.bz&&x.bz.id===c.sector_id+'-BAY-'+n&&(rev||x.up)); if(hit) danger.set(o,z); }); });
+  danger.forEach(z=>{ ctx.beginPath(); z.points.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.closePath(); ctx.fillStyle='rgba(215,38,61,.38)'; ctx.fill(); ctx.lineWidth=lw*2; ctx.strokeStyle='#FF2D46'; ctx.stroke(); });
+  if(danger.size){ const z=[...danger.values()][0], msg='아차사고 위험 · '+(/후진/.test(z.rule||'')?'후진 경로':'적재함 상승 중 덤프 반경')+' 안 사람';
+    ctx.font='800 '+Math.round(fs*1.1)+'px Inter,Noto Sans KR,sans-serif'; const mw=ctx.measureText(msg).width+20; ctx.fillStyle='#D7263D'; ctx.fillRect(fw/2-mw/2,8,mw,fs*1.1+14); ctx.fillStyle='#fff'; ctx.fillText(msg,fw/2-mw/2+10,8+fs*1.1+5);
+    ctx.font='700 '+fs+'px Inter,Noto Sans KR,sans-serif'; }
+  if(!OV.box) return;
   const TB=f.objects.filter(o=>o.cls==='truck').map(o=>o.bbox);
   const inner=b=>TB.some(q=>q!==b&&(q[2]-q[0])*(q[3]-q[1])>(b[2]-b[0])*(b[3]-b[1])&&Math.max(0,Math.min(b[2],q[2])-Math.max(b[0],q[0]))*Math.max(0,Math.min(b[3],q[3])-Math.max(b[1],q[1]))>=0.8*(b[2]-b[0])*(b[3]-b[1]));
   f.objects.forEach(o=>{ const b=o.bbox, w=b[2]-b[0], h=b[3]-b[1], truck=o.cls==='truck';
     if(truck&&(w*h<fw*fh*0.003||inner(b))) return;   // 작은 오탐 · 큰 트럭 박스 안의 중복 박스(운전석만 잡힌 것 등)는 숨김
     const fx=(b[0]+b[2])/2, fy=b[3], inZ=zs.find(z=>ptIn([fx,fy],z.points)), out=truck&&!inZ;   // 구역 밖 트럭(원료 벽 오탐 등)은 판정하지 않음
-    const rr=truck?medRatio(DET[id],t,o.track_id,h/w):0, up=truck&&!out&&rr>=0.6, col=out?'#9AA0A6':truck?(up?'#F0A54A':'#5BD38F'):'#FF5A6E';
-    ctx.lineWidth=lw*1.2; ctx.strokeStyle=col; ctx.strokeRect(b[0],b[1],w,h);
-    const lab=(OV.id?'#'+o.track_id+' · ':'')+(out?'구역 밖':truck?(up?'적재함↑ '+rr.toFixed(2):'트럭 '+rr.toFixed(2)):'사람')+(inZ&&!small?' · '+inZ.name.split(' ')[0]+' '+(inZ.name.split(' ')[1]||''):'');
+    const rr=truck?medRatio(DET[id],t,o.track_id,h/w):0, up=truck&&!out&&rr>=0.6, dz=!truck&&danger.get(o), col=out?'#9AA0A6':truck?(up?'#F0A54A':'#5BD38F'):(dz?'#FF2D46':'#FF8FA0');
+    ctx.lineWidth=lw*(dz?2.4:1.2); ctx.strokeStyle=col; if(o.stand_in) ctx.setLineDash([lw*3,lw*2]); ctx.strokeRect(b[0],b[1],w,h); ctx.setLineDash([]);
+    const lab=(OV.id?'#'+o.track_id+' · ':'')+(out?'구역 밖':truck?(up?'적재함↑ '+rr.toFixed(2):'트럭 '+rr.toFixed(2)):'사람'+(o.stand_in?'(합성)':'')+(dz?' · 위험':''))+(inZ&&!small?' · '+inZ.name.split(' ')[0]+' '+(inZ.name.split(' ')[1]||''):'');
     const tw2=ctx.measureText(lab).width+10; ctx.fillStyle=col; ctx.fillRect(b[0],Math.max(0,b[1]-fs-8),tw2,fs+8); ctx.fillStyle='#141414'; ctx.fillText(lab,b[0]+5,Math.max(fs,b[1]-6)); });
 }
 function medRatio(d,t,tid,now){ // 같은 추적 ID의 최근 1초 세로/가로 중앙값(한 프레임 흔들림 무시 · 변환기와 같은 규칙)
@@ -1196,11 +1236,25 @@ function drawBig(st){
     const nSafe=sec.working.filter(w=>w.safety).length;
     $('#camStat').innerHTML='<span class="chip '+lv+'">'+LV_TEXT[lv]+(sec.status==='down'?'':' '+sec.congestion_pct+'%')+'</span><span class="chip">하역 중 <b class="num">'+sec.working.length+'/'+sec.bays+'</b> · 대기 <b class="num">'+sec.queue.length+'</b></span>'+(nSafe?'<span class="chip crit">안전 경고 <b class="num">'+nSafe+'</b></span>':'')+'<a class="pill-btn" href="#settings" data-roi="1">구역(ROI) 다시 그리기</a>'; drawBays(st,sec); loadCamEv(sec.id,st.clock); }
   else { $('#camStat').innerHTML='<span class="chip">대기장 <b class="num">'+st.counts.yard+'대</b></span><span class="chip">호출 이동 <b class="num">'+st.counts.moving+'대</b></span>'; $('#camBays').innerHTML=''; loadCamEv(null,st.clock); }
-  const live=isLive(camId); setBigLive(live);
+  const live=isLive(camId); setBigLive(live); drawNearMiss(st);
   const det=live?[]:(sec?renderHopperCam(cv,c,sec,byId,hhmm(st.clock)):renderYardCam(cv,c,st,hhmm(st.clock)));
   $('#dlgCount').textContent='이 프레임 · '+det.length+'대';
   $('#dlgRows').innerHTML=det.length?det.map(d=>'<tr><td class="num">#'+esc(d.id)+'</td><td class="plate">'+esc(d.veh)+'</td><td>'+esc(d.zone)+'</td><td class="r num">'+Math.floor(d.stay)+'분</td><td class="r num">'+(d.deg?d.deg+'°':'—')+'</td><td>'+esc(d.judge)+'</td></tr>').join(''):'<tr><td colspan="6" class="empty">이 채널에 잡힌 차량이 없습니다.</td></tr>';
 }
+
+/* 아차사고 기록 (R15) — 영상 NEAR_MISS · 이 카메라 것만 · [장면] = 그 영상 시각으로 이동 */
+const NM_LV={L1:'L1 주의',L2:'L2 경고',L3:'L3 하차 중지'};
+let nmKey='';
+function drawNearMiss(st){
+  const rows=(st.near_miss||[]).filter(x=>x.cam_id===camId).slice().reverse(), key=camId+'|'+rows.map(x=>x.id).join(',');
+  if(key===nmKey) return; nmKey=key;
+  $('#nmCount').textContent=rows.length?rows.length+'건':'';
+  $('#nmList').innerHTML=rows.length?rows.map(x=>'<div class="nm-row"><span class="num cap">'+esc(x.ts)+'</span><span class="nm-lv '+esc(x.level)+'">'+esc(NM_LV[x.level]||x.level)+'</span>'+
+      '<span>'+(x.rule_no?['','①','②','③','④','⑤'][x.rule_no]+' ':'')+esc(x.rule)+' · 베이 '+esc(x.bay)+'<span class="cap" style="display:block">'+esc(x.vehicle_id||'')+' · 영상 '+esc(x.duration_s)+'초 머묾 · 최소 '+esc(x.min_dist_m)+'m <span class="assumed">가정</span>'+(x.source==='stand_in'?'<span class="stand">합성 사람</span>':'')+'</span></span>'+
+      (isLive(camId)&&x.snapshot_t!=null?'<button class="mini" data-nmt="'+x.snapshot_t+'">장면</button>':'<span></span>')+'</div>').join('')
+    :'<div class="empty">'+(isLive(camId)?'이 카메라에서 기록된 아차사고가 없습니다. 영상 모드 서버(--video)에 tools/ingest_videos.py로 넣으면 기록됩니다.':'영상이 연결된 채널에서만 기록됩니다.')+'</div>';
+}
+$('#nmList').addEventListener('click',e=>{ const b=e.target.closest('[data-nmt]'); if(!b) return; const v=$('#bigVid'); if(v.hidden) return; v.currentTime=Math.max(0,+b.dataset.nmt-1); v.pause(); $('#vPlay').textContent='재생'; });
 
 /* 하역장 상세: 베이 1~3 카드 · 이벤트 기록(최근 10분) — 시안 SectorCam */
 const mmss=m=>{ const t=Math.max(0,Math.round(m*60)); return Math.floor(t/60)+'분 '+String(t%60).padStart(2,'0')+'초'; };
@@ -1222,18 +1276,19 @@ function drawBays(st,sec){
   $('#camBays').innerHTML=h;
 }
 const EV_KO={GATE_IN:'계근 입차',ZONE_ARRIVE:'대기장 도착',ZONE_ENTER:'구역 진입',ZONE_EXIT:'구역 이탈',BAY_ENTER:'베이 진입',BAY_EXIT:'하역 완료',VEHICLE_STOPPED:'정지',CALL_REQUEST:'승인 요청',CALL:'호출',ALERT:'운영 알림',
-  SAFETY_ALERT:'안전 경고',SAFETY_ACK:'안전 확인',EFFECT_CONFIRMED:'효과 확정',CALL_ACK:'호출 수락',BEACON_NEAR:'비콘 근접',YARD_DOWN:'하역장 정지',YARD_UP:'하역장 복구',URGENT_IN:'긴급 입고'};
+  SAFETY_ALERT:'안전 경고',SAFETY_ACK:'안전 확인',NEAR_MISS:'아차사고',EFFECT_CONFIRMED:'효과 확정',CALL_ACK:'호출 수락',BEACON_NEAR:'비콘 근접',YARD_DOWN:'하역장 정지',YARD_UP:'하역장 복구',URGENT_IN:'긴급 입고'};
 let camEvAt=0;
 async function loadCamEv(sid,clock){
   if(Date.now()-camEvAt<2000) return; camEvAt=Date.now();
   let ev=[]; try{ ev=await getJ('/api/events?limit=80'+(sid?'&sector_id='+encodeURIComponent(sid):'')); }catch(e){ return; }
   const now=new Date(clock).getTime(); ev=ev.filter(e=>now-new Date(e.ts).getTime()<=10*60000&&(sid||['GATE_IN','ZONE_ARRIVE','CALL','CALL_REQUEST','URGENT_IN'].includes(e.type))).slice(0,30);
-  $('#camEv').innerHTML=ev.length?ev.map(e=>{ const p=e.payload||{}, bad=/SAFETY_ALERT|YARD_DOWN/.test(e.type);
-    const txt=(e.vehicle_id?e.vehicle_id+' ':'')+(p.bay!=null&&/BAY/.test(e.type)?'베이 '+p.bay+' ':'')+(p.rule?p.rule+' ':'')+(p.text||p.message||'');
+  $('#camEv').innerHTML=ev.length?ev.map(e=>{ const p=e.payload||{}, bad=/SAFETY_ALERT|YARD_DOWN|NEAR_MISS/.test(e.type);
+    const txt=(e.vehicle_id?e.vehicle_id+' ':'')+(p.bay!=null&&/BAY/.test(e.type)?'베이 '+p.bay+' ':'')+(p.rule?p.rule+' ':'')+(e.type==='NEAR_MISS'?(p.level||'')+(p.source==='stand_in'?' · 합성':'')+' ':'')+(p.text||p.message||'');
     return '<li><span class="num t">'+esc((e.ts||'').slice(11,19))+'</span><span class="vch" style="background:'+(bad?'#FBDDE1':'#F3F3F1')+';color:'+(bad?'#D7263D':'#3C4043')+'">'+esc(EV_KO[e.type]||e.type)+'</span><span>'+esc(txt.trim())+'</span></li>'; }).join('')
     :'<li class="cap">최근 10분 동안 이벤트가 없습니다.</li>';
 }
-$('#camStat').addEventListener('click',e=>{ if(e.target.closest('[data-roi]')) setTimeout(()=>{ const b=document.querySelector('[data-stab=roi]'); if(b) b.click(); },60); });
+let roiWant=null;
+$('#camStat').addEventListener('click',e=>{ if(e.target.closest('[data-roi]')){ roiWant=camId; setTimeout(()=>{ const b=document.querySelector('[data-stab=roi]'); if(b) b.click(); },60); } });
 
 /* 큰 화면 영상 재생 · 겹치기 · ×1/×4/×8 (시안 SectorCam) */
 let bigLiveId=null;
@@ -1693,9 +1748,7 @@ function renderSettings(d){
 }
 document.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click',()=>{ setTab=b.dataset.stab;
   document.querySelectorAll('[data-stab]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
-  $('#setValues').hidden=setTab!=='values'; $('#setRoi').hidden=setTab!=='roi'; $('#setAdmin').hidden=setTab!=='admin'; $('#recalc').hidden=setTab!=='values'; if(setTab==='roi') loadRoi(); if(setTab==='admin') loadAdmin(); }));
-/* 구역(ROI) — 보기 전용 */
-let roiData=null, roiCam='CAM-02';
+  $('#setValues').hidden=setTab!=='values'; $('#setRoi').hidden=setTab!=='roi'; $('#setAdmin').hidden=setTab!=='admin'; $('#recalc').hidden=setTab!=='values'; if(setTab==='roi'){ loadRoi(roiWant); roiWant=null; } if(setTab==='admin') loadAdmin(); }));
 
 /* ---------- 설정 › 가입 승인 (R14 · 관리자만) ---------- */
 const IS_ADMIN=!!(ME&&ME.is_admin&&!ME.no_auth);
@@ -1728,7 +1781,7 @@ async function loadAdmin(){
     return '<tr><td><span class="st '+u.status+'">'+ST_KO[u.status]+'</span>'+(u.reject_reason?'<span class="cap">사유: '+esc(u.reject_reason)+'</span>':'')+'</td><td>'+esc(u.role_name)+'</td><td>'+who(u)+(me?' <span class="chip">나</span>':'')+'</td><td>'+extra(u)+'</td><td><div class="acts">'+acts+'</div></td></tr>'; }).join('')+'</tbody></table>'
     :'<div class="empty">조건에 맞는 계정이 없어요.</div>';
   $('#admLog').innerHTML=admData.log.length?'<table><thead><tr><th>시각</th><th>처리한 사람</th><th>대상</th><th>처리</th><th>내용</th></tr></thead><tbody>'+admData.log.map(l=>
-    '<tr><td class="num">'+esc(l.ts)+'</td><td>'+esc(l.by||'—')+'</td><td>'+esc(l.to||'—')+' <span class="cap" style="display:inline">'+esc(l.to_id||'')+'</span></td><td>'+esc(({approve:'승인',reject:'반려',role:'역할 변경',disable:'사용 중지',enable:'다시 사용',admin:'관리자 지정/해제',reset_password:'비밀번호 초기화',change_password:'비밀번호 변경'})[l.action]||l.action)+'</td><td>'+esc(l.detail||'')+'</td></tr>').join('')+'</tbody></table>'
+    '<tr><td class="num">'+esc(l.ts)+'</td><td>'+esc(l.by||'—')+'</td><td>'+esc(l.to||'—')+' <span class="cap" style="display:inline">'+esc(l.to_id||'')+'</span></td><td>'+esc(({approve:'승인',reject:'반려',role:'역할 변경',disable:'사용 중지',enable:'다시 사용',admin:'관리자 지정/해제',reset_password:'비밀번호 초기화',change_password:'비밀번호 변경',roi:'구역(ROI) 저장'})[l.action]||l.action)+'</td><td>'+esc(l.detail||'')+'</td></tr>').join('')+'</tbody></table>'
     :'<div class="empty">아직 처리한 기록이 없어요.</div>';
 }
 function dlg(title,body,buttons){ $('#admDlgT').textContent=title; $('#admDlgB').innerHTML=body; $('#admDlgE').textContent=''; $('#admDlgF').innerHTML=buttons; $('#admDlg').hidden=false;
@@ -1765,28 +1818,145 @@ $('#setAdmin').addEventListener('click',e=>{
 ['#admQ'].forEach(id=>$(id).addEventListener('input',()=>{ clearTimeout(window.__admT); window.__admT=setTimeout(loadAdmin,250); }));
 ['#admRole','#admStatus'].forEach(id=>$(id).addEventListener('change',loadAdmin));
 document.addEventListener('click',e=>{ if(e.target.id==='whoAdm') setTimeout(()=>{ const b=$('#admTabBtn'); if(b) b.click(); },120); });
-async function loadRoi(){ if(!roiData){ try{ roiData=await getJ('/api/rois'); }catch(e){ return; } } drawRoi(); }
-const ZC={'하차':['rgba(91,211,143,.28)','#5BD38F'],'대기':['rgba(240,165,74,.28)','#F0A54A'],'위험':['rgba(215,38,61,.25)','#FF5C70']};
-function drawRoi(){
-  const c=roiData.cams.find(x=>x.camera===roiCam)||roiData.cams[0]; roiCam=c.camera;
-  $('#roiChs').innerHTML=roiData.cams.map(x=>'<button class="pill-btn'+(x.camera===roiCam?' dark':'')+'" data-roi="'+x.camera+'" aria-pressed="'+(x.camera===roiCam)+'">'+esc(x.camera+' · '+x.name)+'</button>').join('');
-  $('#roiTitle').textContent='구역(ROI) · '+c.camera+' '+c.name;
-  const cv=$('#roiCanvas'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height, k=W/c.size[0];
-  scene(ctx,W,H,c.camera+' · '+c.name+' · 첫 프레임','08:00:00',false);
-  c.zones.forEach(z=>{ const col=ZC[z.type]||ZC['대기']; ctx.beginPath(); z.points.forEach((p,i)=>i?ctx.lineTo(p[0]*k,p[1]*k):ctx.moveTo(p[0]*k,p[1]*k)); ctx.closePath();
-    ctx.fillStyle=col[0]; ctx.fill(); ctx.setLineDash(z.type==='위험'?[8,6]:[]); ctx.lineWidth=3; ctx.strokeStyle=col[1]; ctx.stroke(); ctx.setLineDash([]);
-    z.points.forEach(p=>{ ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(p[0]*k,p[1]*k,5,0,Math.PI*2); ctx.fill(); });
-    ctx.font='700 16px Inter,Noto Sans KR,sans-serif'; const lx=z.points[0][0]*k+8, ly=z.points[0][1]*k+22; const tw=ctx.measureText(z.id).width;
-    ctx.fillStyle='rgba(20,20,20,.75)'; ctx.fillRect(lx-4,ly-17,tw+8,22); ctx.fillStyle=col[1]; ctx.fillText(z.id,lx,ly); });
-  $('#roiCount').textContent=c.zones.length+'개';
-  $('#roiList').innerHTML=c.zones.map(z=>'<div class="zl"><span class="zt '+esc(z.type)+'">'+esc(z.type)+'</span><span><b>'+esc(z.id)+'</b> · '+esc(z.name)+(z.rule?'<span class="cap" style="display:block">'+esc(z.rule)+' · '+esc(z.active_when)+'일 때만</span>':'')+'</span><span class="cap num">'+z.points.length+'점</span></div>').join('');
-  const file='rois/'+c.camera+(c.sector_id?'_'+c.sector_id:'_YARD')+'.json'; $('#roiFile').textContent=file;
-  $('#roiJson').textContent=JSON.stringify(c,null,1);
+/* 구역(ROI) 편집 (R15) — 영상 첫 프레임 위 다각형 그리기 · 점 이동/추가/삭제 · 저장(관리자) */
+const ZC={'하차':['rgba(91,211,143,.28)','#5BD38F'],'대기':['rgba(240,165,74,.28)','#F0A54A'],'위험':['rgba(215,38,61,.25)','#FF5C70'],'보행 통로':['rgba(76,141,255,.25)','#6FA2FF'],'출입 금지':['rgba(176,76,255,.22)','#C38BFF']};
+const ZT_CLS={'하차':'하차','대기':'대기','위험':'위험','보행 통로':'walk','출입 금지':'nogo'}, ZPRE={'대기':'WAIT','보행 통로':'WALK','출입 금지':'NOGO'};
+const ROI_RULE={'덤프 반경 5m':'REAR','후진 경로':'BACK'};
+const RE={data:null, cam:null, sim:false, zones:[], saved:'[]', sel:-1, drawing:null, drag:null, msg:null, bg:{}};
+const deep=o=>JSON.parse(JSON.stringify(o));
+async function loadRoi(want){
+  try{ RE.data=await getJ('/api/rois/edit'); }catch(e){ $('#roiMsg').innerHTML='<div class="roi-msg err">구역을 불러오지 못했어요.</div>'; return; }
+  const cams=RE.data.cams;
+  if(want&&cams.some(c=>c.camera===want)) pickRoiCam(want,!roiDirty());
+  else if(!RE.cam) pickRoiCam('CAM-01',true);
+  else drawRoi();
 }
-$('#roiChs').addEventListener('click',e=>{ const b=e.target.closest('[data-roi]'); if(b){ roiCam=b.dataset.roi; drawRoi(); } });
-$('#roiDl').addEventListener('click',()=>{ if(!roiData) return; const c=roiData.cams.find(x=>x.camera===roiCam);
-  const url=URL.createObjectURL(new Blob([JSON.stringify(c,null,2)],{type:'application/json'})); const a=document.createElement('a');
-  a.href=url; a.download=c.camera+(c.sector_id?'_'+c.sector_id:'_YARD')+'.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); });
+function roiCamCfg(){ return RE.data.cams.find(c=>c.camera===RE.cam); }
+function roiDirty(){ return !!RE.data&&!RE.sim&&JSON.stringify(RE.zones)!==RE.saved; }
+function pickRoiCam(cam,force){
+  if(!force&&roiDirty()&&!confirm('저장하지 않은 구역 변경이 있어요. 버리고 다른 화면으로 갈까요?')) return;
+  RE.sim=cam==='SIM'; if(!RE.sim) RE.cam=cam;
+  const c=roiCamCfg(); RE.zones=deep(c.zones||[]); RE.saved=JSON.stringify(RE.zones); RE.sel=-1; RE.drawing=null; RE.drag=null; RE.msg=null;
+  if(!RE.sim) roiBg(c); drawRoi();
+}
+function roiBg(c){ // 영상 첫 프레임을 한 번 떠서 배경으로 (영상이 없으면 합성 배경)
+  if(RE.bg[c.camera]!==undefined||!VC[c.camera]) return; RE.bg[c.camera]=null;
+  const v=document.createElement('video'); v.muted=true; v.preload='auto'; v.src=VC[c.camera].video_url;
+  v.addEventListener('loadeddata',()=>{ v.currentTime=0.05; },{once:true});
+  v.addEventListener('seeked',()=>{ const cv=document.createElement('canvas'); cv.width=c.size[0]; cv.height=c.size[1]; cv.getContext('2d').drawImage(v,0,0,cv.width,cv.height); RE.bg[c.camera]=cv; if(RE.cam===c.camera&&!RE.sim) drawRoi(); v.removeAttribute('src'); v.load(); },{once:true});
+}
+function canEdit(){ return !!(RE.data&&RE.data.can_edit&&!RE.sim); }
+function zonePath(ctx,pts,k){ ctx.beginPath(); pts.forEach((p,i)=>i?ctx.lineTo(p[0]*k,p[1]*k):ctx.moveTo(p[0]*k,p[1]*k)); ctx.closePath(); }
+function drawRoi(){
+  if(!RE.data) return; const D=RE.data, ed=canEdit();
+  $('#roiChs').innerHTML=D.cams.map(x=>'<button class="pill-btn'+(!RE.sim&&x.camera===RE.cam?' dark':'')+'" data-roi="'+x.camera+'" aria-pressed="'+(!RE.sim&&x.camera===RE.cam)+'">'+esc(x.camera+' · '+(x.sector_id?'호퍼 '+x.sector_id:'대기장'))+'</button>').join('')+
+    '<button class="pill-btn'+(RE.sim?' dark':'')+'" data-roi="SIM" aria-pressed="'+RE.sim+'">시뮬레이션 그림 (보기)</button>';
+  ['#roiAdd','#roiDel','#roiReset','#roiSave'].forEach(s=>{ $(s).hidden=!ed; }); $('#roiDone').hidden=!RE.drawing;
+  const cv=$('#roiCanvas'), ctx=cv.getContext('2d'); cv.classList.toggle('ro',!ed);
+  if(RE.sim){ drawSimRoi(cv,ctx); return; }
+  const c=roiCamCfg(), W=c.size[0], H=c.size[1]; if(cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; }
+  $('#roiTitle').textContent='구역(ROI) · '+c.camera+' '+(c.sector_id?'호퍼 '+c.sector_id:'대기장')+' '+(c.view||'');
+  $('#roiSub').textContent=(RE.bg[c.camera]?'영상 첫 프레임':'합성 배경(영상 없음)')+' · '+W+'×'+H+' 영상 픽셀'+(ed?'':' · 보기 전용(저장은 관리자)');
+  if(RE.bg[c.camera]) ctx.drawImage(RE.bg[c.camera],0,0,W,H); else scene(ctx,W,H,c.camera+' · 첫 프레임','08:00:00',false);
+  const lw=Math.max(2,W/500), fs=Math.round(W/60), pr=Math.max(5,W/220);
+  RE.zones.forEach((z,i)=>{ const col=ZC[z.type]||ZC['대기'], on=i===RE.sel; zonePath(ctx,z.points,1);
+    ctx.fillStyle=col[0]; ctx.fill(); ctx.setLineDash(z.type==='위험'?[lw*4,lw*3]:[]); ctx.lineWidth=on?lw*2.2:lw; ctx.strokeStyle=on?'#fff':col[1]; ctx.stroke(); ctx.setLineDash([]);
+    if(on||ed) z.points.forEach(p=>{ ctx.fillStyle=on?'#fff':'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.arc(p[0],p[1],on?pr*1.3:pr*0.8,0,Math.PI*2); ctx.fill(); if(on){ ctx.lineWidth=2; ctx.strokeStyle='#141414'; ctx.stroke(); } });
+    ctx.font='700 '+fs+'px Inter,Noto Sans KR,sans-serif'; const lx=z.points[0][0]+8, ly=z.points[0][1]+fs+6, tw=ctx.measureText(z.id).width;
+    ctx.fillStyle='rgba(20,20,20,.75)'; ctx.fillRect(lx-4,ly-fs-2,tw+8,fs+8); ctx.fillStyle=col[1]; ctx.fillText(z.id,lx,ly); });
+  if(RE.drawing){ const d=RE.drawing; ctx.lineWidth=lw*1.5; ctx.strokeStyle='#fff'; ctx.setLineDash([lw*3,lw*2]); ctx.beginPath(); d.pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); if(d.hover&&d.pts.length) ctx.lineTo(d.hover[0],d.hover[1]); ctx.stroke(); ctx.setLineDash([]);
+    d.pts.forEach((p,i)=>{ ctx.fillStyle=i?'#fff':'#FFD84D'; ctx.beginPath(); ctx.arc(p[0],p[1],pr*(i?1:1.5),0,Math.PI*2); ctx.fill(); }); }
+  $('#roiDirty').textContent=roiDirty()?'저장하지 않은 변경 있음':'';
+  $('#roiCount').textContent=RE.zones.length+'개';
+  $('#roiList').innerHTML=RE.zones.length?RE.zones.map((z,i)=>'<div class="zl'+(i===RE.sel?' sel':'')+'" data-zi="'+i+'"><span class="zt '+ZT_CLS[z.type]+'">'+esc(z.type)+'</span><span><b>'+esc(z.id)+'</b> · '+esc(z.name||'')+
+      '<span class="cap" style="display:block">'+(z.rule?esc(z.rule)+' · '+esc(z.active_when||(ROI_RULE[z.rule]==='BACK'?'베이 진입 30초 안':'적재함 상승 중'))+'일 때만':(z.type==='하차'||z.type==='대기')?'체류 '+(z.dwell_sec!=null?z.dwell_sec:3)+'초 유지 시 진입':'판정은 다음 라운드')+'</span></span><span class="cap num">'+z.points.length+'점</span></div>').join('')
+    :'<div class="empty">구역이 없어요. [+ 새 구역]으로 그려 주세요.</div>';
+  roiFormHtml(c);
+  $('#roiMsg').innerHTML=RE.msg?'<div class="roi-msg '+RE.msg[0]+'">'+esc(RE.msg[1])+'</div>':'';
+  const H2=(D.history||[]).filter(h=>!h.detail||h.detail.indexOf(c.camera)===0);
+  $('#roiHist').innerHTML=(D.no_auth?'<p class="cap" style="margin:0 0 6px">로그인 없이 켠 서버라 저장한 사람은 기록되지 않아요.</p>':'')+(H2.length?'<table><thead><tr><th>시각</th><th>누가</th><th>무엇</th></tr></thead><tbody>'+H2.map(h=>'<tr><td class="num">'+esc(h.ts)+'</td><td>'+esc(h.by||'—')+'</td><td>'+esc(h.detail||'')+'</td></tr>').join('')+'</tbody></table>':'<div class="empty">이 카메라 구역을 저장한 기록이 아직 없어요.</div>');
+}
+function drawSimRoi(cv,ctx){ // 시뮬레이션 그림용 구역(rois.json, 1920×1080) — 보기만
+  const D=RE.data, W=1280, H=720, k=W/(D.sim_frame?D.sim_frame[0]:1920); cv.width=W; cv.height=H;
+  $('#roiTitle').textContent='구역(ROI) · 시뮬레이션 그림'; $('#roiSub').textContent='data/rois.json · 1920×1080 · 영상이 없을 때 쓰는 합성 화면용 · 보기 전용';
+  scene(ctx,W,H,'시뮬레이션 그림 · CAM-01~04 구역 겹쳐 보기','08:00:00',false);
+  D.sim.forEach(c=>c.zones.forEach(z=>{ const col=ZC[z.type]||ZC['대기']; zonePath(ctx,z.points,k); ctx.fillStyle=col[0]; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=col[1]; ctx.stroke(); }));
+  $('#roiCount').textContent=D.sim.reduce((n,c)=>n+c.zones.length,0)+'개';
+  $('#roiList').innerHTML=D.sim.map(c=>c.zones.map(z=>'<div class="zl"><span class="zt '+(ZT_CLS[z.type]||'')+'">'+esc(z.type)+'</span><span><b>'+esc(z.id)+'</b> · '+esc(c.camera+' '+z.name)+'</span><span class="cap num">'+z.points.length+'점</span></div>').join('')).join('');
+  $('#roiForm').innerHTML='<p class="cap" style="margin:0">시뮬레이션 그림 구역은 이번 라운드에서 보기만 해요. 실제 판정은 영상 채널 구역(CAM-01~04)으로 해요.</p>'; $('#roiSelId').textContent='';
+  $('#roiHist').innerHTML=''; $('#roiMsg').innerHTML=''; $('#roiDirty').textContent='';
+}
+function nextNo(pre){ const used=new Set(RE.zones.map(z=>z.id)); for(let n=1;n<10;n++){ if(!used.has(pre+n)) return n; } return 9; }
+function zoneBay(z){ const m=/-(\d)$/.exec(z.id||''); return m?+m[1]:1; }
+function genId(z,bay){ const c=roiCamCfg(), sid=c.sector_id, b=bay||zoneBay(z);
+  if(z.type==='하차') return sid+'-BAY-'+b;
+  if(z.type==='위험') return sid+'-'+ROI_RULE[z.rule||'덤프 반경 5m']+'-'+b;
+  const pre=(sid||'YARD')+'-'+ZPRE[z.type]+'-'; if(z.id&&z.id.indexOf(pre)===0) return z.id; return pre+nextNo(pre); }
+function autoName(z){ const b=zoneBay(z); return z.type==='하차'?'베이 '+b+' 정차 위치':z.type==='위험'?(ROI_RULE[z.rule]==='BACK'?'베이 '+b+' 진입·후진 경로':'베이 '+b+' 뒤 덤프 반경'):z.type==='대기'?'대기선':z.type==='보행 통로'?'보행 통로':'출입 금지 구역'; }
+function roiFormHtml(c){
+  const z=RE.zones[RE.sel], ed=canEdit(); $('#roiSelId').textContent=z?z.id:'';
+  if(!z){ $('#roiForm').innerHTML='<p class="cap" style="margin:0">'+(ed?'화면이나 목록에서 구역을 고르면 종류 · 베이 · 규칙 · 이름 · 체류 시간을 바꿀 수 있어요.':'관리자만 구역을 바꾸고 저장할 수 있어요. 지금은 보기만 됩니다.')+'</p>'; return; }
+  const dis=ed?'':' disabled', types=c.sector_id?Object.keys(ZC):['대기','보행 통로','출입 금지'];
+  $('#roiForm').innerHTML='<div class="roi-form">'+
+    '<label>종류<select data-f="type"'+dis+'>'+types.map(t=>'<option'+(t===z.type?' selected':'')+'>'+t+'</option>').join('')+'</select></label>'+
+    ((z.type==='하차'||z.type==='위험')?'<label>베이 번호<select data-f="bay"'+dis+'>'+[1,2,3].map(n=>'<option value="'+n+'"'+(n===zoneBay(z)?' selected':'')+'>베이 '+n+'</option>').join('')+'</select></label>':'<label>ID<input value="'+esc(z.id)+'" disabled></label>')+
+    (z.type==='위험'?'<label class="full">위험 규칙 (켜짐 조건)<select data-f="rule"'+dis+'>'+Object.keys(ROI_RULE).map(r=>'<option'+(r===z.rule?' selected':'')+'>'+r+'</option>').join('')+'</select><span class="cap">'+(ROI_RULE[z.rule]==='BACK'?'② 베이 진입 30초 안에 사람이 들어오면':'① 적재함이 올라가 있을 때 사람이 들어오면')+' 아차사고 · 1초 L2 · 2초 L3 하차 중지 <span class="assumed">가정값</span></span></label>':'')+
+    '<label class="full">이름<input data-f="name" maxlength="40" value="'+esc(z.name||'')+'"'+dis+'></label>'+
+    ((z.type==='하차'||z.type==='대기')?'<label>체류 시간(초)<input data-f="dwell_sec" type="number" min="0" max="30" step="0.5" value="'+(z.dwell_sec!=null?z.dwell_sec:3)+'"'+dis+'></label><span class="cap" style="align-self:end">이만큼 머물러야 진입·이탈로 봐요</span>':'')+
+    '</div>';
+}
+$('#roiForm').addEventListener('change',e=>{ const el=e.target.closest('[data-f]'); if(!el||!canEdit()) return; const z=RE.zones[RE.sel]; if(!z) return; const f=el.dataset.f, wasAuto=!z.name||z.name===autoName(z)||z.name==='새 구역';
+  if(f==='type'){ const b=zoneBay(z); z.type=el.value; if(z.type==='위험'){ z.rule=z.rule||'덤프 반경 5m'; z.active_when=ROI_RULE[z.rule]==='BACK'?'베이 진입 30초 안':'적재함 상승 중'; } else { delete z.rule; delete z.active_when; }
+    if(!(z.type==='하차'||z.type==='대기')) delete z.dwell_sec; z.id=''; z.id=genId(z,b); }
+  else if(f==='bay') z.id=genId(z,+el.value);
+  else if(f==='rule'){ z.rule=el.value; z.active_when=ROI_RULE[z.rule]==='BACK'?'베이 진입 30초 안':'적재함 상승 중'; z.id=genId(z); }
+  else if(f==='name') z.name=el.value.trim();
+  else if(f==='dwell_sec'){ const v=+el.value; if(v===3) delete z.dwell_sec; else z.dwell_sec=v; }
+  if(f!=='name'&&wasAuto) z.name=autoName(z);   // 자동으로 붙인 이름이면 종류·베이·규칙에 맞게 다시
+  RE.msg=null; drawRoi(); });
+$('#roiForm').addEventListener('input',e=>{ const el=e.target.closest('[data-f=name]'); if(el&&RE.zones[RE.sel]){ RE.zones[RE.sel].name=el.value; $('#roiDirty').textContent=roiDirty()?'저장하지 않은 변경 있음':''; } });
+function roiPt(e){ const cv=$('#roiCanvas'), r=cv.getBoundingClientRect(), k=cv.width/r.width; return [Math.round((e.clientX-r.left)*k),Math.round((e.clientY-r.top)*k),k]; }
+function hitPoint(x,y,k){ const R=12*k, order=RE.sel>=0?[RE.sel].concat(RE.zones.map((_,i)=>i).filter(i=>i!==RE.sel)):RE.zones.map((_,i)=>i);
+  for(const zi of order){ const pts=RE.zones[zi].points; for(let pi=0;pi<pts.length;pi++) if(Math.hypot(pts[pi][0]-x,pts[pi][1]-y)<=R) return {zi,pi}; } return null; }
+function hitZone(x,y){ for(let i=RE.zones.length-1;i>=0;i--) if(ptIn([x,y],RE.zones[i].points)) return i; return -1; }
+const clampP=(x,y)=>{ const s=roiCamCfg().size; return [Math.max(0,Math.min(s[0],x)),Math.max(0,Math.min(s[1],y))]; };
+$('#roiCanvas').addEventListener('mousedown',e=>{ if(!canEdit()||e.button!==0) return; const [x,y,k]=roiPt(e);
+  if(RE.drawing){ const d=RE.drawing; if(d.pts.length>=3&&Math.hypot(d.pts[0][0]-x,d.pts[0][1]-y)<=14*k){ finishDraw(); return; } d.pts.push(clampP(x,y)); drawRoi(); return; }
+  const h=hitPoint(x,y,k);
+  if(h&&e.altKey){ delPoint(h); return; }
+  if(h){ RE.sel=h.zi; RE.drag=h; drawRoi(); return; }
+  RE.sel=hitZone(x,y); drawRoi(); });
+window.addEventListener('mousemove',e=>{ if((!RE.drag&&!RE.drawing)||$('#setRoi').hidden) return; const [x,y]=roiPt(e);
+  if(RE.drag){ RE.zones[RE.drag.zi].points[RE.drag.pi]=clampP(x,y); drawRoi(); } else { RE.drawing.hover=clampP(x,y); drawRoi(); } });
+window.addEventListener('mouseup',()=>{ RE.drag=null; });
+$('#roiCanvas').addEventListener('contextmenu',e=>{ if(!canEdit()) return; const [x,y,k]=roiPt(e), h=hitPoint(x,y,k); if(h){ e.preventDefault(); delPoint(h); } });
+function delPoint(h){ const pts=RE.zones[h.zi].points; if(pts.length<=3){ RE.msg=['err','점은 3개보다 적을 수 없어요. 구역을 지우려면 [선택 구역 삭제]를 눌러 주세요.']; } else { pts.splice(h.pi,1); RE.sel=h.zi; RE.msg=null; } drawRoi(); }
+$('#roiCanvas').addEventListener('dblclick',e=>{ if(!canEdit()||RE.drawing||RE.sel<0) return; const [x,y,k]=roiPt(e), pts=RE.zones[RE.sel].points; let best=null;
+  for(let i=0;i<pts.length;i++){ const a=pts[i], b=pts[(i+1)%pts.length], dx=b[0]-a[0], dy=b[1]-a[1], L=dx*dx+dy*dy||1, t=Math.max(0,Math.min(1,((x-a[0])*dx+(y-a[1])*dy)/L)), d=Math.hypot(a[0]+t*dx-x,a[1]+t*dy-y); if(!best||d<best.d) best={i,d}; }
+  if(best&&best.d<=12*k){ pts.splice(best.i+1,0,clampP(x,y)); drawRoi(); } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&RE.drawing&&!$('#setRoi').hidden){ RE.drawing=null; RE.msg=['','그리기를 취소했어요.']; drawRoi(); } });
+$('#roiAdd').addEventListener('click',()=>{ if(!canEdit()) return; RE.drawing={pts:[],hover:null}; RE.sel=-1; RE.msg=['','화면을 눌러 점을 찍어 주세요. 3개 이상 찍은 뒤 [그리기 끝] 또는 첫 점(노란 점)을 누르면 구역이 생겨요.']; drawRoi(); $('#roiCanvas').focus(); });
+$('#roiDone').addEventListener('click',()=>finishDraw());
+function finishDraw(){ const d=RE.drawing; if(!d) return; if(d.pts.length<3){ RE.msg=['err','점을 3개 이상 찍어 주세요.']; drawRoi(); return; }
+  const c=roiCamCfg(), z={id:'',type:c.sector_id?'하차':'대기',name:'',points:d.pts};
+  const used=RE.zones.filter(x=>x.type==='하차').map(zoneBay), b=[1,2,3].find(n=>!used.includes(n))||1;
+  z.id=genId(z,b); z.name=autoName(z);
+  RE.zones.push(z); RE.sel=RE.zones.length-1; RE.drawing=null; RE.msg=['','구역을 만들었어요. 오른쪽에서 종류 · 베이 · 규칙을 정하고 [저장]을 눌러 주세요.']; drawRoi(); }
+$('#roiDel').addEventListener('click',()=>{ if(!canEdit()||RE.sel<0) return; const z=RE.zones[RE.sel]; RE.zones.splice(RE.sel,1); RE.sel=-1; RE.msg=['',z.id+' 구역을 지웠어요. [저장]해야 반영돼요.']; drawRoi(); });
+$('#roiReset').addEventListener('click',()=>{ RE.zones=JSON.parse(RE.saved); RE.sel=-1; RE.drawing=null; RE.msg=['','마지막 저장 상태로 되돌렸어요.']; drawRoi(); });
+$('#roiSave').addEventListener('click',async()=>{ if(!canEdit()) return; const cam=RE.cam;
+  try{ const d=await postJ('/api/admin/rois/'+encodeURIComponent(cam),{zones:RE.zones});
+    const c=roiCamCfg(); c.zones=d.zones; RE.zones=deep(d.zones); RE.saved=JSON.stringify(RE.zones); if(VC[cam]) VC[cam].zones=deep(d.zones);   // CAM 겹쳐 그리기는 바로 새 구역으로
+    try{ RE.data.history=(await getJ('/api/rois/edit')).history; }catch(e){}
+    RE.msg=['ok',d.message+' ('+d.detail+')']; }
+  catch(err){ RE.msg=['err','저장하지 못했어요: '+err.message]; }
+  drawRoi(); });
+$('#roiChs').addEventListener('click',e=>{ const b=e.target.closest('[data-roi]'); if(b) pickRoiCam(b.dataset.roi); });
+$('#roiList').addEventListener('click',e=>{ const r=e.target.closest('[data-zi]'); if(r&&!RE.sim){ RE.sel=+r.dataset.zi; drawRoi(); } });
+window.addEventListener('beforeunload',e=>{ if(roiDirty()){ e.preventDefault(); e.returnValue=''; } });
+$('#roiDl').addEventListener('click',()=>{ if(!RE.data||RE.sim) return; const c=roiCamCfg(), out=Object.assign({},c,{zones:RE.zones});
+  const url=URL.createObjectURL(new Blob([JSON.stringify(out,null,2)],{type:'application/json'})); const a=document.createElement('a');
+  a.href=url; a.download=c.camera+(c.sector_id?'_'+c.sector_id:'_YARD')+'_zones.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); });
 $('#autoSw').addEventListener('change',async e=>{
   try{ const r=await postJ('/api/approval?auto='+e.target.checked); dockMsg=r.auto_approve?'자동 승인을 켰어요 · 호출 시각이 되면 바로 호출합니다.':'자동 승인을 껐어요 · 현장 담당자가 승인해야 호출됩니다 (L2).'; await refresh(); pollView(true); }catch(err){ e.target.checked=!e.target.checked; }
 });
