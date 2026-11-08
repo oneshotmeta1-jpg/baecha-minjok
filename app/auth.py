@@ -34,6 +34,8 @@ RULES = [
     ("GET", r"^/api/me$", {"control", "field", "driver"}),
     ("*", r"^/api/driver/", {"driver"}),                                        # 운전자 = 자기 차량만 (서버가 로그인한 차량번호로 고름)
     ("*", r"^/api/field/", {"field", "control"}),                               # 현장 = 담당 하역장만 (서버가 담당 하역장으로 거름)
+    ("GET", r"^/api/notify/log$", {"control"}),                                 # 알림 기록(받음 · 읽음 · 조치까지 초) — 관제
+    ("*", r"^/api/notify/", {"control", "field", "driver"}),                    # 내 알림함 · 받음/읽음 표시(서버가 로그인한 사람 것만)
     ("POST", r"^/api/ingest$", {"control", "ingest"}),                          # 영상 모듈: 이 PC에서 또는 토큰
     ("WS", r"^/ws$", {"control"}),                                              # 관제 화면 실시간 = 전체 상태
     ("WS", r"^/ws/m$", {"field", "driver"}),                                    # 모바일 실시간 = 역할별로 걸러 보냄

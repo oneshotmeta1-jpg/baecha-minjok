@@ -25,6 +25,7 @@ from app.runtime import REASONS, Runtime  # noqa: E402
 from app.sim import STEP, load  # noqa: E402
 from app.cams import cam_list  # noqa: E402
 from app import auth  # noqa: E402
+from app.notify import Notifier  # noqa: E402
 
 DATA = ROOT / "data"
 WEB = ROOT / "web"
@@ -36,6 +37,7 @@ import os  # noqa: E402
 rt = Runtime(seed=7) if os.environ.get("DOCK_MEMORY") else Runtime(seed=7, db_path=DATA / "events.db", assumptions_path=DATA / "assumptions.json")
 clients: set = set()
 mobiles: dict = {}   # 모바일 실시간 연결 → 로그인한 사람
+NOTI = None          # 알림(R13) — 로그인 켠 서버에서 계정 DB와 함께 만든다
 mobile_sent: dict = {}
 
 
@@ -52,6 +54,10 @@ async def ticker():
                 acc -= STEP
                 rt.step()
             rt.store.commit()
+        if NOTI:
+            NOTI.feed(rt)                       # 새 이벤트 → 받는 사람별 알림
+            if real and int(now) != int(now - real):
+                NOTI.tick(rt)                   # 1초마다: 안전 경고 재전송 · 닫힌 경고 멈춤
         await broadcast()
 
 
@@ -78,10 +84,11 @@ async def broadcast():
 
 
 def mobile_view(u, st=None, p2=None):
+    notes = NOTI.inbox(u["id"]) if NOTI and u.get("id") else {"unread": 0, "items": [], "new": []}
     if u["role"] == "driver":
-        return {"role": "driver", **rt.driver_view((u.get("vehicle") or {}).get("plate"), st)}
+        return {"role": "driver", "notes": notes, **rt.driver_view((u.get("vehicle") or {}).get("plate"), st)}
     hop = ["A", "B", "C", "YARD"] if u["role"] == "control" else (u.get("hoppers") or [])
-    return {"role": "field", **rt.field_view(hop, st, p2)}
+    return {"role": "field", "notes": notes, **rt.field_view(hop, st, p2)}
 
 
 @asynccontextmanager
@@ -467,8 +474,9 @@ def my_hoppers(request):
 
 @app.get("/api/driver/me")
 async def driver_me(request: Request):
-    """운전자: 자기 차량(가입한 차량번호)의 지금 상태 · 순번(PC 순번표의 같은 행) · 안전 경고만."""
-    return rt.driver_view(my_plate(request))
+    """운전자: 자기 차량(가입한 차량번호)의 지금 상태 · 순번(PC 순번표의 같은 행) · 안전 경고만 + 내 알림함."""
+    u = me_of(request)
+    return {**rt.driver_view(my_plate(request)), "notes": NOTI.inbox(u["id"]) if NOTI and u.get("id") else {"unread": 0, "items": [], "new": []}}
 
 
 @app.get("/api/driver/accept")
@@ -511,7 +519,35 @@ async def driver_stopped(request: Request):
 
 @app.get("/api/field/home")
 async def field_home(request: Request):
-    return rt.field_view(my_hoppers(request))
+    u = me_of(request)
+    return {**rt.field_view(my_hoppers(request)), "notes": NOTI.inbox(u["id"]) if NOTI and u.get("id") else {"unread": 0, "items": [], "new": []}}
+
+
+# ---------- 알림 (R13): 내 알림함 · 받음 · 읽음 ----------
+@app.get("/api/notify/inbox")
+async def notify_inbox(request: Request):
+    u = me_of(request)
+    return NOTI.inbox(u["id"]) if NOTI and u.get("id") else {"unread": 0, "items": [], "new": []}
+
+
+@app.post("/api/notify/seen")
+async def notify_seen(request: Request, body: dict = Body(...)):
+    """화면에 배너가 떴다(받음). body: {"ids": [..]}"""
+    u = me_of(request)
+    return {"n": NOTI.mark(u["id"], body.get("ids") or [], "delivered_at") if NOTI and u.get("id") else 0}
+
+
+@app.post("/api/notify/read")
+async def notify_read(request: Request, body: dict = Body(...)):
+    """읽음. body: {"ids": [..]} 또는 {"ids": "all"}"""
+    u = me_of(request)
+    return {"n": NOTI.mark(u["id"], body.get("ids") or [], "read_at") if NOTI and u.get("id") else 0}
+
+
+@app.get("/api/notify/log")
+async def notify_log(limit: int = 200):
+    """관제: 알림 기록 — 받는 사람 · 받음 · 읽음 · 조치까지 초"""
+    return NOTI.log(min(limit, 1000)) if NOTI else []
 
 
 def need_own(request, **kw):
@@ -599,7 +635,9 @@ if __name__ == "__main__":
     except (AttributeError, ValueError):
         pass
     import os
-    auth.install(app, None if args.no_auth else auth.AuthStore(":memory:" if args.check else DATA / "auth.db"),
+    store = None if args.no_auth else auth.AuthStore(":memory:" if args.check else DATA / "auth.db")
+    NOTI = Notifier(store) if store else None
+    auth.install(app, store,
                  no_auth=args.no_auth, secure_cookie=False, ingest_token=os.environ.get("DOCK_INGEST_TOKEN"),
                  shift_label=rt.rec.settings.get("shift", {}).get("label", "오후 교대"))
     host = "0.0.0.0" if args.lan else "127.0.0.1"
