@@ -96,6 +96,20 @@ class Notifier:
                     out.append((u, "운영", f"{hname(at)} · {kind}", p.get("text", ""), "alert", p.get("id"), f"alert|{kind}|{at}|{vid}"))
         return out
 
+    def signup_request(self, u, now=None):
+        """가입 신청(승인 대기) → 관리자들에게 '승인' 알림 (R14). 이름 대신 역할 · 아이디만."""
+        if not self.db:
+            return 0
+        admins = self.db.execute("SELECT id FROM users WHERE role='control' AND is_admin=1 AND status='active'").fetchall()
+        ev = {"type": "SIGNUP_REQUEST", "ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "sector_id": None, "vehicle_id": None}
+        n = 0
+        for (aid,) in admins:
+            if self.send({"id": aid}, "승인", f"가입 신청 · {u['role_name']}", f"아이디 {u['login_id']} · 설정 › 가입 승인에서 처리", "admin",
+                         f"signup#{u['id']}", f"signup|{u['id']}", ev, now=now):
+                n += 1
+        self.db.commit()
+        return n
+
     # ---------- 보내기 ----------
     def send(self, u, kind, title, body, link, ref, dedup, ev, now=None):
         now = now if now is not None else self.clock()

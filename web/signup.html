@@ -36,6 +36,8 @@ fieldset{border:0;padding:0;margin:0} legend{padding:0;font-size:16px;font-weigh
 .done{flex:1;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:14px}
 .done .big{font-size:26px;font-weight:700} .done .who{font-size:14px;color:var(--ink-2)}
 .mstep{display:none}
+.fld .hint{font-size:12px;color:#1D47B8;font-weight:600}
+.done .idbox{font-size:15px;color:var(--ink-2)} .done .idbox b{display:block;font-size:30px;color:var(--ink);letter-spacing:.02em;margin-top:2px}
 @media (max-width:900px){
   .wrap{grid-template-columns:minmax(0,1fr);padding:20px 16px 24px;gap:16px}
   h1{font-size:24px} .steps{display:none} .mstep{display:block;font-size:13px;color:var(--muted);font-weight:600}
@@ -65,7 +67,8 @@ const RN={control:'관제 담당자',field:'현장 담당자',driver:'운전자'
 let role=null, step=1, hop=new Set();
 function setStep(n){ step=n; document.querySelectorAll('.steps .st').forEach(e=>e.classList.toggle('on',+e.dataset.s<=n)); document.querySelectorAll('.steps .bar').forEach(e=>e.classList.toggle('on',+e.dataset.b<n));
   $('#mstep').textContent=n+' / 3 · '+['','역할 선택','정보 입력','승인 대기'][n]; }
-const fld=(id,label,attrs,extra)=>'<label class="fld" data-f="'+id+'">'+label+(extra||'<input id="'+id+'" '+(attrs||'')+'>')+'<span class="err" id="e_'+id+'"></span></label>';
+const HINT={emp_no:'로그인 아이디로 써요',plate:'로그인 아이디로 써요(예: 82가 1234)'};
+const fld=(id,label,attrs,extra)=>'<label class="fld" data-f="'+id+'">'+label+(extra||'<input id="'+id+'" '+(attrs||'')+'>')+(HINT[id]?'<span class="hint">'+HINT[id]+'</span>':'')+'<span class="err" id="e_'+id+'"></span></label>';
 const sel=(id,label,opts)=>fld(id,label,'','<select id="'+id+'"><option value="">'+label+' 선택</option>'+opts.map(o=>'<option>'+esc(o)+'</option>').join('')+'</select>');
 function form(){
   setStep(2);
@@ -108,7 +111,7 @@ async function submit(){
 function done(d){
   setStep(3);
   $('#card').innerHTML='<div class="done"><span class="chip '+(d.status==='active'?'blue':'')+'">'+(d.status==='active'?'사용 가능':'승인 대기')+'</span><div class="big">'+(d.status==='active'?'가입됐어요':'가입 신청을 받았어요')+'</div>'+
-    '<div class="who">'+RN[d.role]+' · 아이디 <b>'+esc(d.login_id)+'</b></div><div class="msg '+(d.status==='active'?'ok':'info')+'">'+esc(d.message)+'</div>'+
+    '<div class="idbox">'+RN[d.role]+' · 로그인 아이디<b>'+esc(d.login_id)+'</b></div><div class="msg '+(d.status==='active'?'ok':'info')+'">'+esc(d.message)+'</div>'+
     '<a class="btn dark" href="/login">로그인하러 가기</a></div>';
 }
 document.querySelectorAll('.rc').forEach(b=>b.addEventListener('click',()=>{ role=b.dataset.role; document.querySelectorAll('.rc').forEach(x=>x.setAttribute('aria-checked',String(x===b))); hop=new Set(); form(); }));

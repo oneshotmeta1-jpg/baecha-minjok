@@ -29,9 +29,11 @@ PLATE = re.compile(r"^\d{2,3}[가-힣]\s?\d{4}$")          # 차량번호 예: 8
 
 # 권한 표 (위에서부터 처음 맞는 줄): (메서드, 경로 정규식, 허용 역할). 없는 /api 경로는 GET = 관제·현장, 그 밖 = 관제만.
 RULES = [
+    ("POST", r"^/api/auth/change_password$", {"control", "field", "driver"}),
     ("*", r"^/api/auth/", {"public"}),
     ("GET", r"^/api/health$", {"public"}),
     ("GET", r"^/api/me$", {"control", "field", "driver"}),
+    ("*", r"^/api/admin/", {"control"}),                                        # 관리자 화면 — 관제 담당자 중 관리자만(처리 함수에서 한 번 더)
     ("*", r"^/api/driver/", {"driver"}),                                        # 운전자 = 자기 차량만 (서버가 로그인한 차량번호로 고름)
     ("*", r"^/api/field/", {"field", "control"}),                               # 현장 = 담당 하역장만 (서버가 담당 하역장으로 거름)
     ("GET", r"^/api/notify/log$", {"control"}),                                 # 알림 기록(받음 · 읽음 · 조치까지 초) — 관제
@@ -71,7 +73,12 @@ class AuthStore:
                 status TEXT NOT NULL, is_admin INTEGER DEFAULT 0, pw_salt BLOB NOT NULL, pw_hash BLOB NOT NULL, created_at REAL);
             CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, expires REAL NOT NULL, remember INTEGER);
             CREATE TABLE IF NOT EXISTS fails (login_id TEXT PRIMARY KEY, n INTEGER NOT NULL, locked_until REAL);
+            CREATE TABLE IF NOT EXISTS auth_log (id INTEGER PRIMARY KEY, ts REAL, actor_id INTEGER, target_id INTEGER, action TEXT, detail TEXT);
         """)
+        cols = {r[1] for r in self.db.execute("PRAGMA table_info(users)")}
+        for c, ddl in (("reject_reason", "TEXT"), ("must_change_pw", "INTEGER DEFAULT 0"), ("decided_at", "REAL")):
+            if c not in cols:                                     # R14: 반려 사유 · 임시 비밀번호 · 처리 시각
+                self.db.execute(f"ALTER TABLE users ADD COLUMN {c} {ddl}")
         self.db.commit()
 
     # ---------- 계정 ----------
@@ -188,6 +195,7 @@ class AuthStore:
         u = self.user(uid=r[0])
         if u["status"] != "active":
             return u["status"], u
+        u["must_change_pw"] = bool(self.db.execute("SELECT must_change_pw FROM users WHERE id=?", (u["id"],)).fetchone()[0])
         return "ok", u
 
     def new_session(self, uid, remember, now=None):
@@ -214,6 +222,148 @@ class AuthStore:
             self.db.execute("DELETE FROM sessions WHERE token_hash=?", (hashlib.sha256(tok.encode()).hexdigest(),))
             self.db.commit()
 
+
+# ---------- 관리자 (R14): 가입 승인 · 반려 · 역할 · 사용 중지 · 관리자 지정 · 비밀번호 초기화 ----------
+def mask_phone(p):
+    p = re.sub(r"\D", "", p or "")
+    return f"{p[:3]}-****-{p[-4:]}" if len(p) >= 10 else ("" if not p else "****")
+
+
+class AdminError(Exception):
+    pass
+
+
+def _admin_methods():
+    def users(self, q="", role="", status=""):
+        rows = self.db.execute("SELECT id, login_id, role, name, phone, dept, hoppers, vehicle, consent, status, is_admin, created_at, reject_reason, decided_at FROM users ORDER BY "
+                               "CASE status WHEN 'pending' THEN 0 ELSE 1 END, id DESC").fetchall()
+        out = []
+        for r in rows:
+            u = {"id": r[0], "login_id": r[1], "role": r[2], "role_name": ROLES[r[2]], "name": r[3], "phone": mask_phone(r[4]), "dept": r[5],
+                 "hoppers": json.loads(r[6] or "[]"), "vehicle": json.loads(r[7]) if r[7] else None, "consent": json.loads(r[8] or "{}"),
+                 "status": r[9], "is_admin": bool(r[10]), "created_at": r[11], "reject_reason": r[12], "decided_at": r[13]}
+            if q and q not in u["name"] and q not in u["login_id"]:
+                continue
+            if role and u["role"] != role or status and u["status"] != status:
+                continue
+            out.append(u)
+        return out
+
+    def log_action(self, actor_id, target_id, action, detail=""):
+        self.db.execute("INSERT INTO auth_log (ts, actor_id, target_id, action, detail) VALUES (?,?,?,?,?)", (time.time(), actor_id, target_id, action, detail))
+
+    def recent_log(self, limit=20):
+        rows = self.db.execute("""SELECT l.ts, a.name, t.name, t.login_id, l.action, l.detail FROM auth_log l
+                                  LEFT JOIN users a ON a.id=l.actor_id LEFT JOIN users t ON t.id=l.target_id ORDER BY l.id DESC LIMIT ?""", (limit,)).fetchall()
+        return [{"ts": time.strftime("%m-%d %H:%M", time.localtime(r[0])), "by": r[1], "to": r[2], "to_id": r[3], "action": r[4], "detail": r[5]} for r in rows]
+
+    def kill_sessions(self, uid):
+        self.db.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
+
+    def _target(self, uid):
+        u = self.user(uid=uid)
+        if not u:
+            raise AdminError("없는 계정이에요.")
+        return u
+
+    def _admins(self, exclude=None):
+        return self.db.execute("SELECT COUNT(*) FROM users WHERE is_admin=1 AND status='active' AND id<>?", (exclude or -1,)).fetchone()[0]
+
+    def admin_do(self, actor, uid, action, **kw):
+        """관리자 처리 하나. 반환: (메시지, 추가 정보). 잘못되면 AdminError."""
+        t = self._target(uid)
+        now = time.time()
+        extra = {}
+        if action == "approve":
+            if t["status"] not in ("pending", "rejected"):
+                raise AdminError("승인 대기 · 반려 계정만 승인할 수 있어요.")
+            self.db.execute("UPDATE users SET status='active', reject_reason=NULL, decided_at=? WHERE id=?", (now, uid))
+            msg, detail = f"{t['name']} 승인", ""
+        elif action == "reject":
+            reason = (kw.get("reason") or "").strip()[:200]
+            if not reason:
+                raise AdminError("반려 사유를 적어 주세요.")
+            if t["id"] == actor["id"]:
+                raise AdminError("자기 자신은 반려할 수 없어요.")
+            if t["is_admin"] and not self._admins(exclude=uid):
+                raise AdminError("마지막 관리자는 반려할 수 없어요.")
+            self.db.execute("UPDATE users SET status='rejected', reject_reason=?, decided_at=? WHERE id=?", (reason, now, uid))
+            self.kill_sessions(uid)
+            msg, detail = f"{t['name']} 반려", reason
+        elif action == "role":
+            role, hoppers = kw.get("role") or t["role"], kw.get("hoppers")
+            if role not in ROLES:
+                raise AdminError("역할을 확인해 주세요.")
+            if role == "driver" and not t["vehicle"]:
+                raise AdminError("차량 정보가 없는 계정은 운전자로 바꿀 수 없어요.")
+            if t["is_admin"] and role != "control" and not self._admins(exclude=uid):
+                raise AdminError("마지막 관리자는 관제 담당자에서 바꿀 수 없어요.")
+            hop = [h for h in (hoppers if hoppers is not None else t["hoppers"]) if h in HOPPERS]
+            if role == "field" and not hop:
+                raise AdminError("현장 담당자는 담당 하역장을 하나 이상 골라 주세요.")
+            self.db.execute("UPDATE users SET role=?, hoppers=?, is_admin=CASE WHEN ?='control' THEN is_admin ELSE 0 END WHERE id=?",
+                            (role, json.dumps(hop if role == "field" else [], ensure_ascii=False), role, uid))
+            self.kill_sessions(uid)               # 화면 · 권한이 바뀌니 다시 로그인
+            msg, detail = f"{t['name']} 역할 변경", f"{ROLES[t['role']]} → {ROLES[role]}" + (f" ({', '.join(hop)})" if role == "field" else "")
+        elif action == "disable":
+            if t["id"] == actor["id"]:
+                raise AdminError("자기 자신은 사용 중지할 수 없어요.")
+            if t["is_admin"] and not self._admins(exclude=uid):
+                raise AdminError("마지막 관리자는 사용 중지할 수 없어요.")
+            self.db.execute("UPDATE users SET status='disabled', decided_at=? WHERE id=?", (now, uid))
+            self.kill_sessions(uid)
+            msg, detail = f"{t['name']} 사용 중지", ""
+        elif action == "enable":
+            if t["status"] != "disabled":
+                raise AdminError("사용 중지된 계정만 다시 쓸 수 있어요.")
+            self.db.execute("UPDATE users SET status='active', decided_at=? WHERE id=?", (now, uid))
+            msg, detail = f"{t['name']} 다시 사용", ""
+        elif action == "admin":
+            on = bool(kw.get("on"))
+            if on and (t["role"] != "control" or t["status"] != "active"):
+                raise AdminError("사용 중인 관제 담당자만 관리자로 지정할 수 있어요.")
+            if not on and t["is_admin"] and not self._admins(exclude=uid):
+                raise AdminError("마지막 관리자는 해제할 수 없어요.")
+            self.db.execute("UPDATE users SET is_admin=? WHERE id=?", (int(on), uid))
+            msg, detail = f"{t['name']} 관리자 {'지정' if on else '해제'}", ""
+        elif action == "reset_password":
+            tmp = "".join(secrets.choice("abcdefghjkmnpqrstuvwxyz") for _ in range(4)) + "".join(secrets.choice("23456789") for _ in range(4))
+            salt, h = hash_pw(tmp)
+            self.db.execute("UPDATE users SET pw_salt=?, pw_hash=?, must_change_pw=1 WHERE id=?", (salt, h, uid))
+            self.db.execute("DELETE FROM fails WHERE login_id=?", (t["login_id"],))
+            self.kill_sessions(uid)
+            msg, detail = f"{t['name']} 비밀번호 초기화", "임시 비밀번호 발급(화면에 한 번만 표시)"
+            extra["temp_password"] = tmp            # 저장 · 기록하지 않고 응답에만 한 번
+        else:
+            raise AdminError("모르는 처리예요.")
+        self.log_action(actor["id"], uid, action, detail)
+        self.db.commit()
+        return msg, extra
+
+    def change_password(self, uid, old, new):
+        r = self.db.execute("SELECT pw_salt, pw_hash FROM users WHERE id=?", (uid,)).fetchone()
+        if not r or not hmac.compare_digest(hash_pw(old or "", r[0])[1], r[1]):
+            raise AdminError("지금 비밀번호가 맞지 않아요.")
+        if pw_problem(new):
+            raise AdminError(pw_problem(new))
+        if new == old:
+            raise AdminError("새 비밀번호는 지금과 달라야 해요.")
+        salt, h = hash_pw(new)
+        self.db.execute("UPDATE users SET pw_salt=?, pw_hash=?, must_change_pw=0 WHERE id=?", (salt, h, uid))
+        self.log_action(uid, uid, "change_password", "")
+        self.db.commit()
+
+    def pending_count(self):
+        return self.db.execute("SELECT COUNT(*) FROM users WHERE status='pending'").fetchone()[0]
+
+    for f in (users, log_action, recent_log, kill_sessions, _target, _admins, admin_do, change_password, pending_count):
+        setattr(AuthStore, f.__name__ if f.__name__ != "users" else "list_users", f)
+
+
+_admin_methods()
+
+ADMIN_NAMES = {"approve": "승인", "reject": "반려", "role": "역할 변경", "disable": "사용 중지", "enable": "다시 사용", "admin": "관리자 지정/해제",
+               "reset_password": "비밀번호 초기화", "change_password": "비밀번호 변경"}
 
 GUEST = {"id": 0, "login_id": "-", "role": "control", "role_name": ROLES["control"], "name": "관제 담당자", "is_admin": True, "no_auth": True}
 
@@ -291,10 +441,13 @@ def install(app, store, no_auth=False, secure_cookie=False, ingest_token=None, s
         if res == "pending":
             return JSONResponse({"detail": "관리자 승인을 기다리고 있어요. 승인되면 로그인할 수 있어요."}, status_code=403)
         if res == "rejected":
-            return JSONResponse({"detail": "가입 신청이 반려됐어요. 관리자에게 문의해 주세요."}, status_code=403)
+            why = store.db.execute("SELECT reject_reason FROM users WHERE id=?", (x["id"],)).fetchone()[0]
+            return JSONResponse({"detail": "가입 신청이 반려됐어요." + (f" 사유: {why}" if why else " 관리자에게 문의해 주세요."), "reason": why}, status_code=403)
+        if res == "disabled":
+            return JSONResponse({"detail": "사용 중지된 계정이에요. 관리자에게 문의해 주세요."}, status_code=403)
         remember = bool(body.get("remember"))
         tok = store.new_session(x["id"], remember)
-        r = JSONResponse({"user": public_user(x), "home": home_of(x)})
+        r = JSONResponse({"user": public_user(x), "home": home_of(x), "must_change_pw": bool(x.get("must_change_pw"))})
         r.set_cookie(COOKIE, tok, httponly=True, samesite="lax", secure=secure_cookie, path="/",
                      max_age=REMEMBER_SEC if remember else None)
         return r
@@ -315,9 +468,48 @@ def install(app, store, no_auth=False, secure_cookie=False, ingest_token=None, s
         if err:
             return JSONResponse({"detail": "입력을 확인해 주세요.", "errors": err}, status_code=422)
         msg = {"active": "가입됐어요. 바로 로그인할 수 있어요.", "pending": "가입 신청을 받았어요. 관리자가 확인한 뒤 승인하면 로그인할 수 있어요."}[u["status"]]
+        if u["status"] == "pending" and getattr(app.state, "on_signup", None):
+            app.state.on_signup(u)
         if u["is_admin"]:
             msg = "첫 관제 담당자라 관리자로 가입됐어요. 바로 로그인할 수 있어요."
         return {"status": u["status"], "message": msg, "login_id": u["login_id"], "role": u["role"]}
+
+    def need_admin(request):
+        u = current(request)
+        if not u or u.get("role") != "control" or not u.get("is_admin"):
+            raise HTTPException(403, "관리자만 할 수 있어요.")
+        if off:
+            raise HTTPException(400, "로그인 없이 켠 서버(--no-auth)에는 계정이 없어요.")
+        return u
+
+    @app.get("/api/admin/users")
+    async def admin_users(request: Request, q: str = "", role: str = "", status: str = ""):
+        need_admin(request)
+        return {"users": store.list_users(q.strip(), role, status), "pending": store.pending_count(), "log": store.recent_log(20)}
+
+    @app.post("/api/admin/users/{uid}/{action}")
+    async def admin_action(request: Request, uid: int, action: str, body: dict = Body(default={})):
+        a = need_admin(request)
+        try:
+            msg, extra = store.admin_do(a, uid, action, **(body or {}))
+        except AdminError as e:
+            raise HTTPException(409, str(e))
+        if action in ("approve", "reject") and getattr(app.state, "on_admin", None):
+            app.state.on_admin(uid, ADMIN_NAMES[action])          # 가입 신청 알림 = 조치됨
+        return {"message": msg, **extra}
+
+    @app.post("/api/auth/change_password")
+    async def change_password(request: Request, body: dict = Body(...)):
+        u = current(request)
+        if not u or off:
+            raise HTTPException(401, "로그인이 필요해요.")
+        if body.get("new") != body.get("new2"):
+            raise HTTPException(422, "새 비밀번호가 서로 달라요.")
+        try:
+            store.change_password(u["id"], body.get("old"), body.get("new"))
+        except AdminError as e:
+            raise HTTPException(422, str(e))
+        return {"ok": True, "home": home_of(u)}
 
     @app.get("/api/auth/check_id")
     async def check_id(login_id: str):
@@ -328,6 +520,11 @@ def install(app, store, no_auth=False, secure_cookie=False, ingest_token=None, s
         u = current(request)
         if not u:
             raise HTTPException(401, "로그인이 필요해요.")
-        return dict(public_user(u), shift=u.get("shift"), home=home_of(u))
+        extra = {}
+        if store and not off:
+            extra["must_change_pw"] = bool(store.db.execute("SELECT must_change_pw FROM users WHERE id=?", (u["id"],)).fetchone()[0])
+            if u.get("is_admin"):
+                extra["pending_signups"] = store.pending_count()
+        return dict(public_user(u), shift=u.get("shift"), home=home_of(u), **extra)
 
     return current

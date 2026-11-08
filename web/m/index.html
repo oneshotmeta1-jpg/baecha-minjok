@@ -261,6 +261,7 @@ function connect(){
 }
 (async()=>{
   try{ ME=await api('/api/me'); }catch(e){ return; }
+  if(ME.must_change_pw){ location.replace('/login?change=1'); return; }       // 임시 비밀번호 → 먼저 바꾸기 (R14)
   if(ME.role==='control'&&!ME.no_auth){ /* 관제 담당자가 열면 현장 담당자 화면(전체 하역장)으로 미리보기 */ ME=Object.assign({},ME,{role:'field',role_name:'현장 화면 미리보기'}); }
   if(ME.no_auth) ME=Object.assign({},ME,{role:'field',role_name:'현장 화면 미리보기'});
   if(ME.role==='driver'){ try{ window.CARGOS=(await api('/api/driver/accept')).cargos; }catch(e){ window.CARGOS=[]; } }

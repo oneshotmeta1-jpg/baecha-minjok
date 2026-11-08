@@ -5,6 +5,7 @@
     py tools/users.py reject <아이디>             # 반려
     py tools/users.py admin <아이디>              # 관리자로
     py tools/users.py add <역할 control|field|driver> <아이디> <이름>   # 비밀번호는 입력창에서(화면·기록에 안 남음)
+    py tools/users.py reset <아이디>             # 비밀번호 초기화: 임시 비밀번호를 이 창에만 한 번 보여 주고, 다음 로그인 때 바꾸게 함
 
 data/auth.db(git 제외)를 바로 고친다. 서버가 켜져 있어도 된다.
 """
@@ -33,6 +34,12 @@ def main(argv):
             sys.exit(f"없는 아이디: {lid}")
         st.set_status(lid, "rejected" if cmd == "reject" else "active", is_admin=True if cmd == "admin" else None)
         print(f"{lid}: {st.user(login_id=lid)['status']}" + (" · 관리자" if cmd == "admin" else ""))
+    elif cmd == "reset":
+        u = st.user(login_id=lid)
+        if not u:
+            sys.exit(f"없는 아이디: {lid}")
+        _, extra = st.admin_do(u, u["id"], "reset_password")      # 관리자 화면과 같은 처리(세션 끊기 · 기록), 처리한 사람 = 본인(명령어)
+        print(f"{lid}: 임시 비밀번호 {extra['temp_password']}  (이 창에만 보여요 · 다음 로그인 때 새 비밀번호로 바꾸게 돼요)")
     elif cmd == "add":
         role, name = argv[1], argv[3]
         lid = argv[2]

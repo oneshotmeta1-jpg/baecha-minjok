@@ -637,6 +637,9 @@ if __name__ == "__main__":
     import os
     store = None if args.no_auth else auth.AuthStore(":memory:" if args.check else DATA / "auth.db")
     NOTI = Notifier(store) if store else None
+    if NOTI:
+        app.state.on_signup = NOTI.signup_request          # 가입 신청 → 관리자 알림(R14)
+        app.state.on_admin = lambda uid, how: (NOTI.act_ref(f"signup#{uid}", how), NOTI.db.commit())
     auth.install(app, store,
                  no_auth=args.no_auth, secure_cookie=False, ingest_token=os.environ.get("DOCK_INGEST_TOKEN"),
                  shift_label=rt.rec.settings.get("shift", {}).get("label", "오후 교대"))
