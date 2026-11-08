@@ -64,7 +64,22 @@ form{display:flex;flex-direction:column;gap:16px}
 <script>
 const $=s=>document.querySelector(s);
 $('#forgot').addEventListener('click',()=>{ $('#msg').className='msg info'; $('#msg').textContent='비밀번호 찾기는 아직 준비 중이에요. 관리자에게 초기화를 요청해 주세요.'; });
-fetch('/api/me').then(r=>r.ok?r.json():null).then(u=>{ if(u&&u.home) location.replace(u.home); }).catch(()=>{});
+const CHANGE=new URLSearchParams(location.search).get('change');
+fetch('/api/me').then(r=>r.ok?r.json():null).then(u=>{ if(!u||!u.home) return; if(u.must_change_pw||CHANGE) changeForm(null,u.home); else location.replace(u.home); }).catch(()=>{});
+/* 임시 비밀번호로 들어오면 새 비밀번호로 바꾸기 (R14) */
+function changeForm(oldPw,home){
+  const card=document.querySelector('section.card');
+  card.innerHTML='<div><h1>새 비밀번호</h1><p class="sub">관리자가 비밀번호를 초기화했어요. 쓰실 비밀번호로 바꿔 주세요.</p></div>'+
+    '<form id="cf" novalidate>'+(oldPw?'':'<label class="fld">지금(임시) 비밀번호<input id="cpOld" type="password" autocomplete="current-password"></label>')+
+    '<label class="fld">새 비밀번호<input id="cpNew" type="password" autocomplete="new-password" placeholder="영문·숫자 8자 이상"></label>'+
+    '<label class="fld">새 비밀번호 확인<input id="cpNew2" type="password" autocomplete="new-password"></label>'+
+    '<div class="msg" id="cmsg" role="alert"></div><button class="btn dark" id="cgo" type="submit">바꾸고 시작하기</button></form>';
+  const f=document.getElementById('cf'); f.querySelector('input').focus();
+  f.addEventListener('submit',async e=>{ e.preventDefault(); const m=document.getElementById('cmsg');
+    const body={old:oldPw||document.getElementById('cpOld').value,new:document.getElementById('cpNew').value,new2:document.getElementById('cpNew2').value};
+    const r=await fetch('/api/auth/change_password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const d=await r.json().catch(()=>({}));
+    if(r.ok){ location.replace(d.home||home||'/'); return; } m.className='msg bad'; m.textContent=d.detail||'바꾸지 못했어요.'; });
+}
 let lockTimer=null;
 $('#f').addEventListener('submit',async e=>{
   e.preventDefault();
@@ -74,7 +89,7 @@ $('#f').addEventListener('submit',async e=>{
   try{
     const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login_id:lid,password:pw,remember:$('#remember').checked})});
     const d=await r.json().catch(()=>({}));
-    if(r.ok){ location.replace(d.home||'/'); return; }
+    if(r.ok){ if(d.must_change_pw){ changeForm(pw,d.home); return; } location.replace(d.home||'/'); return; }
     $('#msg').className='msg bad'; $('#msg').textContent=d.detail||'로그인하지 못했어요.'; $('#pw').value=''; $('#pw').focus();
     if(r.status===423&&d.retry_after){ let n=d.retry_after; clearInterval(lockTimer);
       lockTimer=setInterval(()=>{ n--; if(n<=0){ clearInterval(lockTimer); $('#go').disabled=false; $('#msg').className='msg info'; $('#msg').textContent='다시 로그인할 수 있어요.'; } else $('#msg').textContent='5번 틀려서 잠겼어요. '+n+'초 뒤에 다시 해 주세요.'; },1000); return; }
