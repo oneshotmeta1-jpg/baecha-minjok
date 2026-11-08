@@ -36,4 +36,13 @@
 - **반려**: `git switch main && git branch -D office/r<N>` → `git push origin --delete office/r<N>` → 서버를 main으로 재시작
   → `round.applied = base`, `status: "idle"`. `decision_note`는 다음 목표에 반영.
 
+- **DB 정리 (승인·반려 반영 때마다 이어서)**: 최근 3개 라운드만 원문을 두고, 그보다 오래된 라운드의
+  회의 대화(`log`)·개선안 상세·후보 보고는 `office/archive/r<N>.json`으로 옮긴다. DB에는 목표(300자)·승인한 개선안 제목·
+  결과·후보 요약과 `archived` 경로, `items_total`만 남는다. 라운드 목록·적용 버전·`site.brief`는 그대로다.
+  1. ArtifactData `get`(`out_dir` 사용)으로 최신 문서를 받고 `version`을 적어 둔다.
+  2. `node office/tools/archive_rounds.mjs <받은 office.json> <정리본.json>` (`--keep 3` 기본, 다시 돌려도 결과 같음)
+  3. 새 `office/archive/*.json`을 main에 커밋·push (원문이 저장소에 올라간 뒤에만 DB를 줄인다).
+  4. ArtifactData `set`에 `file_path: <정리본.json>`, `if_version: <1에서 본 version>`. 실패하면 1부터 다시.
+  - 오피스 화면이 열려 있으면 화면이 새 문서를 받아 다시 그린다. 회의 중이면 회의가 끝난 뒤에 정리한다.
+
 push는 오피스에서 승인한 범위 안에서만. 강제 push·main 직접 커밋 금지(문서 정리 제외).

@@ -256,7 +256,7 @@ function normalize(d){
 
 /* ---------- persistence ---------- */
 async function connect(){
-  dbg('페이지 시작 (화면 버전 5)');
+  dbg('페이지 시작 (화면 버전 6)');
   try { sample = await claude.use('sample'); } catch(e){ sample = null; dbg('Claude 연결 오류: '+(e&&e.message||e)); }
   dbg('Claude 회의 기능: '+(sample?'있음':'없음'));
   let db=null, user=null;
@@ -300,8 +300,10 @@ let saving = Promise.resolve();
 function save(){
   if(!store) return;
   const copy = JSON.parse(JSON.stringify(state));
-  let size = JSON.stringify(copy).length;
-  for(let i=0; size>200000 && i<copy.rounds.length-1; i++){ copy.rounds[i].log=[]; if(copy.rounds[i].candidate) copy.rounds[i].candidate.report=[]; size=JSON.stringify(copy).length; }
+  // 한글은 UTF-8로 3바이트라 글자 수가 아니라 바이트로 잰다
+  const bytes = v => new TextEncoder().encode(JSON.stringify(v)).length;
+  let size = bytes(copy);
+  for(let i=0; size>200000 && i<copy.rounds.length-1; i++){ copy.rounds[i].log=[]; if(copy.rounds[i].candidate) copy.rounds[i].candidate.report=[]; size=bytes(copy); }
   lastSaved = JSON.stringify(copy);
   saving = saving.then(()=>store.set(copy)).catch(()=>note('저장하지 못했습니다. 새로고침하면 마지막 저장 상태로 돌아갑니다.'));
 }
@@ -635,6 +637,11 @@ function candidateHtml(round){
     list('직접 확인해 주세요', (c.checks||[]).map(esc))+
     (c.limits&&c.limits.length?list('알아 둘 점', c.limits.map(esc)):'');
 }
+// 오래된 라운드는 회의 대화·상세를 저장소 파일로 옮기고 요약만 남긴다 (office/tools/archive_rounds.mjs)
+const archiveUrl = r => state.site.repo ? state.site.repo+'/blob/main/'+r.archived : '';
+const archivedNote = r => '이 라운드의 회의 대화와 개선안 상세, 후보 보고 전체는 저장소 '+
+  (archiveUrl(r) ? '<a href="'+esc(archiveUrl(r))+'" target="_blank" rel="noopener">'+esc(r.archived)+'</a>' : '<b>'+esc(r.archived)+'</b>')+
+  '로 옮겼습니다. 여기에는 승인한 개선안과 결과만 남겼습니다.';
 let lastStepKey='';
 function renderStep(){
   const s=state.status, latest=latestRound(), r=shownRound();
@@ -657,7 +664,8 @@ function renderStep(){
       (r.candidate?candidateHtml(r):'')+
       '<div class="result '+(r.applied && r.candidate && r.applied===r.candidate.version?'ok':'no')+'">'+
         (r.applied ? (r.candidate && r.applied===r.candidate.version ? r.applied+'로 업데이트했습니다.' : '반려되어 '+r.applied+'를 그대로 씁니다.') : r.decision ? '결정 반영 대기' : r.plan_at ? '수정 작업 대기' : '개선안 선택 전')+
-        (r.decision_note?'<br><span class="note">남긴 의견: '+esc(r.decision_note)+'</span>':'')+'</div>';
+        (r.decision_note?'<br><span class="note">남긴 의견: '+esc(r.decision_note)+'</span>':'')+'</div>'+
+      (r.archived?'<div class="note">'+archivedNote(r)+'</div>':'');
   }
   else if(s==='plan'){
     title='R'+r.n+' 개선안 고르기';
@@ -699,7 +707,7 @@ function renderRounds(){
     const res = r.applied ? (r.candidate && r.applied===r.candidate.version ? r.applied+' 적용' : '반려') : r.decision ? '반영 대기' : r.candidate ? '후보 검토' : r.plan_at ? '작업 대기' : '선택 중';
     const ok = r.applied && r.candidate && r.applied===r.candidate.version;
     return '<button class="vitem'+(r.n===cur?' sel':'')+'" data-r="'+r.n+'"><span class="v">R'+r.n+'</span><span class="t">'+esc(r.goal)+'</span>'+
-      '<span class="st'+(ok?' ok':'')+'">'+esc(res)+'</span><span class="fb">개선안 '+(r.items||[]).length+'개 중 '+(r.selected||[]).length+'개 승인</span></button>';
+      '<span class="st'+(ok?' ok':'')+'">'+esc(res)+'</span><span class="fb">개선안 '+(r.items_total||(r.items||[]).length)+'개 중'+(r.selected||[]).length+'개 승인</span></button>';
   }).join('') : '<div class="empty">목표마다 한 줄씩 쌓입니다.</div>';
 }
 let lastLog='';
@@ -710,6 +718,7 @@ function renderLog(){
   else if(r){ msgs=(r.log||[]).concat(r.candidate&&r.candidate.report?[{from:'PL',to:'ALL',text:'── 작업 보고 ('+r.candidate.version+') ──',sep:true}].concat(r.candidate.report):[]); label='R'+r.n; }
   else { msgs=[]; label=''; }
   const html = msgs.length ? msgs.map(m=>m.sep?'<div class="sepline">'+esc(m.text)+'</div>':'<div class="msg">'+roleChip(m.from)+'<span class="meta"><b>'+esc(ROLE[m.from]?ROLE[m.from].ko:m.from)+'</b> → '+esc(WHO(m.to))+'</span><span class="txt">'+esc(m.text)+'</span></div>').join('')
+    : r && r.archived && label==='R'+r.n ?'<div class="empty">'+archivedNote(r)+'</div>'
     : '<div class="empty">'+(state.status==='meeting'?'팀이 회의를 준비하고 있습니다.':'팀의 대화가 여기에 기록됩니다.')+'</div>';
   $('#logSub').textContent = label ? label+' · '+msgs.filter(m=>!m.sep).length+'개 발언' : '';
   if(html!==lastLog){ const box=$('#log'), atEnd=box.scrollTop+box.clientHeight>=box.scrollHeight-30; lastLog=html; box.innerHTML=html; if(atEnd) box.scrollTop=box.scrollHeight; }
