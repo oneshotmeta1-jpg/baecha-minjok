@@ -138,6 +138,7 @@ class Sim:
         self.overrides = {}         # 담당자가 바꾼 호퍼 {차량: 호퍼}
         self.safety = []            # 안전 경고 (덤프 반경 안 작업자) — 열림/확인/오탐지/자동 해제
         self.safety_seq = 0
+        self.near_miss = []         # 아차사고 기록 (R15, 영상 NEAR_MISS) — 사고 직전 위험 한 건씩
         self.series = []            # 10분마다 대기 차량 수
         self.busy_min = 0.0         # 하차구가 실제로 쓰인 시간(하차구·분)
         self.cap_min = 0.0          # 가동 중인 하차구 시간(하차구·분)
@@ -409,6 +410,15 @@ class Sim:
             return "ok"
         if typ == "URGENT_IN":
             self.events.append(ev)
+            return "ok"
+        if typ == "NEAR_MISS":             # 아차사고: 차가 이미 나갔어도 기록은 남긴다 (같은 id는 한 번)
+            if not p.get("id") or any(x["id"] == p["id"] for x in self.near_miss):
+                return "ignored"
+            self.events.append(ev)
+            self.near_miss.append({"id": p["id"], "t": t, "ts": ev.get("ts", "")[11:19] or self.hhmm(t), "cam_id": ev.get("cam_id"), "sector_id": sid,
+                                   "bay": p.get("bay"), "vehicle_id": vid, "rule": p.get("rule"), "rule_no": p.get("rule_no"), "level": p.get("level"),
+                                   "duration_s": p.get("duration_s"), "min_dist_m": p.get("min_dist_m"), "source": p.get("source", "video"),
+                                   "snapshot_t": p.get("snapshot_t"), "clip": p.get("clip"), "video": p.get("video"), "zone_id": p.get("zone_id")})
             return "ok"
         if typ in ("YARD_DOWN", "YARD_UP") and sid in self.sec_cfg:
             (self.sector_down if typ == "YARD_DOWN" else self.sector_up)(sid)
@@ -948,6 +958,7 @@ class Sim:
                     "up": sum(1 for s in sviews if s["status"] == "up"), "late": sum(d["late"] for d in self.done_trips)},
             "alerts": self.alerts[:40],
             "safety_open": [x for x in self.safety if x["status"] == "open"],
+            "near_miss": self.near_miss[-30:],
             "road": self.road_trucks(),
             "road_cfg": self.settings["road"],
             "routes": self.routes_view(),

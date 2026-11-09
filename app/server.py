@@ -24,6 +24,7 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 from app.runtime import REASONS, Runtime  # noqa: E402
 from app.sim import STEP, load  # noqa: E402
 from app.cams import cam_list  # noqa: E402
+from app import rois as roi_edit  # noqa: E402
 from app import auth  # noqa: E402
 from app.notify import Notifier  # noqa: E402
 
@@ -287,7 +288,23 @@ MEDIA = ROOT / CAMS.get("dir", "영상")
 
 @app.get("/api/cams")
 async def cams():
-    return {"cams": cam_list(CAMS, MEDIA), "time_scale": CAMS.get("time_scale", 1), "mode": "video" if rt.video else "sim"}
+    return {"cams": cam_list(CAMS, MEDIA, stand_in=load_stand_in()), "time_scale": CAMS.get("time_scale", 1), "mode": "video" if rt.video else "sim",
+            "near_miss": {k: CAMS.get("near_miss", {}).get(k) for k in ("level_sec", "rules")}}
+
+
+def load_stand_in():
+    p = DATA / "stand_in.json"
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {"cams": {}}
+
+
+def get_cams():
+    return CAMS
+
+
+def set_cams(cfg):
+    """구역(ROI) 저장 뒤 서버가 들고 있는 영상 채널 설정을 바꾼다 (R15)."""
+    global CAMS
+    CAMS = cfg
 
 
 @app.get("/api/panel2")
@@ -643,6 +660,7 @@ if __name__ == "__main__":
     auth.install(app, store,
                  no_auth=args.no_auth, secure_cookie=False, ingest_token=os.environ.get("DOCK_INGEST_TOKEN"),
                  shift_label=rt.rec.settings.get("shift", {}).get("label", "오후 교대"))
+    roi_edit.install(app, store, DATA / "cams.json", DATA / "rois.json", get_cams, set_cams, off=args.no_auth or store is None)
     host = "0.0.0.0" if args.lan else "127.0.0.1"
     print(f"이 PC: http://127.0.0.1:{args.port}/" + ("  (로그인 없이 --no-auth)" if args.no_auth else "  (로그인 필요 · 처음이면 /signup에서 관제 담당자로 가입 = 관리자)"))
     if args.lan:

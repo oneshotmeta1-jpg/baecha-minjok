@@ -8,6 +8,7 @@
 - 화면의 영상 반복 재생은 이벤트를 다시 넣지 않는다. 같은 파일을 두 번 실행해도 서버가 event_id로 중복을 거른다(결과 "duplicate").
 - 영상에는 계근 신호가 없어서, 영상에 처음 나온 차마다 GATE_IN을 1분 앞에 넣는다(원료·적재량은 가정, payload.assumed=true).
 - 영상 시각은 data/cams.json time_scale배로 늘린다(15초 클립 → 10분).
+- 아차사고(R15): 사람이 안 나오는 호퍼 영상에는 data/stand_in.json의 합성 사람을 섞어 판정한다(NEAR_MISS payload.source = stand_in).
 """
 import argparse
 import hashlib
@@ -20,6 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "vision"))
 from to_events import convert, video_rois  # noqa: E402
+import near_miss  # noqa: E402
 
 
 def eid(e, start, video, play):
@@ -29,20 +31,24 @@ def eid(e, start, video, play):
     return hashlib.sha1(k.encode("utf-8")).hexdigest()[:16]
 
 
-def build(start, cfg=None, sectors=None, settings=None, play=1):
+def build(start, cfg=None, sectors=None, settings=None, play=1, stand_in=None):
     cfg = cfg or json.loads((ROOT / "data" / "cams.json").read_text(encoding="utf-8"))
     sectors = sectors or json.loads((ROOT / "data" / "sectors.json").read_text(encoding="utf-8"))
     settings = settings or json.loads((ROOT / "data" / "settings.json").read_text(encoding="utf-8"))
     bc = {s["id"]: s.get("bay_cargo") or s["cargo"] for s in sectors["sectors"]}
     mix = [c for c, n in settings["fleet"]["cargo_mix"].items() for _ in range(n)]
+    stand_in = near_miss.load_stand_in() if stand_in is None else stand_in
+    nm_cfg = near_miss.config(cfg)
     out, report = [], []
     for c in cfg["cams"]:
         det = ROOT / cfg["dir"] / (Path(c["video"]).stem + ".det.json")
         if not det.exists():
             report.append((c["camera"], "det.json 없음"))
             continue
-        evs = convert(json.loads(det.read_text(encoding="utf-8")), start, video_rois(cfg, c["camera"]), scale=cfg.get("time_scale", 1), flush=True)
-        report.append((c["camera"], f"이벤트 {len(evs)}건"))
+        d = near_miss.merge_stand_in(json.loads(det.read_text(encoding="utf-8")), stand_in.get("cams", {}).get(c["camera"]))
+        evs = convert(d, start, video_rois(cfg, c["camera"]), scale=cfg.get("time_scale", 1), flush=True, nm_cfg=nm_cfg)
+        nms = [e for e in evs if e["type"] == "NEAR_MISS"]
+        report.append((c["camera"], f"이벤트 {len(evs)}건" + (f" · 아차사고 {len(nms)}건(" + ", ".join(e["payload"]["level"] + " " + e["payload"]["rule"] + ("·합성" if e["payload"]["source"] == "stand_in" else "") for e in nms) + ")" if nms else "")))
         first = {}
         for e in evs:
             first.setdefault(e["vehicle_id"], e)
