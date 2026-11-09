@@ -39,6 +39,8 @@ RULES = [
     ("GET", r"^/api/notify/log$", {"control"}),                                 # 알림 기록(받음 · 읽음 · 조치까지 초) — 관제
     ("*", r"^/api/notify/", {"control", "field", "driver"}),                    # 내 알림함 · 받음/읽음 표시(서버가 로그인한 사람 것만)
     ("POST", r"^/api/ingest$", {"control", "ingest"}),                          # 영상 모듈: 이 PC에서 또는 토큰
+    ("GET", r"^/api/cams(/live)?$", {"control", "field"}),                      # CAM 4채널 새 창(R17) — 현장은 담당 하역장 채널만(서버가 거름)
+    ("GET", r"^/media/", {"control", "field"}),                                 # 영상 · 탐지 결과 파일 (CAM 새 창)
     ("WS", r"^/ws$", {"control"}),                                              # 관제 화면 실시간 = 전체 상태
     ("WS", r"^/ws/m$", {"field", "driver"}),                                    # 모바일 실시간 = 역할별로 걸러 보냄
 ]
@@ -415,6 +417,13 @@ def install(app, store, no_auth=False, secure_cookie=False, ingest_token=None, s
             return await call_next(request)
         roles = allowed_roles(method, path)
         mobile = path == "/m" or path.startswith("/m/")
+        if path in ("/cams", "/web/cams.html"):              # CAM 4채널 새 창(R17): 관제 · 현장만, 운전자는 자기 화면으로
+            u = current(request)
+            if not u:
+                return RedirectResponse("/login", status_code=303)
+            if u["role"] not in ("control", "field"):
+                return RedirectResponse(home_of(u), status_code=303)
+            return await call_next(request)
         if path in ("/", "/index.html", "/web/index.html") or mobile:
             u = current(request)
             if not u:

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CAM 4채널 · 하역관제</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&family=Noto+Sans+KR:wght@500;700;800&display=swap">
+<style>
+/* CAM 4채널 새 창 (R17) — 관제실 두 번째 모니터용. 대시보드와 같은 그리기 코드(web/cam_view.js) */
+:root{--bg:#0f1012;--tile:#1b1d1f;--ink:#f3f3f1;--muted:#a3a7ab;--red:#FF2D46;--ok:#2F6FE4;--warn:#F0A020;--crit:#E8590C}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Inter,'Noto Sans KR',sans-serif}
+body{display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:12px;padding:8px 14px;font-size:14px;flex:none}
+header h1{font-size:16px;margin:0;font-weight:800}
+header .sp{flex:1}
+header .clock{font-weight:800;font-size:18px;font-variant-numeric:tabular-nums}
+header .hint{color:var(--muted);font-size:12px}
+header button{background:#2a2d31;color:var(--ink);border:0;border-radius:999px;padding:6px 12px;font:600 12.5px inherit;cursor:pointer}
+header button:hover{background:#3a3e43}
+header button[aria-pressed="true"]{background:var(--ink);color:#141414}
+#grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:8px;padding:0 8px 8px}
+#grid.one{grid-template-columns:1fr;grid-template-rows:1fr}
+#grid.one .tile:not(.focus){display:none}
+.tile{position:relative;background:var(--tile);border-radius:12px;overflow:hidden;min-height:0;min-width:0;cursor:zoom-in;outline:3px solid transparent;outline-offset:-3px;display:flex;align-items:center;justify-content:center}
+#grid.one .tile{cursor:zoom-out}
+.tile:focus-visible{outline-color:#8FB3FF}
+.tile .stage{position:relative;width:100%;aspect-ratio:16/9;max-height:100%}
+.tile video,.tile canvas.ov,.tile canvas.sim{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+.tile canvas.ov{pointer-events:none}
+.tile .top{position:absolute;left:8px;right:8px;top:8px;display:flex;gap:6px;align-items:center;z-index:3;pointer-events:none}
+.tile .nm{background:rgba(15,16,18,.78);padding:4px 10px;border-radius:999px;font-weight:800;font-size:14px}
+.tile .src{font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px;background:rgba(15,16,18,.7)}
+.tile .src.live{background:#D7263D}
+.tile .lv{font-size:12px;font-weight:800;padding:3px 9px;border-radius:999px;color:#fff}
+.tile .lv.ok{background:var(--ok)} .tile .lv.warn{background:var(--warn);color:#141414} .tile .lv.crit{background:var(--crit)} .tile .lv.down{background:var(--red)}
+.tile .sp{flex:1}
+.tile .tclock{background:rgba(15,16,18,.78);padding:4px 10px;border-radius:999px;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
+.tile .bot{position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;align-items:center;z-index:3}
+.tile .sum{background:rgba(15,16,18,.78);padding:4px 10px;border-radius:999px;font-size:12.5px;font-weight:600;pointer-events:none}
+.tile .det{margin-left:auto;background:rgba(243,243,241,.92);color:#141414;border:0;border-radius:999px;padding:4px 10px;font:700 12px inherit;cursor:pointer}
+.tile .alarm{display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:46px;z-index:3;background:var(--red);color:#fff;font-weight:800;font-size:14px;padding:6px 14px;border-radius:999px;white-space:nowrap;pointer-events:none}
+.tile.risk{outline-color:var(--red);animation:blink 1s steps(2,end) infinite}
+.tile.risk .alarm{display:block}
+@keyframes blink{50%{outline-color:rgba(255,45,70,.35)}}
+@media (prefers-reduced-motion:reduce){.tile.risk{animation:none}}
+.empty{grid-column:1/-1;grid-row:1/-1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:15px;text-align:center;padding:20px}
+@media (max-width:700px){#grid{grid-template-columns:1fr;grid-template-rows:none;overflow:auto} #grid .tile{min-height:56vw} header .hint{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>CAM 4채널</h1>
+  <span class="clock" id="clock">--:--</span>
+  <span class="hint" id="hint">채널 누르기 = 1채널 크게 · 1~4 선택 · Esc = 4분할 · F = 전체 화면</span>
+  <span class="sp"></span>
+  <button id="gridBtn" aria-pressed="true" title="Esc">4분할</button>
+  <button id="fsBtn" title="F">전체 화면</button>
+  <button id="dashBtn" title="대시보드 창으로">대시보드</button>
+</header>
+<main id="grid" aria-live="polite"><div class="empty">채널을 불러오는 중…</div></main>
+<script src="/web/cam_view.js"></script>
+<script>
+(async()=>{
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LV={ok:'원활',warn:'주의',crit:'혼잡',down:'정지'};
+const OV={box:true,id:true,zone:true,radius:true};
+
+/* 창 크기·위치 기억 — 대시보드가 다음에 열 때 같은 자리로 (같은 출처 localStorage) */
+function saveWin(){ try{ localStorage.setItem('camsWin',JSON.stringify({w:outerWidth,h:outerHeight,x:screenX,y:screenY})); }catch(e){} }
+let sw=null; addEventListener('resize',()=>{ clearTimeout(sw); sw=setTimeout(saveWin,400); }); addEventListener('beforeunload',saveWin);
+setInterval(()=>{ if(!document.hidden) saveWin(); },5000);   // 창 이동은 이벤트가 없어 가끔 기록
+
+let meta, live;
+try{ meta=await (await fetch('/api/cams')).json(); live=await (await fetch('/api/cams/live')).json(); }
+catch(e){ $('#grid').innerHTML='<div class="empty">채널을 불러오지 못했습니다. 로그인 상태를 확인하고 새로고침해 주세요.</div>'; return; }
+const VC=Object.fromEntries((meta.cams||[]).filter(c=>c.source==='video').map(c=>[c.camera,c]));
+const APR=((meta.near_miss||{}).rules||[]).find(x=>x.key==='approach'&&x.enabled)||null;
+const CH=live.cams;   // [{id,name,sector_id,...}] — 이 사람이 볼 수 있는 채널만(현장 = 담당 하역장)
+if(!CH.length){ $('#grid').innerHTML='<div class="empty">볼 수 있는 카메라가 없습니다(담당 하역장 없음).</div>'; return; }
+const DET={};
+const loadDet=async id=>{ const c=VC[id]; if(c&&c.det_url&&!(id in DET)){ DET[id]=null; try{ DET[id]=await (await fetch(c.det_url)).json(); }catch(e){} } };
+CH.forEach(c=>loadDet(c.id));
+
+$('#grid').innerHTML=CH.map((c,i)=>'<div class="tile" id="t-'+c.id+'" tabindex="0" role="button" aria-label="'+esc(c.id+' '+c.name)+' — 눌러서 크게/4분할">'+
+  '<div class="stage">'+(VC[c.id]?'<video muted loop autoplay playsinline preload="auto" src="'+esc(VC[c.id].video_url)+'"></video><canvas class="ov"></canvas>':'<canvas class="sim" width="1280" height="720"></canvas>')+'</div>'+
+  '<div class="top"><span class="nm">'+(i+1)+' · '+esc(c.id)+' '+esc(c.name)+'</span><span class="src'+(VC[c.id]?' live':'')+'">'+(VC[c.id]?'LIVE(영상)':'시뮬레이션')+'</span><span class="lv"></span><span class="sp"></span><span class="tclock"></span></div>'+
+  '<div class="alarm"></div>'+
+  '<div class="bot"><span class="sum"></span><button class="det" data-det="'+esc(c.id)+'" title="대시보드 창에서 이 채널 상세 열기">상세</button></div></div>').join('');
+
+/* 1채널 크게 ↔ 4분할 */
+let focus=null;
+function show(id){ focus=id; const g=$('#grid'); g.classList.toggle('one',!!id);
+  document.querySelectorAll('.tile').forEach(t=>t.classList.toggle('focus',t.id==='t-'+id));
+  $('#gridBtn').setAttribute('aria-pressed',String(!id)); if(id){ const t=$('#t-'+id); if(t) t.focus({preventScroll:true}); } }
+function openDetail(id){   // 대시보드 창의 채널 상세(#cam/CAM-0n)
+  const w=window.opener&&!window.opener.closed?window.opener:null;
+  try{ if(w){ w.location.hash='#cam/'+id; w.focus(); return; } }catch(e){}
+  window.open('/#cam/'+id,'dock_main');
+}
+$('#grid').addEventListener('click',e=>{ const d=e.target.closest('[data-det]'); if(d){ e.stopPropagation(); openDetail(d.dataset.det); return; }
+  const t=e.target.closest('.tile'); if(!t) return; const id=t.id.slice(2); show(focus===id?null:id); });
+$('#grid').addEventListener('dblclick',e=>{ const t=e.target.closest('.tile'); if(t) openDetail(t.id.slice(2)); });
+$('#gridBtn').addEventListener('click',()=>show(null));
+const fs=()=>{ if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); else document.documentElement.requestFullscreen().catch(()=>{}); };
+$('#fsBtn').addEventListener('click',fs);
+$('#dashBtn').addEventListener('click',()=>{ const w=window.opener&&!window.opener.closed?window.opener:null; if(w) w.focus(); else window.open('/','dock_main'); });
+addEventListener('keydown',e=>{ if(e.ctrlKey||e.metaKey||e.altKey) return;
+  if(e.key==='Escape'&&focus){ show(null); e.preventDefault(); }
+  else if(/^[1-4]$/.test(e.key)&&CH[+e.key-1]){ show(CH[+e.key-1].id); e.preventDefault(); }
+  else if(e.key==='f'||e.key==='F'||e.key==='ㄹ'){ fs(); e.preventDefault(); }
+  else if(e.key==='Enter'&&document.activeElement&&document.activeElement.classList.contains('tile')){ const id=document.activeElement.id.slice(2); show(focus===id?null:id); } });
+
+/* 상태 1초마다: 호퍼 상태 칩 · 요약 · 위험(안전 경고 · 최근 아차사고) */
+const hm=c=>(c||'').slice(11,16);
+let frameRisk={};
+function applyLive(L){ live=L; $('#clock').textContent=hm(L.clock)+(L.running?'':' · 멈춤');
+  L.cams.forEach(c=>{ const t=$('#t-'+c.id); if(!t) return;
+    const lv=c.status==='down'?'down':c.level, chip=t.querySelector('.lv');
+    chip.className='lv'+(lv?' '+lv:''); chip.textContent=lv?(LV[lv]+(c.congestion_pct!=null&&lv!=='down'?' '+c.congestion_pct+'%':'')):'';
+    chip.hidden=!lv; t.querySelector('.sum').textContent=c.summary; t.querySelector('.tclock').textContent=hm(L.clock); });
+  paintRisk(); }
+function paintRisk(){ (live.cams||[]).forEach(c=>{ const t=$('#t-'+c.id); if(!t) return;
+    const r=c.risk||frameRisk[c.id]; t.classList.toggle('risk',!!r);
+    t.querySelector('.alarm').textContent=r?(c.risk?c.risk.text+(c.risk.ts?' · '+c.risk.ts:''):'아차사고 위험 · '+r.text+' (영상)'):''; }); }
+applyLive(live);
+setInterval(async()=>{ try{ const r=await fetch('/api/cams/live'); if(r.status===401){ location.href='/login'; return; } if(r.ok) applyLive(await r.json()); }catch(e){} },1000);
+
+/* 그리기: 영상 채널 = 탐지 결과 겹쳐 그리기(대시보드와 같은 함수) · 시뮬레이션 채널 = 측면 그림 */
+(function loop(){
+  const fr={};
+  CH.forEach(c=>{ const t=$('#t-'+c.id); if(!t||t.offsetParent===null) return;
+    if(VC[c.id]){ const v=t.querySelector('video'), cv=t.querySelector('canvas.ov');
+      const r=CamView.drawOv(cv,VC[c.id],DET[c.id],v?v.currentTime:0,focus!==c.id,OV,APR); if(r) fr[c.id]=r; }
+    else { const cv=t.querySelector('canvas.sim'), L=live.cams.find(x=>x.id===c.id)||{};
+      if(L.sector){ const byId={}; CamView.renderHopperCam(cv,{id:c.id,name:c.name},L.sector,byId,hm(live.clock)); }
+      else CamView.renderYardCam(cv,{id:c.id,name:c.name},{vehicles:live.yard_vehicles||[]},hm(live.clock)); } });
+  const key=JSON.stringify(fr); if(key!==JSON.stringify(frameRisk)){ frameRisk=fr; paintRisk(); }
+  requestAnimationFrame(loop);
+})();
+document.title='CAM 4채널 · 하역관제';
+})();
+</script>
+</body>
+</html>
