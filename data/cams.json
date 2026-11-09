@@ -3,13 +3,15 @@
   "dir": "영상",
   "time_scale": 40,
   "near_miss": {
-    "_note": "아차사고 규칙(R15, vision/near_miss.py). 시간은 영상 초(time_scale 곱하기 전). 위험이 이어진 시간 0초 L1 주의 → 1초 L2 경고 → 2초 L3 하차 중지(SAFETY_ALERT). gap_sec 넘게 끊기면 한 건으로 닫음. 거리 = 사람 발끝↔트럭 박스 × 카메라별 m_per_px. 모두 가정값. ③~⑤는 구조만 있고 꺼져 있음.",
+    "_note": "아차사고 규칙(R15, vision/near_miss.py). 시간은 영상 초(time_scale 곱하기 전). 위험이 이어진 시간 0초 L1 주의 → 1초 L2 경고 → 2초 L3 하차 중지(SAFETY_ALERT, 규칙 ①②만). gap_sec 넘게 끊기면 한 건으로 닫음. 거리 = 사람 발끝↔트럭 박스 × 카메라별 m_per_px. 모두 가정값. ③ 접근은 R16에서 대기장(CAM-04)에 켬. ④⑤는 구조만 있고 꺼져 있음.",
     "level_sec": {
       "L2": 1.0,
       "L3": 2.0
     },
     "gap_sec": 0.5,
     "reverse_window_sec": 30,
+    "stand_in": false,
+    "_stand_in": "합성 사람 스위치(R16). false(기본) = 호퍼 영상에 data/stand_in.json 사람을 섞지 않음 → 호퍼 아차사고는 실제 영상에 사람이 나올 때만. true = R15처럼 시연용 합성 사람(기록에 '합성' 표시). 시뮬레이션의 호퍼 안전 경고 무작위 발생은 data/sectors.json safety.synthetic.",
     "rules": [
       {
         "no": 1,
@@ -26,9 +28,18 @@
       {
         "no": 3,
         "key": "approach",
-        "name": "트럭·사람 기준 거리 이하 접근",
-        "enabled": false,
-        "dist_m": 3
+        "name": "움직이는 트럭과 사람 기준 거리 이하 접근",
+        "enabled": true,
+        "_note": "R16 대기장(CAM-04) 실제 영상. 거리 = 사람 발끝↔트럭 박스, 사람 키 person_h_m로 m 환산. 3m 이하 L1 · 2m 이하(또는 1초) L2 · 1m 이하(또는 2초) L3. 최근 1초 동안 트럭 접지점이 max(20px, 박스 너비 10%) 넘게 움직여야 '움직이는 트럭'. 처음 보인 순간 0.8m 안 트럭은 그 사람이 내린 차로 보고 제외. 모두 가정값.",
+        "cams": ["CAM-04"],
+        "dist_m": 3,
+        "l2_m": 2,
+        "l3_m": 1,
+        "person_h_m": 1.7,
+        "move_win_sec": 1.0,
+        "move_px": 20,
+        "move_frac": 0.1,
+        "driver_m": 0.8
       },
       {
         "no": 4,
@@ -56,9 +67,8 @@
      ]},
     {"camera": "CAM-03", "sector_id": "C", "bay": 1, "video": "3호퍼 영상.mp4", "size": [1280, 720], "view": "측면", "m_per_px": 0.023,
      "zones": [
-       {"id": "C-BAY-1", "type": "하차", "name": "베이 1 정차 위치(오른쪽 원료 벽은 제외)", "points": [[150, 440], [980, 440], [980, 600], [150, 600]]},
-       {"id": "C-REAR-1", "type": "위험", "rule": "덤프 반경 5m", "active_when": "적재함 상승 중", "name": "베이 1 뒤 덤프 반경", "points": [[860, 300], [1000, 300], [1000, 600], [860, 600]]},
-       {"id": "C-BACK-1", "type": "위험", "rule": "후진 경로", "active_when": "베이 진입 30초 안", "name": "베이 1 진입·후진 경로", "points": [[150, 470], [410, 470], [410, 620], [150, 620]]}
+       {"id": "C-BAY-1", "type": "하차", "name": "베이 1 정차 위치(오른쪽 원료 벽은 제외)", "points": [[364, 176], [736, 172], [1001, 657], [89, 364]]},
+       {"id": "C-REAR-1", "type": "위험", "name": "베이 1 뒤 덤프 반경", "rule": "덤프 반경 5m", "active_when": "적재함 상승 중", "points": [[775, 170], [1013, 142], [1084, 463], [991, 591]]}
      ]},
     {"camera": "CAM-04", "sector_id": null, "video": "대기소 영상.mp4", "size": [1920, 1080], "view": "대기장 전경", "m_per_px": 0.03,
      "zones": [

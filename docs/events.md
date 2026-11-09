@@ -188,15 +188,26 @@ R2에서 팀이 제안한 `order_approved` 등 소문자 이름은 기존 형식
  "dump_deg": 50, "repeat": 0, "action": "앱 경고 · 하차 중지 요청 (가상)", "stand_in": "cam"}}
 ```
 
-### 아차사고 (R15)
+### 아차사고 (R15 · R16)
 
-- 판정: `vision/near_miss.py`, 규칙·단계 기준은 `data/cams.json` `near_miss`(가정값). ③ 접근 거리 · ④ 출입 금지 · ⑤ 대기선 넘음은 설정 항목만 있고 꺼져 있다.
-- 거리: 사람 발끝 ↔ 트럭 박스 가장 가까운 점 × 카메라별 `m_per_px`(가정). 시간은 영상 초(time_scale 곱하기 전).
-- 합성 사람: 호퍼 영상에는 사람이 없어 `data/stand_in.json`의 손으로 둔 궤적을 섞는다 → `source: "stand_in"`, 화면에 "합성" 표시. 실제 사람 영상이 생기면 이 파일을 비운다.
-- 기록: 서버는 `NEAR_MISS`를 차가 나간 뒤에 와도 받고(같은 id는 `ignored`), `GET /api/state`의 `near_miss`(최근 30건)로 준다. 단계 L3만 하차를 멈춘다(SAFETY_ALERT).
+- 판정: `vision/near_miss.py`, 규칙·단계 기준은 `data/cams.json` `near_miss`(가정값). ④ 출입 금지 · ⑤ 대기선 넘음은 설정 항목만 있고 꺼져 있다.
+- 거리(①②): 사람 발끝 ↔ 트럭 박스 가장 가까운 점 × 카메라별 `m_per_px`(가정). 시간은 영상 초(time_scale 곱하기 전).
+- **③ 접근(R16, 대기장 CAM-04)**: 구역(대기장 주차면) 안 사람과 **움직이는** 트럭(최근 1초 접지점 이동 ≥ max(20px, 박스 너비 10%)) 사이가 3m 이하.
+  거리는 사람 박스 키를 1.7m로 보고 환산(멀리 있을수록 작게 보이는 원근 보정). 단계 = 거리(3m L1 · 2m L2 · 1m L3)와 이어진 시간(1초 L2 · 2초 L3) 중 높은 것.
+  처음 보인 순간 0.8m 안에 있던 트럭은 그 사람이 내린 차(운전자)로 보고 짝짓지 않는다. 한 사람은 가장 가까운 트럭 하나. 대기장엔 하차가 없어 L3여도 `SAFETY_ALERT`는 없다.
+- 합성 사람: `data/stand_in.json`의 손으로 둔 궤적. **R16부터 기본 꺼짐**(`near_miss.stand_in: false`) — 켜면 호퍼 영상에 섞고 `source: "stand_in"`, 화면에 "합성" 표시.
+  시뮬레이션의 호퍼 안전 경고 무작위 발생(합성 작업자)도 `data/sectors.json` `safety.synthetic: false`로 꺼짐([위험 시연] 버튼은 그대로).
+- 기록: 서버는 `NEAR_MISS`를 차가 나간 뒤에 와도 받고(같은 id는 `ignored`), `GET /api/state`의 `near_miss`(최근 30건)로 준다. 단계 L3만 하차를 멈춘다(SAFETY_ALERT, 규칙 ①②).
+- 시뮬레이션 모드(R16): 서버가 켜질 때 영상 탐지 결과에서 **실제 사람으로 잡힌** 아차사고(source=video)를 뽑아, 영상 한 바퀴(클립 × time_scale ≈ 11분)마다 같은 장면을 기록한다(id 뒤 `-R<회차>`). L2·L3는 첫 회차에만 알림(`ALERT` kind 아차사고).
 
 ```json
 {"ts": "2026-11-09T08:08:10", "type": "NEAR_MISS", "source": "cam", "cam_id": "CAM-01", "sector_id": "A", "zone": "rear", "track_id": 1, "vehicle_id": "CAM-01-T1", "payload": {"id": "NM-CAM-01-901-84", "rule": "덤프 반경", "rule_no": 1, "level": "L3", "duration_s": 3.83, "min_dist_m": 1.8, "zone_id": "A-REAR-1", "bay": 1, "person_track": 901, "snapshot_t": 8.79, "clip": [6.42, 14.25], "source": "stand_in", "assumed": ["m_per_px", "level_sec"]}}
+```
+
+③ 접근(R16, 실제 영상 CAM-04 — 추가 필드: `rule_key`, `truck_track`, `truck_moving`, `truck_speed_kmh`(가정 환산), `dist_method`; `sector_id`·`bay`는 null, `zone`은 yard):
+
+```
+{"ts": "2026-11-09T08:06:52", "type": "NEAR_MISS", "source": "cam", "cam_id": "CAM-04", "sector_id": null, "zone": "yard", "track_id": 55, "vehicle_id": "CAM-04-T55", "payload": {"id": "NM-CAM-04-132-69", "rule": "사람·트럭 접근", "rule_no": 3, "rule_key": "approach", "level": "L3", "duration_s": 3.41, "min_dist_m": 0.0, "zone_id": "YARD-WAIT-1", "bay": null, "person_track": 132, "truck_track": 55, "truck_moving": true, "truck_speed_kmh": 7.0, "dist_method": "사람 키 1.7m 기준 환산", "snapshot_t": 9.02, "clip": [4.9, 12.31], "source": "video", "start_offset_s": 6.9, "assumed": ["person_h_m", "dist_m", "level_sec", "move_px"]}}
 ```
 
 ### 구역(ROI) 편집 (R15)
@@ -256,11 +267,12 @@ py tools/replay_events.py events.jsonl --speed 60
 | `ZONE_ENTER` zone=queue | CAM-01~03 대기선 | 대기선 |
 | `BAY_ENTER` / `BAY_EXIT` (payload `bay` 1~3) | CAM-01~03 하차장 | 하역 중 → 완료, 건별 작업 기록 1건 |
 | `SAFETY_ALERT` (payload `rule` 덤프 반경 5m · 후진 경로) | CAM | 안전 탭 · 베이 안전 중지 · 이후 호출 보류 |
-| `NEAR_MISS` (payload `level` L1~L3, `source` video · stand_in) | CAM | 아차사고 기록 · CAM 크게 보기 목록 (L3는 위 SAFETY_ALERT가 함께 옴) |
+| `NEAR_MISS` (payload `level` L1~L3, `source` video · stand_in) | CAM | 아차사고 기록 · CAM 크게 보기 목록 (①② L3는 위 SAFETY_ALERT가 함께 옴) · ③ 대기장 접근은 맵 대기장 표식(최근 10분) |
 | `YARD_DOWN` / `YARD_UP` | 현장 | 하역장 정지·복구 |
 
 `vision/to_events.py` 판정 규칙: 박스 아래 중심점(접지점)이 `data/rois.json` 구역 안에 3초 이상 → 진입, 3초 이상 밖·화면에서 사라짐 → 이탈.
 사람 발끝이 REAR-n(덤프 반경)에 있고 그 베이 트럭 박스가 세로/가로 ≥ 0.6(적재함 상승), 또는 BACK-n(후진 경로)에 있고 그 베이 진입 30초 안 → 아차사고(R15): 이어진 시간으로 L1 → L2(1초) → L3(2초, 이때 SAFETY_ALERT), 끝날 때 NEAR_MISS 한 건.
+대기장(CAM-04)에서 사람과 움직이는 트럭이 3m 이하 → 아차사고 ③ 접근(R16): 거리·지속 시간으로 L1~L3, 끝날 때 NEAR_MISS 한 건(SAFETY_ALERT 없음).
 
 ## 실제 영상 채널 (R9)
 

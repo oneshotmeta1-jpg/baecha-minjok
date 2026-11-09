@@ -99,6 +99,9 @@ def apply_assumptions(settings: dict, std_items: list, a: dict):
             settings[sec][key] = a[k]
 
 
+VIDEO_NM = []   # 서버가 켜질 때 채우는 실제 영상 아차사고 목록 (R16, app/cams.video_near_miss)
+
+
 class Sim:
     def __init__(self, seed: int = 7, on_event=None, mode: str = "recommend", assumptions: dict | None = None,
                  driven: bool = False):
@@ -126,6 +129,9 @@ class Sim:
         self.routes = {(r["from"], r["to"]): r for r in self.cfg["roads"]}
         self.mpp = self.cfg["map"]["mpp"]          # 화면 1px = 몇 m (실제 지도 축척)
         self.ore = self.cfg["ore"]
+        # 시뮬레이션 모드에서도 실제 영상(대기장 CAM-04 등)에서 잡힌 아차사고를 영상 한 바퀴(클립 × time_scale)마다 기록한다(R16).
+        # 목록은 서버가 켜질 때 영상 탐지 결과로 만든다(app/cams.video_near_miss). 테스트처럼 서버 없이 만들면 비어 있다.
+        self.video_nm = [] if (driven or mode != "recommend") else list(VIDEO_NM)
         self.reset()
 
     # ---------- setup ----------
@@ -139,6 +145,7 @@ class Sim:
         self.safety = []            # 안전 경고 (덤프 반경 안 작업자) — 열림/확인/오탐지/자동 해제
         self.safety_seq = 0
         self.near_miss = []         # 아차사고 기록 (R15, 영상 NEAR_MISS) — 사고 직전 위험 한 건씩
+        self.video_nm_done = set()  # 시뮬레이션 모드에서 재생한 영상 아차사고 (id, 회차)
         self.series = []            # 10분마다 대기 차량 수
         self.busy_min = 0.0         # 하차구가 실제로 쓰인 시간(하차구·분)
         self.cap_min = 0.0          # 가동 중인 하차구 시간(하차구·분)
@@ -314,7 +321,7 @@ class Sim:
         """반입마다 한 번 정한다(같은 시드·같은 반입이면 같은 결과): 이번 하차 중 작업자가 들어오는지, 언제, 계속 감지되는지."""
         if "safety_plan" in v:
             return v["safety_plan"]
-        if self.driven:                    # 영상 모드: 안전 경고는 영상(SAFETY_ALERT)으로만
+        if self.driven or not self.safety_cfg().get("synthetic", True):   # 영상 모드 · 합성 꺼짐(R16): 호퍼 안전 경고는 영상(실제 사람)으로만
             v["safety_plan"] = None
             return None
         c = self.safety_cfg()
@@ -328,6 +335,28 @@ class Sim:
                     "persist": rnd.random() < c.get("persist_prob", 0), "rule": "reverse" if rev else "dump"}
         v["safety_plan"] = plan
         return plan
+
+    def video_nm_tick(self, t):
+        """실제 영상 아차사고 재생: x = {off(분), cycle(분), cam_id, vehicle_id, payload}. 회차마다 id 뒤에 -R<n>."""
+        for x in self.video_nm:
+            if t < x["off"]:
+                continue
+            k = int((t - x["off"]) // x["cycle"])
+            if (x["payload"]["id"], k) in self.video_nm_done:
+                continue
+            self.video_nm_done.add((x["payload"]["id"], k))
+            p = dict(x["payload"], id=f'{x["payload"]["id"]}-R{k + 1}', play=k + 1)
+            self.emit("NEAR_MISS", "cam", vehicle={"id": x["vehicle_id"], "track_id": p.get("truck_track")}, sector_id=None,
+                      zone=x.get("zone") or "yard", cam_id=x["cam_id"], payload=p)
+            self.near_miss.append({"id": p["id"], "t": t, "ts": self.hhmm(t), "cam_id": x["cam_id"], "sector_id": None, "bay": p.get("bay"),
+                                   "vehicle_id": x["vehicle_id"], "rule": p.get("rule"), "rule_no": p.get("rule_no"), "rule_key": p.get("rule_key"),
+                                   "level": p.get("level"), "duration_s": p.get("duration_s"), "min_dist_m": p.get("min_dist_m"),
+                                   "source": p.get("source", "video"), "snapshot_t": p.get("snapshot_t"), "clip": p.get("clip"),
+                                   "video": p.get("video"), "zone_id": p.get("zone_id"), "truck_speed_kmh": p.get("truck_speed_kmh")})
+            if p.get("level") in ("L2", "L3") and k == 0:      # 같은 영상 장면이 반복되므로 알림은 첫 회차만(기록·맵 표시는 회차마다)
+                self.alert("crit" if p["level"] == "L3" else "warn", "아차사고",
+                           f"대기장 {x['cam_id']} · 움직이는 트럭 {x['vehicle_id']}과 작업자 {p.get('min_dist_m')}m ({p['level']}, 실제 영상)",
+                           "대기장 보행 동선·운전자 서행 확인 (CAM-04 장면 보기)")
 
     def safety_raise(self, v, dist=None, repeat=0, prev=None, rule="dump"):
         sid = v["sector"]
@@ -602,6 +631,8 @@ class Sim:
         self.t = round(self.t + STEP, 4)
         t = self.t
         st = self.settings
+        if self.video_nm:
+            self.video_nm_tick(t)
 
         # 1) 계근대(입) 도착
         while self.pending_arrivals and self.pending_arrivals[0]["arr_t"] <= t:

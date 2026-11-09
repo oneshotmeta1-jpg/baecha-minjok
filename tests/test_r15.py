@@ -4,7 +4,9 @@
 2. 합성 사람(stand_in) 보간 · 기록에 합성 표시
 3. NEAR_MISS 이벤트 → 서버 기록(같은 id 한 번) · docs/events.md 예시가 그대로 접수됨
 4. 구역 저장 API: 로그인 없으면 401 · 관리자 아니면 403 · 관리자 저장 + 처리 기록 · 잘못된 구역 422 · 파일 모양 유지
-5. 실제 영상(있으면): 시연 순서 3번 반복해도 같은 건수 · CAM-01 덤프 반경 L3(+하차 중지) · CAM-03 후진 경로 L2
+5. 실제 영상(있으면): 시연 순서 3번 반복해도 같은 건수 · 합성 사람 꺼짐(R16) → 호퍼 아차사고 없음 · CAM-04 실제 사람 접근 L3
+6. R16 접근 규칙 ③: 움직이는 트럭 ↔ 사람 거리 단계 · 서 있는 트럭 · 운전자 · 구역 밖 · 가장 가까운 트럭 하나
+판정 규칙 테스트는 tests/zones_fixture.json의 고정 구역을 쓴다(현장에서 다시 그린 data/cams.json 구역과 무관).
 """
 import json
 import re
@@ -31,6 +33,9 @@ def check(name, ok, note=""):
 
 
 CFG = json.loads((ROOT / "data" / "cams.json").read_text(encoding="utf-8"))
+_FIX = json.loads((ROOT / "tests" / "zones_fixture.json").read_text(encoding="utf-8"))
+for _c in CFG["cams"]:
+    _c["zones"] = _FIX[_c["camera"]]
 NM = near_miss.config(CFG)
 
 # 1) 다각형 · 규칙
@@ -74,7 +79,8 @@ check("기록 필드: 규칙 번호 · 지속 · 최소 거리(m) · 스냅샷 �
       p["rule_no"] == 1 and p["rule"] == "덤프 반경" and p["min_dist_m"] >= 0 and p["clip"][0] <= p["snapshot_t"] <= p["clip"][1] and p["source"] == "video", json.dumps(p, ensure_ascii=False)[:160])
 off = json.loads(json.dumps(NM)); off["rules"][0]["enabled"] = False
 check("규칙을 끄면(설정 enabled=false) 기록하지 않음", not nms(run([(5, 8)], nm=off)))
-check("규칙 ③~⑤는 설정 항목만 있고 꺼져 있음", [r["enabled"] for r in NM["rules"]] == [True, True, False, False, False])
+check("규칙 ①② 켜짐 · ③ 접근은 대기장(CAM-04)만 켜짐(R16) · ④⑤ 꺼짐", [r["enabled"] for r in NM["rules"]] == [True, True, True, False, False]
+      and near_miss.rule(NM, "approach")["cams"] == ["CAM-04"])
 # 규칙 ② 후진 경로: CAM-03 C-BACK-1, 베이 진입(3초 유지) 뒤 30초 안
 BACK = [250, 420, 290, 560]
 def run3(person_at, until=45.0):
@@ -96,6 +102,14 @@ fake = {"size": [1280, 720], "frames": [{"t": t / 4, "cam_id": "CAM-01", "object
 merged = near_miss.merge_stand_in(fake, [{"track_id": 99, "keys": [[5, 980, 640, 50, 160], [8, 985, 640, 50, 160]]}])
 sm = nms(convert(merged, "2026-11-09T08:00:00", video_rois(CFG, "CAM-01"), scale=1, flush=True, nm_cfg=NM))
 check("합성 사람으로 생긴 기록은 source=stand_in", len(sm) == 1 and sm[0]["payload"]["source"] == "stand_in", sm and sm[0]["payload"]["level"])
+
+check("합성 사람 스위치: 기본 꺼짐(cams.json near_miss.stand_in=false)", near_miss.stand_in_on(NM) is False)
+from app.cams import cam_list  # noqa: E402
+with tempfile.TemporaryDirectory() as _td:
+    _on = json.loads(json.dumps(CFG)); _on["near_miss"]["stand_in"] = True
+    _cl0, _cl1 = cam_list(CFG, Path(_td), stand_in=SI), cam_list(_on, Path(_td), stand_in=SI)
+check("화면(/api/cams): 꺼져 있으면 합성 사람 궤적을 보내지 않음 · 켜면 보냄",
+      all(not c["stand_in"] for c in _cl0) and any(c["stand_in"] for c in _cl1))
 
 # 3) 서버 기록 · 문서 예시
 from app.runtime import Runtime  # noqa: E402
@@ -177,10 +191,76 @@ if all((ROOT / CFG["dir"] / (Path(c["video"]).stem + ".det.json")).exists() for 
         runs.append((tuple((x["cam_id"], x["rule"], x["level"], x["source"]) for x in rv.rec.near_miss), len(rv.rec.safety)))
     check("시연 3번 반복: 같은 아차사고 건수 · 같은 안전 경고 수", len(set(runs)) == 1, str(runs[0]))
     nm0 = dict(((c, r), (lv, s)) for c, r, lv, s in runs[0][0])
-    check("CAM-01 덤프 반경 L3(합성) · CAM-03 후진 경로 L2(합성) · L3만 안전 경고",
-          nm0.get(("CAM-01", "덤프 반경")) == ("L3", "stand_in") and nm0.get(("CAM-03", "후진 경로")) == ("L2", "stand_in") and runs[0][1] == 1, str(nm0))
+    check("합성 사람 꺼짐: 호퍼(CAM-01~03) 아차사고·안전 경고 없음 · 기록은 모두 실제 영상(source=video)",
+          not any(c in ("CAM-01", "CAM-02", "CAM-03") for c, _r in nm0) and runs[0][1] == 0 and all(s == "video" for _lv, s in nm0.values()), str(nm0))
+    apr = [x for x in runs[0][0] if x[0] == "CAM-04"]
+    check("대기장 CAM-04 실제 영상: 움직이는 트럭과 사람 접근 2건 모두 L3", [x[1:] for x in apr] == [("사람·트럭 접근", "L3", "video")] * 2, str(apr))
+    _on = json.loads(json.dumps(json.loads((ROOT / "data" / "cams.json").read_text(encoding="utf-8")))); _on["near_miss"]["stand_in"] = True
+    for _c in _on["cams"]:
+        _c["zones"] = _FIX[_c["camera"]] if _c["camera"] != "CAM-04" else _c["zones"]
+    evs_on, _ = ingest_videos.build("2026-11-09T08:00:00", cfg=_on)
+    check("스위치를 켜면 R15처럼 합성 사람 기록(source=stand_in, '합성')이 다시 생김",
+          any(e["type"] == "NEAR_MISS" and e["payload"]["source"] == "stand_in" for e in evs_on))
 else:
     print("건너뜀 실제 영상 시연 — 영상/*.det.json 없음 (py vision/detect_video.py)")
+
+# 6) R16 접근 규칙 ③ (대기장 CAM-04, 1920×1080)
+PH = lambda x, y, tid=7, h=60: {"track_id": tid, "cls": "person", "bbox": [x - 12, y - h, x + 12, y]}
+
+
+def run4(truck_box_at, people_at, until=12.0, step=0.25, nm=None):
+    """truck_box_at(t) → 트럭 박스 목록[(tid, bbox)], people_at(t) → 사람 목록"""
+    fr, t = [], 0.0
+    while t <= until:
+        objs = [{"track_id": tid, "cls": "truck", "bbox": b} for tid, b in truck_box_at(t)] + people_at(t)
+        fr.append({"t": round(t, 2), "cam_id": "CAM-04", "objects": objs})
+        t += step
+    return nms(convert({"size": [1920, 1080], "frames": fr}, "2026-11-09T08:00:00", video_rois(CFG, "CAM-04"), scale=1, flush=True, nm_cfg=nm or NM))
+
+
+# 트럭이 오른쪽에서 왼쪽으로 초당 60px(박스 너비 300) — 사람(키 60px → 1px = 1.7/60 m)은 x=1000에 서 있음
+mv_truck = lambda t: [(55, [1600 - 60 * t, 300, 1900 - 60 * t, 450])]
+stand = lambda t: [PH(1000, 400)]
+a1 = run4(mv_truck, stand)
+check("접근 ③: 움직이는 트럭이 사람에게 다가오면 한 건 · L3 · 최소 거리 0m · 출처 실제 영상 · SAFETY_ALERT 없음",
+      len(a1) == 1 and a1[0]["payload"]["level"] == "L3" and a1[0]["payload"]["min_dist_m"] == 0 and a1[0]["payload"]["source"] == "video"
+      and a1[0]["payload"]["rule_no"] == 3 and a1[0]["zone"] == "yard" and a1[0]["payload"]["bay"] is None,
+      json.dumps(a1[0]["payload"], ensure_ascii=False)[:200] if a1 else "없음")
+# 거리 단계만 보기: 지속 시간 단계가 오르지 않게 level_sec를 크게
+long_ = json.loads(json.dumps(NM)); long_["level_sec"] = {"L2": 99, "L3": 99}
+def stop_at(gap_px):   # 트럭이 사람 오른쪽 gap_px 앞에서 멈추지 않고 그 거리로 지나감(위아래로 비켜 지나감)
+    return lambda t: [(55, [1600 - 60 * t, 400 + gap_px, 1900 - 60 * t, 530 + gap_px])]   # 박스 위쪽이 사람 발끝(y=400)보다 gap_px 아래
+lv = [(g, [x["payload"]["level"] for x in run4(stop_at(g), stand, nm=long_)]) for g in (90, 50, 20)]   # 2.6m · 1.4m · 0.6m 아래로 비켜 감
+check("접근 ③ 거리 단계: 3m 이하 L1 · 2m 이하 L2 · 1m 이하 L3 (가정값)", [x[1] for x in lv] == [["L1"], ["L2"], ["L3"]], str(lv))
+park = lambda t: [(2, [1020, 300, 1300, 450])]
+check("서 있는 트럭 옆 사람(바로 옆이어도)은 아차사고 아님", not run4(park, stand))
+drv = lambda t: [PH(1010, 400, tid=8)] if t >= 1 else []
+mv_slow_start = lambda t: [(55, [1020 - (60 * (t - 4) if t > 4 else 0), 300, 1300 - (60 * (t - 4) if t > 4 else 0), 450])]
+check("운전자 제외: 트럭 바로 옆에서 처음 나타난 사람은 그 트럭이 움직여도 아차사고 아님", not run4(mv_slow_start, drv))
+outside = lambda t: [PH(1000, 260)]           # 대기장 구역(y ≥ 285) 밖
+check("대기장 구역 밖 사람은 판정하지 않음", not run4(lambda t: [(55, [1600 - 60 * t, 150, 1900 - 60 * t, 300])], outside))
+two = lambda t: [(55, [1600 - 60 * t, 300, 1900 - 60 * t, 450]), (56, [1700 - 60 * t, 300, 2000 - 60 * t, 450])]
+check("한 사람은 가장 가까운 움직이는 트럭 하나로 한 건", len(run4(two, stand)) == 1)
+off3 = json.loads(json.dumps(NM)); near_miss.rule(off3, "approach")["enabled"] = False
+check("규칙 ③을 끄면 기록하지 않음", not run4(mv_truck, stand, nm=off3))
+oth = json.loads(json.dumps(NM)); near_miss.rule(oth, "approach")["cams"] = ["CAM-09"]
+check("규칙 ③은 지정한 카메라(cams)에서만", not run4(mv_truck, stand, nm=oth))
+
+# 7) 시뮬레이션 모드: 영상 아차사고 재생 · 합성 안전 경고 꺼짐
+from app import sim as SM  # noqa: E402
+sav = list(SM.VIDEO_NM)
+SM.VIDEO_NM[:] = [{"off": 3.0, "cycle": 11.0, "cam_id": "CAM-04", "vehicle_id": "CAM-04-T55", "zone": "yard",
+                   "payload": {"id": "NM-X", "rule": "사람·트럭 접근", "rule_no": 3, "rule_key": "approach", "level": "L3", "min_dist_m": 0.0,
+                               "duration_s": 3.4, "source": "video", "snapshot_t": 9.0, "clip": [4.9, 12.3]}}]
+rs = Runtime(7)
+rs.advance(30)
+SM.VIDEO_NM[:] = sav
+ids = [x["id"] for x in rs.rec.near_miss]
+check("시뮬레이션 모드: 실제 영상 아차사고를 영상 한 바퀴(11분)마다 기록 · 알림은 첫 회차만",
+      ids == ["NM-X-R1", "NM-X-R2", "NM-X-R3"] and sum(a["kind"] == "아차사고" for a in rs.rec.alerts_all) == 1, str(ids))
+rs2 = Runtime(7); rs2.advance(240)
+check("시뮬레이션 모드: 호퍼 합성 안전 경고(무작위 작업자) 꺼짐 · 서버 없이 만들면 영상 아차사고 목록도 비어 있음",
+      not rs2.rec.safety and not rs2.rec.near_miss, f"{len(rs2.rec.safety)}건")
 
 bad_r = [r for r in results if not r[1]]
 print(f"\n{len(results) - len(bad_r)}/{len(results)} 통과")
