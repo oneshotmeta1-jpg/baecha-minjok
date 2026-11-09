@@ -1776,7 +1776,7 @@ async function loadAdmin(){
   admBadge(admData.pending); $('#admPendN').textContent=pending.length+'건';
   $('#admPending').innerHTML=pending.length?'<table><thead><tr><th>신청</th><th>역할</th><th>이름 · 아이디</th><th>담당 · 차량</th><th>알림 동의</th><th></th></tr></thead><tbody>'+pending.map(u=>
     '<tr><td class="num">'+esc(new Date(u.created_at*1000).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}))+'</td><td>'+esc(u.role_name)+'</td><td>'+who(u)+'</td><td>'+extra(u)+'</td><td>'+consentTxt(u.consent)+'</td>'+
-    '<td><div class="acts"><button class="pill-btn dark" data-ad="approve" data-uid="'+u.id+'">승인</button><button class="pill-btn danger" data-ad="reject" data-uid="'+u.id+'">반려</button></div></td></tr>').join('')+'</tbody></table>'
+    '<td><div class="acts"><button class="pill-btn dark" data-ad="approve" data-uid="'+u.id+'">승인</button><button class="pill-btn danger" data-ad="reject" data-uid="'+u.id+'">반려</button><button class="pill-btn" data-ad="delete" data-uid="'+u.id+'">삭제</button></div></td></tr>').join('')+'</tbody></table>'
     :'<div class="empty">승인을 기다리는 신청이 없어요.</div>';
   $('#admUsers').innerHTML=all.length?'<table><thead><tr><th>상태</th><th>역할</th><th>이름 · 아이디</th><th>담당 · 차량 · 권한</th><th>처리</th></tr></thead><tbody>'+all.map(u=>{
     const me=ME&&u.login_id===ME.login_id;
@@ -1784,11 +1784,12 @@ async function loadAdmin(){
       '<button class="pill-btn" data-ad="role" data-uid="'+u.id+'">역할 · 담당</button>'+
       (u.status==='disabled'?'<button class="pill-btn" data-ad="enable" data-uid="'+u.id+'">다시 사용</button>':(u.status==='active'&&!me?'<button class="pill-btn danger" data-ad="disable" data-uid="'+u.id+'">사용 중지</button>':''))+
       (u.role==='control'&&u.status==='active'?'<button class="pill-btn" data-ad="admin" data-on="'+(u.is_admin?0:1)+'" data-uid="'+u.id+'">'+(u.is_admin?'관리자 해제':'관리자 지정')+'</button>':'')+
-      '<button class="pill-btn" data-ad="reset_password" data-uid="'+u.id+'">비밀번호 초기화</button>';
+      '<button class="pill-btn" data-ad="reset_password" data-uid="'+u.id+'">비밀번호 초기화</button>'+
+      (me?'':'<button class="pill-btn danger" data-ad="delete" data-uid="'+u.id+'">삭제</button>');
     return '<tr><td><span class="st '+u.status+'">'+ST_KO[u.status]+'</span>'+(u.reject_reason?'<span class="cap">사유: '+esc(u.reject_reason)+'</span>':'')+'</td><td>'+esc(u.role_name)+'</td><td>'+who(u)+(me?' <span class="chip">나</span>':'')+'</td><td>'+extra(u)+'</td><td><div class="acts">'+acts+'</div></td></tr>'; }).join('')+'</tbody></table>'
     :'<div class="empty">조건에 맞는 계정이 없어요.</div>';
   $('#admLog').innerHTML=admData.log.length?'<table><thead><tr><th>시각</th><th>처리한 사람</th><th>대상</th><th>처리</th><th>내용</th></tr></thead><tbody>'+admData.log.map(l=>
-    '<tr><td class="num">'+esc(l.ts)+'</td><td>'+esc(l.by||'—')+'</td><td>'+esc(l.to||'—')+' <span class="cap" style="display:inline">'+esc(l.to_id||'')+'</span></td><td>'+esc(({approve:'승인',reject:'반려',role:'역할 변경',disable:'사용 중지',enable:'다시 사용',admin:'관리자 지정/해제',reset_password:'비밀번호 초기화',change_password:'비밀번호 변경',roi:'구역(ROI) 저장'})[l.action]||l.action)+'</td><td>'+esc(l.detail||'')+'</td></tr>').join('')+'</tbody></table>'
+    '<tr><td class="num">'+esc(l.ts)+'</td><td>'+esc(l.by||'—')+'</td><td>'+esc(l.to||'—')+' <span class="cap" style="display:inline">'+esc(l.to_id||'')+'</span></td><td>'+esc(({delete:'계정 삭제',approve:'승인',reject:'반려',role:'역할 변경',disable:'사용 중지',enable:'다시 사용',admin:'관리자 지정/해제',reset_password:'비밀번호 초기화',change_password:'비밀번호 변경',roi:'구역(ROI) 저장'})[l.action]||l.action)+'</td><td>'+esc(l.detail||'')+'</td></tr>').join('')+'</tbody></table>'
     :'<div class="empty">아직 처리한 기록이 없어요.</div>';
 }
 function dlg(title,body,buttons){ $('#admDlgT').textContent=title; $('#admDlgB').innerHTML=body; $('#admDlgE').textContent=''; $('#admDlgF').innerHTML=buttons; $('#admDlg').hidden=false;
@@ -1803,6 +1804,7 @@ $('#admDlg').addEventListener('click',async e=>{
     if(a==='reject') body={reason:$('#admReason').value};
     if(a==='role') body={role:$('#admNewRole').value,hoppers:[...document.querySelectorAll('#admHops input:checked')].map(x=>x.value)};
     if(a==='admin') body={on:b.dataset.on==='1'};
+    if(a==='delete') body={confirm:$('#admDelConfirm').value};
     const d=await adminDo(uid,a,body);
     if(d.temp_password){ dlg('임시 비밀번호','<p class="cap" style="margin:0">지금 한 번만 보여요. 본인에게 직접 알려 주세요. 다음 로그인 때 새 비밀번호로 바꾸게 돼요.</p><div class="tmp">'+esc(d.temp_password)+'</div>','<button class="pill-btn dark" data-x="1">확인했어요</button>'); }
     else closeDlg();
@@ -1820,6 +1822,8 @@ $('#setAdmin').addEventListener('click',e=>{
   else if(a==='disable') dlg(u.name+' 사용 중지','<p class="cap" style="margin:0">지금 로그인한 기기도 바로 로그아웃돼요. [다시 사용]으로 되돌릴 수 있어요.</p>',go('사용 중지','danger'));
   else if(a==='enable') dlg(u.name+' 다시 사용','<p class="cap" style="margin:0">다시 로그인할 수 있게 돼요.</p>',go('다시 사용'));
   else if(a==='admin') dlg(u.name+(b.dataset.on==='1'?' 관리자 지정':' 관리자 해제'),'<p class="cap" style="margin:0">관리자는 이 가입 승인 탭을 쓸 수 있어요.</p>',go(b.dataset.on==='1'?'지정':'해제','dark',b.dataset.on));
+  else if(a==='delete') dlg(u.name+' 계정 삭제','<p class="cap" style="margin:0;color:#D7263D;font-weight:700">되돌릴 수 없어요.</p><p class="cap" style="margin:0">계정 · 로그인 · 받은 알림이 지워지고, 지금 로그인한 기기는 바로 로그아웃돼요. 처리 기록에는 누구를 지웠는지 남아요. 다시 쓰려면 새로 가입해야 해요.'+(u.role==='driver'?' (지운 운전자의 지난 운행 기록은 운영 분석에 그대로 남아요.)':'')+'</p>'+
+      '<label class="cap">확인을 위해 아이디 <b>'+esc(u.login_id)+'</b> 를 똑같이 입력해 주세요<input id="admDelConfirm" autocomplete="off" style="width:100%;font:inherit;border:1px solid var(--line-2);border-radius:12px;padding:10px;margin-top:4px"></label>',go('삭제','danger'));
   else if(a==='reset_password') dlg(u.name+' 비밀번호 초기화','<p class="cap" style="margin:0">임시 비밀번호를 만들어 한 번만 보여 줘요. 지금 로그인한 기기는 로그아웃돼요.</p>',go('초기화','danger'));
 });
 ['#admQ'].forEach(id=>$(id).addEventListener('input',()=>{ clearTimeout(window.__admT); window.__admT=setTimeout(loadAdmin,250); }));

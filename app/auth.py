@@ -255,7 +255,14 @@ def _admin_methods():
     def recent_log(self, limit=20):
         rows = self.db.execute("""SELECT l.ts, a.name, t.name, t.login_id, l.action, l.detail FROM auth_log l
                                   LEFT JOIN users a ON a.id=l.actor_id LEFT JOIN users t ON t.id=l.target_id ORDER BY l.id DESC LIMIT ?""", (limit,)).fetchall()
-        return [{"ts": time.strftime("%m-%d %H:%M", time.localtime(r[0])), "by": r[1], "to": r[2], "to_id": r[3], "action": r[4], "detail": r[5]} for r in rows]
+        out = []
+        for r in rows:
+            to, to_id = r[2], r[3]
+            if to is None and r[4] == "delete" and r[5]:
+                parts = r[5].split(" · ")
+                to, to_id = parts[0] + " (삭제됨)", parts[1] if len(parts) > 1 else ""
+            out.append({"ts": time.strftime("%m-%d %H:%M", time.localtime(r[0])), "by": r[1], "to": to, "to_id": to_id, "action": r[4], "detail": r[5]})
+        return out
 
     def kill_sessions(self, uid):
         self.db.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
@@ -326,6 +333,19 @@ def _admin_methods():
                 raise AdminError("마지막 관리자는 해제할 수 없어요.")
             self.db.execute("UPDATE users SET is_admin=? WHERE id=?", (int(on), uid))
             msg, detail = f"{t['name']} 관리자 {'지정' if on else '해제'}", ""
+        elif action == "delete":
+            if (kw.get("confirm") or "").strip() != t["login_id"]:
+                raise AdminError("삭제하려면 아이디를 똑같이 입력해 주세요.")
+            if t["id"] == actor["id"]:
+                raise AdminError("자기 자신은 삭제할 수 없어요.")
+            if t["is_admin"] and not self._admins(exclude=uid):
+                raise AdminError("마지막 관리자는 삭제할 수 없어요.")
+            self.kill_sessions(uid)
+            self.db.execute("DELETE FROM fails WHERE login_id=?", (t["login_id"],))
+            if self.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='notifications'").fetchone():
+                self.db.execute("DELETE FROM notifications WHERE user_id=?", (uid,))
+            self.db.execute("DELETE FROM users WHERE id=?", (uid,))
+            msg, detail = f"{t['name']} 계정 삭제", f"{t['name']} · {t['login_id']} · {ROLES[t['role']]}"   # 지운 뒤에도 기록에서 누구였는지 보이게
         elif action == "reset_password":
             tmp = "".join(secrets.choice("abcdefghjkmnpqrstuvwxyz") for _ in range(4)) + "".join(secrets.choice("23456789") for _ in range(4))
             salt, h = hash_pw(tmp)
@@ -362,7 +382,7 @@ def _admin_methods():
 
 _admin_methods()
 
-ADMIN_NAMES = {"approve": "승인", "reject": "반려", "role": "역할 변경", "disable": "사용 중지", "enable": "다시 사용", "admin": "관리자 지정/해제",
+ADMIN_NAMES = {"delete": "계정 삭제", "approve": "승인", "reject": "반려", "role": "역할 변경", "disable": "사용 중지", "enable": "다시 사용", "admin": "관리자 지정/해제",
                "reset_password": "비밀번호 초기화", "change_password": "비밀번호 변경"}
 
 GUEST = {"id": 0, "login_id": "-", "role": "control", "role_name": ROLES["control"], "name": "관제 담당자", "is_admin": True, "no_auth": True}

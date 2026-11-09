@@ -125,6 +125,26 @@ check("처리 기록: 승인 · 반려 · 중지 · 다시 사용 · 역할 · �
       {"approve", "reject", "disable", "enable", "role", "admin", "reset_password", "change_password"} <= set(acts) and lg[0]["action"] == "change_password", ", ".join(acts[:8]))
 check("기록에 누가 · 누구를 · 사유", any(l["action"] == "reject" and l["by"] == "관리자" and l["to"] == "현장하나" and l["detail"] == "사번 확인 불가" for l in lg))
 
+# 8) 계정 삭제
+signup(c0, role="field", emp_no="DEL1", dept="원료입고팀", hoppers=["C"], name="지울사람")
+uid = {u["login_id"]: u["id"] for u in st.list_users()}
+ctl2.post(f"/api/admin/users/{uid['DEL1']}/approve")
+dl, _ = login("DEL1")
+check("삭제는 아이디를 똑같이 입력해야 함", ctl2.post(f"/api/admin/users/{uid['DEL1']}/delete", json={"confirm": "DEL"}).status_code == 409)
+check("관리자가 아니면 삭제 403", fld.post(f"/api/admin/users/{uid['DEL1']}/delete", json={"confirm": "DEL1"}).status_code in (401, 403))
+check("자기 자신은 삭제 못 함", ctl2.post(f"/api/admin/users/{uid['CTL2']}/delete", json={"confirm": "CTL2"}).status_code == 409)
+r = ctl2.post(f"/api/admin/users/{uid['DEL1']}/delete", json={"confirm": "DEL1"})
+check("삭제 → 목록에서 사라지고, 로그인해 있던 기기는 바로 401, 같은 아이디로 로그인 안 됨",
+      r.status_code == 200 and not st.user(login_id="DEL1") and dl.get("/api/me").status_code == 401 and login("DEL1")[1].status_code == 401)
+check("삭제한 계정의 알림 · 세션도 지워짐", not st.db.execute("SELECT 1 FROM notifications WHERE user_id=?", (uid["DEL1"],)).fetchone()
+      and not st.db.execute("SELECT 1 FROM sessions WHERE user_id=?", (uid["DEL1"],)).fetchone())
+lg = ctl2.get("/api/admin/users").json()["log"][0]
+check("처리 기록에 누구를 지웠는지 남음(삭제됨 표시)", lg["action"] == "delete" and lg["to"] == "지울사람 (삭제됨)" and lg["to_id"] == "DEL1", str(lg))
+check("지운 아이디로 다시 가입할 수 있음", signup(c0, role="field", emp_no="DEL1", dept="원료입고팀", hoppers=["C"], name="다시").status_code == 200)
+uid = {u["login_id"]: u["id"] for u in st.list_users()}
+st.admin_do(st.user(login_id="CTL2"), uid["ADM1"], "admin", on=False) if st.user(login_id="ADM1")["is_admin"] else None
+check("마지막 관리자는 삭제 못 함(다른 관리자가 지우려 해도)", st._admins() == 1 and ctl2.post(f"/api/admin/users/{uid['CTL2']}/delete", json={"confirm": "CTL2"}).status_code == 409)
+
 bad = [x for x in results if not x[1]]
 print(f"\n{len(results) - len(bad)}/{len(results)} 통과")
 sys.exit(1 if bad else 0)
