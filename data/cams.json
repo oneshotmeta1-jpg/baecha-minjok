@@ -4,25 +4,53 @@
   "time_scale": 40,
   "near_miss": {
     "_note": "아차사고 규칙(R15, vision/near_miss.py). 시간은 영상 초(time_scale 곱하기 전). 위험이 이어진 시간 0초 L1 주의 → 1초 L2 경고 → 2초 L3 하차 중지(SAFETY_ALERT). gap_sec 넘게 끊기면 한 건으로 닫음. 거리 = 사람 발끝↔트럭 박스 × 카메라별 m_per_px. 모두 가정값. ③~⑤는 구조만 있고 꺼져 있음.",
-    "level_sec": {"L2": 1.0, "L3": 2.0},
+    "level_sec": {
+      "L2": 1.0,
+      "L3": 2.0
+    },
     "gap_sec": 0.5,
     "reverse_window_sec": 30,
     "rules": [
-      {"no": 1, "key": "dump", "name": "적재함 상승 중 덤프 반경 안 사람", "enabled": true},
-      {"no": 2, "key": "reverse", "name": "베이 진입 직후 후진 경로 안 사람", "enabled": true},
-      {"no": 3, "key": "approach", "name": "트럭·사람 기준 거리 이하 접근", "enabled": false, "dist_m": 3},
-      {"no": 4, "key": "no_entry", "name": "출입 금지 구역 진입", "enabled": false},
-      {"no": 5, "key": "queue_cross", "name": "호출 전 대기선 넘어 호퍼 진입", "enabled": false}
+      {
+        "no": 1,
+        "key": "dump",
+        "name": "적재함 상승 중 덤프 반경 안 사람",
+        "enabled": true
+      },
+      {
+        "no": 2,
+        "key": "reverse",
+        "name": "베이 진입 직후 후진 경로 안 사람",
+        "enabled": true
+      },
+      {
+        "no": 3,
+        "key": "approach",
+        "name": "트럭·사람 기준 거리 이하 접근",
+        "enabled": false,
+        "dist_m": 3
+      },
+      {
+        "no": 4,
+        "key": "no_entry",
+        "name": "출입 금지 구역 진입",
+        "enabled": false
+      },
+      {
+        "no": 5,
+        "key": "queue_cross",
+        "name": "호출 전 대기선 넘어 호퍼 진입",
+        "enabled": false
+      }
     ]
   },
   "cams": [
     {"camera": "CAM-01", "sector_id": "A", "bay": 1, "video": "1호퍼 영상.mp4", "size": [1280, 720], "view": "측면", "m_per_px": 0.016,
      "zones": [
-       {"id": "A-BAY-1", "type": "하차", "name": "베이 1 정차 위치", "points": [[150, 480], [960, 480], [960, 650], [150, 650]]},
-       {"id": "A-REAR-1", "type": "위험", "rule": "덤프 반경 5m", "active_when": "적재함 상승 중", "name": "베이 1 뒤 덤프 반경", "points": [[820, 380], [1110, 380], [1110, 700], [820, 700]]}
+       {"id": "A-BAY-1", "type": "하차", "name": "베이 1 정차 위치", "points": [[361, 313], [865, 385], [708, 595], [204, 457]]},
+       {"id": "A-REAR-1", "type": "위험", "name": "베이 1 뒤 덤프 반경", "rule": "덤프 반경 5m", "active_when": "적재함 상승 중", "points": [[872, 400], [1102, 447], [1105, 380], [1031, 661], [717, 595]]}
      ]},
-    {"camera": "CAM-02", "sector_id": "B", "bay": 1, "video": "2호퍼 영상.mp4", "size": [1280, 720], "view": "후면", "m_per_px": 0.02,
-     "limit": "후면(뒤에서 본) 실내 영상 — 사전학습 YOLO가 트럭을 찾지 못함(파인튜닝 필요). 영상 재생만 되고 이벤트는 나오지 않는다.",
+    {"camera": "CAM-02", "sector_id": "B", "bay": 1, "video": "2호퍼 영상.mp4", "size": [1280, 720], "view": "후면", "m_per_px": 0.02, "limit": "후면(뒤에서 본) 실내 영상 — 사전학습 YOLO가 트럭을 찾지 못함(파인튜닝 필요). 영상 재생만 되고 이벤트는 나오지 않는다.",
      "zones": [
        {"id": "B-BAY-1", "type": "하차", "name": "베이 1 진입로", "points": [[440, 330], [840, 330], [840, 560], [440, 560]]}
      ]},
