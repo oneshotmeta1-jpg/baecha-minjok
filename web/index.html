@@ -147,6 +147,12 @@ main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.42fr) min
 /* ① 맵 */
 #mapBd{display:flex;flex-direction:column;gap:6px;overflow:hidden}
 #mapSvg{flex:1;min-height:0;width:100%}
+#mapBd{position:relative}
+#mapSvg,#isoSvg{touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none} #mapSvg.drag,#isoSvg.drag{cursor:grabbing}
+.mapzoom{position:absolute;right:calc(var(--pad) + 6px);top:34px;display:flex;flex-direction:column;background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.18);overflow:hidden;z-index:2}
+.mapzoom button{width:34px;height:32px;border:0;background:#fff;font:700 17px/1 inherit;color:var(--ink);cursor:pointer}
+.mapzoom button+button{border-top:1px solid var(--line)} .mapzoom button:hover{background:var(--soft)}
+.mapzoom .zr{font-size:11px;font-weight:700} .mapzoom .zl{font-size:10px;color:var(--muted);text-align:center;padding:3px 0;border-top:1px solid var(--line)}
 #mapSvg .hop{cursor:pointer}
 .veh{transition:transform .28s linear}
 .legend{display:flex;flex-wrap:wrap;gap:4px 6px}
@@ -627,12 +633,13 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
 <main id="monMain">
   <div class="side" id="sideL" aria-label="호퍼 A · B"></div>
   <section class="card c-map" aria-label="시나리오 좌표 맵">
-    <div class="hd"><h2>하역장 관제 맵</h2><div class="seg" role="group" aria-label="맵 보기" style="background:var(--soft)"><button data-mv="iso" aria-pressed="false">3D 배치도</button><button data-mv="plan" aria-pressed="true">평면도</button></div><span class="mapsum" id="mapSum"></span><span class="sp"></span>
+    <div class="hd"><h2>하역장 관제 맵</h2><div class="seg" role="group" aria-label="맵 보기" style="background:var(--soft)"><button data-mv="iso" aria-pressed="false">구내 관제 맵</button><button data-mv="plan" aria-pressed="true">평면도</button></div><span class="mapsum" id="mapSum"></span><span class="sp"></span>
       <span class="chip" title="배경 지도와 경로 거리는 OpenStreetMap 실제 데이터, 원료야드·계근대·대기장·호퍼 위치는 가정">OSM 실제 지도 · 시설 위치 가정</span></div>
     <div class="bd" id="mapBd">
       <div class="mapnote"><span class="mcam">CAM-01 호퍼 A</span>·<span class="mcam">CAM-02 호퍼 B</span>·<span class="mcam">CAM-03 호퍼 C</span>·<span class="mcam">CAM-04 대기장</span><span class="sp"></span><span>야드를 누르면 상세 · 작업 기록은 운영 분석 → 건별 기록</span></div>
       <svg id="mapSvg" role="img" aria-label="하역장 평면도와 덤프트럭 위치" preserveAspectRatio="xMidYMid meet"></svg>
-      <svg id="isoSvg" style="display:none" role="img" aria-label="하역장 3D 배치도와 덤프트럭 위치" preserveAspectRatio="xMidYMid meet"></svg>
+      <svg id="isoSvg" style="display:none" role="img" aria-label="구내 관제 맵(입체 배치도)과 덤프트럭 위치" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="mapzoom" role="group" aria-label="지도 확대·축소"><button data-zm="in" aria-label="확대" title="확대 (마우스 휠 위로)">+</button><button data-zm="out" aria-label="축소" title="축소 (마우스 휠 아래로)">−</button><button data-zm="reset" class="zr" aria-label="전체 보기" title="전체 보기 (두 번 클릭)">전체</button><div class="zl" id="zoomLv">100%</div></div>
       <div class="legend">
         <span class="chip ok">원활 &lt;60%</span><span class="chip warn">주의 60~85%</span><span class="chip crit">혼잡 85%+</span>
         <span class="chip"><i style="background:var(--s-yard)"></i>대기장 대기</span><span class="chip"><i style="background:var(--s-moving)"></i>호출 이동</span>
@@ -980,29 +987,32 @@ function drawOverlay(s){
   s.vehicles.filter(v=>v.state==='moving'&&v.xy&&v.sector_id).slice(0,4).forEach(v=>{
     ovLayer.appendChild(pill(v.xy[0]+14,v.xy[1]-34,v.id+' → '+sname(v.sector_id)+(v.bay!=null?' '+(v.bay+1)+'번 베이':'')+' · '+(v.eta_min||0)+'분','#1D47B8','#fff')); });
 }
-/* 3D 배치도: 시안 그림(web/assets/map3d.png, 움직이는 표시는 지운 배경) 위에 실제 데이터를 얹는다
-   좌표 = 그림 좌표(2419×1512 기준). 야드 상태 말풍선 · 트럭 위치 · 작업자 반경 · 이동 말풍선 · 대기장 대수는 /api/state 값 */
+/* 구내 관제 맵: 팀 시안 벡터 그림(web/assets/site_map_iso.svg — site_map_full.html에서 트럭·작업자·경로·상태 말풍선을 뺀 배경)
+   위에 실제 데이터를 얹는다. 좌표 = 그림 좌표(viewBox 29 82 1236 633). 호퍼 야드 색 · 트럭 위치 · 작업자 반경 · 이동 경로 · 대기장 대수는 /api/state 값 */
 const iso=$('#isoSvg');
+const ISO_VB=[29,82,1236,633];
 const M3={
-  bay:{A:[[577,630],[660,655],[743,680]],B:[[1100,790],[1182,812],[1263,832]],C:[[866,905],[948,925],[1030,945]]},
-  yardPill:{A:[443,428,[695,585]],B:[1055,500,[1268,752]],C:[641,1053,[885,892]]},
-  delayPill:{A:[800,606],B:[1273,845],C:[1100,1000]},
-  queue:{A:[[848,640],[880,652],[912,664]],B:[[1196,700],[1160,712],[1124,724]],C:[[1000,846],[968,834],[936,822]]},
-  hit:{A:[[548,548],[836,622],[790,724],[505,650]],B:[[1080,718],[1345,775],[1310,880],[1035,815]],C:[[850,825],[1095,885],[1035,985],[810,930]]},
-  lot:i=>i<6?[1312+48*i,688+12.5*i]:[1276+48*(i-6),744+11*(i-6)], lotPill:[1531,845,[1520,812]],
-  route:{A:[[1255,700],[1195,686],[1125,660],[1120,600],[1035,580],[920,600],[830,640]],
-         B:[[1255,700],[1195,686],[1110,718]],
-         C:[[1255,700],[1195,686],[1082,725],[1030,800],[1000,840]]}
+  yard:{A:[[304.5,297.2],[442.4,331.5],[409.0,382.5],[271.0,348.2]],B:[[582.6,382.9],[711.4,414.9],[677.9,465.9],[549.1,433.8]],C:[[463.4,442.2],[578.4,470.8],[545.9,520.3],[430.9,491.7]]},
+  bay:{A:[[303,337],[349,350],[395,362]],B:[[583,423],[626,434],[669,445]],C:[[462,481],[500,490],[539,499]]},
+  yardPill:{A:[235,227,[368,310]],B:[558,265,[671,398]],C:[340,558,[473,476]]},
+  delayPill:{A:[150,372],B:[674,448],C:[560,535]},
+  queue:{A:[[430,383],[412,380],[394,376]],B:[[604,377],[620,370],[637,366]],C:[[452,455],[432,456],[412,457]]},
+  lot:i=>i<6?[695+25.3*i,368+6.3*i]:[676+25.3*(i-6),396+6.3*(i-6)], lotPill:[811,447,[805,430]],
+  route:{A:[[664.6,372.3],[632.4,364.3],[594.8,348.3],[593.1,318.3],[551.7,308.0],[486.7,321.4],[419.7,354.2]],
+         B:[[664.6,372.3],[632.4,364.3],[597.3,384.6]],
+         C:[[664.6,372.3],[632.4,364.3],[597.3,384.6],[572.2,388.2],[535.3,442.4],[492.8,454.1]]},
+  movePill:[880,505]
 };
 const LVC={ok:'#2F6FE4',warn:'#F0A020',crit:'#E8590C',down:'#D7263D'};
+const LVF={ok:'rgba(47,111,228,.14)',warn:'rgba(240,160,32,.18)',crit:'rgba(232,89,12,.18)',down:'rgba(215,38,61,.22)'};
 function tw(t,fs){ let w=0; for(const ch of t) w+=/[ㄱ-힝]/.test(ch)?fs*0.98:(/[ ·.]/.test(ch)?fs*0.32:fs*0.58); return w; }
-function pill3(x,y,t,o){ o=o||{}; const fs=o.fs||24, w=Math.max(o.minw||0,tw(t,fs)+(o.dot?62:40)), h=fs*2;
-  let g='<g'+(o.attr||'')+'><rect x="'+x+'" y="'+(y+3)+'" width="'+w+'" height="'+h+'" rx="'+h/2+'" fill="rgba(0,0,0,.10)"/><rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+h/2+'" fill="'+(o.bg||'#fff')+'" stroke="'+(o.stroke||'#E3E3E0')+'" stroke-width="1.5"/>';
-  if(o.dot) g+='<circle cx="'+(x+26)+'" cy="'+(y+h/2)+'" r="8" fill="'+o.dot+'"/>';
-  g+='<text x="'+(x+(o.dot?44:20))+'" y="'+(y+h/2+fs*0.36)+'" font-size="'+fs+'" font-weight="700" fill="'+(o.fg||'#141414')+'">'+esc(t)+'</text></g>'; return {g,w,h}; }
-function lead(x1,y1,x2,y2){ return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#141414" stroke-width="2"/><circle cx="'+x2+'" cy="'+y2+'" r="4.5" fill="#141414"/>'; }
+function pill3(x,y,t,o){ o=o||{}; const fs=o.fs||12, k=fs/12, w=Math.max(o.minw||0,tw(t,fs)+(o.dot?31:20)*k), h=fs*2.1;
+  let g='<g'+(o.attr||'')+'><rect x="'+x+'" y="'+(y+1.5*k)+'" width="'+w+'" height="'+h+'" rx="'+h/2+'" fill="rgba(0,0,0,.10)"/><rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+h/2+'" fill="'+(o.bg||'#fff')+'" stroke="'+(o.stroke||'#E3E3E0')+'" stroke-width=".8"/>';
+  if(o.dot) g+='<circle cx="'+(x+13*k)+'" cy="'+(y+h/2)+'" r="'+4.5*k+'" fill="'+o.dot+'"/>';
+  g+='<text x="'+(x+(o.dot?23:10)*k)+'" y="'+(y+h/2+fs*0.36)+'" font-size="'+fs+'" font-weight="700" fill="'+(o.fg||'#141414')+'">'+esc(t)+'</text></g>'; return {g,w,h}; }
+function lead(x1,y1,x2,y2){ return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#2a2c31" stroke-width="1"/><circle cx="'+x2+'" cy="'+y2+'" r="2.6" fill="#2a2c31"/>'; }
 function truck3(x,y,o){ o=o||{}; const body=o.body||'#E3B341', cab=o.cab||'#2B2D2F';
-  let g='<g transform="translate('+x.toFixed(1)+','+y.toFixed(1)+')">';
+  let g='<g transform="translate('+x.toFixed(1)+','+y.toFixed(1)+') scale(.55)">';
   if(o.ring) g+='<ellipse cx="0" cy="8" rx="20" ry="12" fill="none" stroke="'+o.ring+'" stroke-width="3"/>';
   g+='<polygon points="-12,4 2,10 2,22 -12,16" fill="'+body+'" stroke="#fff" stroke-width="1"/><polygon points="2,10 8,6 8,18 2,22" fill="'+body+'" opacity=".75"/>';
   g+='<polygon points="-6,-14 6,-8 6,10 -6,4" fill="'+cab+'"/><polygon points="6,-8 14,-13 14,5 6,10" fill="'+cab+'" opacity=".8"/><polygon points="-6,-14 2,-19 14,-13 6,-8" fill="'+cab+'" opacity=".9"/>';
@@ -1010,40 +1020,74 @@ function truck3(x,y,o){ o=o||{}; const body=o.body||'#E3B341', cab=o.cab||'#2B2D
   return g+'</g>'; }
 function along(pts,f){ const L=[];let tot=0; for(let i=1;i<pts.length;i++){ const d=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); L.push(d); tot+=d; }
   let r=Math.max(0,Math.min(1,f))*tot; for(let i=0;i<L.length;i++){ if(r<=L[i]){ const k=L[i]?r/L[i]:0; return [pts[i][0]+(pts[i+1][0]-pts[i][0])*k,pts[i][1]+(pts[i+1][1]-pts[i][1])*k]; } r-=L[i]; } return pts[pts.length-1]; }
+let isoBaseState=0;   // 0 아직 · 1 불러오는 중 · 2 다 됨
 function drawIso(s){
-  iso.setAttribute('viewBox','0 0 2419 1512');
-  if(!iso.querySelector('#isoOv')) iso.innerHTML='<image href="/web/assets/map3d.png" x="0" y="0" width="2419" height="1512"/><g id="isoOv" font-family="Inter,Noto Sans KR,sans-serif"></g>';
+  if(!iso.querySelector('#isoOv')){ iso.setAttribute('viewBox',ISO_VB.join(' ')); iso.innerHTML='<rect x="-3000" y="-3000" width="8000" height="8000" fill="#efefec"/><g id="isoBase"></g><g id="isoOv" font-family="\'Noto Sans KR\',\'Malgun Gothic\',sans-serif"></g>'; }
+  if(!isoBaseState){ isoBaseState=1;
+    fetch('/web/assets/site_map_iso.svg').then(r=>r.text()).then(t=>{ const m=t.match(/<svg[^>]*>([\s\S]*)<\/svg>/); iso.querySelector('#isoBase').innerHTML=m?m[1]:''; isoBaseState=2; if(last&&mapView==='iso') drawIso(last); })
+      .catch(()=>{ isoBaseState=0; }); }
+  s.sectors.forEach(x=>{ const yp=iso.querySelector('#isoYard'+x.id); if(!yp) return; const lv=x.status==='down'?'down':x.level;
+    yp.setAttribute('fill',LVF[lv]); yp.setAttribute('stroke',LVC[lv]); yp.setAttribute('stroke-width','1.4'); });
   let g='', top='';
   s.sectors.forEach(x=>{ const id=x.id; if(!M3.bay[id]) return; const lv=x.status==='down'?'down':x.level;
-    g+='<polygon data-cam="'+x.cam_id+'" points="'+M3.hit[id].map(p=>p.join(',')).join(' ')+'" fill="'+(x.status==='down'?'rgba(215,38,61,.18)':'transparent')+'" style="cursor:pointer"><title>'+esc(x.name)+' CAM 보기</title></polygon>';
+    g+='<polygon data-cam="'+x.cam_id+'" points="'+M3.yard[id].map(p=>p.join(',')).join(' ')+'" fill="'+(x.status==='down'?'rgba(215,38,61,.12)':'transparent')+'" style="cursor:pointer"><title>'+esc(x.name)+' CAM 보기</title></polygon>';
     const [px,py,anc]=M3.yardPill[id], t=x.name+' 야드 · '+(x.status==='down'?'정지':LV_TEXT[x.level]+' '+x.congestion_pct+'%');
-    const p=pill3(px,py,t,{minw:352,dot:LVC[lv],attr:' data-cam="'+x.cam_id+'" style="cursor:pointer"'}); top+=lead(px+p.w*0.55,py+(anc[1]>py?p.h:0),anc[0],anc[1])+p.g;
+    const p=pill3(px,py,t,{fs:13,minw:186,dot:LVC[lv],attr:' data-cam="'+x.cam_id+'" style="cursor:pointer"'}); top+=lead(px+p.w*0.55,py+(anc[1]>py?p.h:0),anc[0],anc[1])+p.g;
     x.working.forEach(w=>{ const q=M3.bay[id][w.bay]||M3.bay[id][0];
-      if(w.safety){ g+='<ellipse cx="'+q[0]+'" cy="'+(q[1]+4)+'" rx="44" ry="26" fill="rgba(215,38,61,.16)" stroke="#D7263D" stroke-width="3" stroke-dasharray="7 5"/><g transform="translate('+(q[0]+28)+','+(q[1]-20)+')"><circle cy="-8" r="6" fill="#D7263D"/><rect x="-5" y="-2" width="10" height="20" rx="4" fill="#D7263D"/></g>';
-        const wx=Math.max(20,q[0]-400), wp=pill3(wx,q[1]-40,'작업자 · '+(w.safety_rule||'덤프 하역 반경')+' 안',{minw:343,bg:'#D7263D',stroke:'#D7263D',fg:'#fff'});
-        top+='<line x1="'+(wx+wp.w)+'" y1="'+(q[1]-16)+'" x2="'+(q[0]+28)+'" y2="'+(q[1]-22)+'" stroke="#141414" stroke-width="2"/>'+wp.g; }
+      if(w.safety){ g+='<ellipse cx="'+q[0]+'" cy="'+(q[1]+2)+'" rx="22" ry="13" fill="rgba(215,38,61,.14)" stroke="#D7263D" stroke-width="1.5" stroke-dasharray="4 3"/><g transform="translate('+(q[0]+14)+','+(q[1]-10)+') scale(.5)"><circle cy="-8" r="6" fill="#D7263D"/><rect x="-5" y="-2" width="10" height="20" rx="4" fill="#D7263D"/></g>';
+        const wx=Math.max(40,q[0]-215), wp=pill3(wx,q[1]-22,'작업자 · '+(w.safety_rule||'덤프 하역 반경')+' 안',{minw:180,bg:'#D7263D',stroke:'#D7263D',fg:'#fff'});
+        top+='<line x1="'+(wx+wp.w)+'" y1="'+(q[1]-9)+'" x2="'+(q[0]+14)+'" y2="'+(q[1]-12)+'" stroke="#2a2c31" stroke-width="1"/>'+wp.g; }
       g+=truck3(q[0],q[1],{raised:w.dump_deg>=15,ring:w.delayed?'#E8590C':null}); });
     const late=x.working.filter(w=>w.delayed);
-    if(late.length){ const [dx,dy]=M3.delayPill[id], q=M3.bay[id][late[0].bay]||M3.bay[id][0], dp=pill3(dx,dy,'작업 지연 ×'+Math.max(...late.map(w=>w.delay_x||1.3)).toFixed(1),{minw:210,bg:'#FFE9DD',stroke:'#FFE9DD',fg:'#C2410C'});
-      top+=lead(dx+8,dy+dp.h/2,q[0],q[1])+dp.g; }
+    if(late.length){ const [dx,dy]=M3.delayPill[id], q=M3.bay[id][late[0].bay]||M3.bay[id][0], dp=pill3(dx,dy,'작업 지연 ×'+Math.max(...late.map(w=>w.delay_x||1.3)).toFixed(1),{minw:110,bg:'#FDE7D6',stroke:'#FDE7D6',fg:'#C2410C'});
+      top+=lead(dx+6,dy+dp.h/2,q[0],q[1])+dp.g; }
     (x.queue||[]).slice(0,3).forEach((vid,i)=>{ const q=M3.queue[id][i]; g+=truck3(q[0],q[1],{}); });
   });
   const yard=s.vehicles.filter(v=>v.state==='yard'||v.state==='arrived');
   yard.slice(0,12).forEach((v,i)=>{ const q=M3.lot(i); g+=truck3(q[0],q[1],{ring:v.urgent?'#D7263D':null}); });
-  const [lx,ly,la]=M3.lotPill, lp=pill3(lx,ly,'차량 대기장 · '+s.counts.yard+'대',{minw:280,dot:'#8A8F95'}); top+=lead(lx+8,ly+lp.h/2,la[0],la[1])+lp.g;
+  const [lx,ly,la]=M3.lotPill, lp=pill3(lx,ly,'차량 대기장 · '+s.counts.yard+'대',{fs:13,minw:148,dot:'#8A8F95'}); top+=lead(lx+6,ly+lp.h/2,la[0],la[1])+lp.g;
   s.vehicles.filter(v=>v.state==='moving'&&v.sector_id&&M3.route[v.sector_id]).slice(0,3).forEach((v,i)=>{
     const sec=s.sectors.find(x=>x.id===v.sector_id), dest=M3.bay[v.sector_id][v.bay||0], pts=M3.route[v.sector_id].concat([dest]);
     const f=sec&&sec.travel_min?1-(v.eta_min||0)/sec.travel_min:0.5, q=along(pts,f);
-    g+='<polyline points="'+pts.map(p=>p.join(',')).join(' ')+'" fill="none" stroke="#2F6FE4" stroke-width="4" stroke-dasharray="10 8" opacity=".85"/><circle cx="'+dest[0]+'" cy="'+(dest[1]+8)+'" r="9" fill="#2F6FE4" stroke="#fff" stroke-width="3"/>';
+    g+='<polyline points="'+pts.map(p=>p.join(',')).join(' ')+'" fill="none" stroke="#2F6FE4" stroke-width="2.4" stroke-dasharray="6 5" opacity=".9"/><circle cx="'+dest[0]+'" cy="'+(dest[1]+4)+'" r="5" fill="#2F6FE4" stroke="#fff" stroke-width="2"/>';
     g+=truck3(q[0],q[1],{body:'#2F6FE4',cab:'#1D47B8',ring:v.urgent?'#D7263D':null});
-    const y0=954+i*58, mp=pill3(1188,y0,v.id+' → '+sname(v.sector_id)+' '+((v.bay||0)+1)+'번 베이 · '+(v.eta_min||0)+'분',{minw:474,bg:'#2F6FE4',stroke:'#2F6FE4',fg:'#fff'});
-    top+='<line x1="1200" y1="'+(y0+mp.h/2)+'" x2="'+q[0].toFixed(1)+'" y2="'+q[1].toFixed(1)+'" stroke="#141414" stroke-width="2"/>'+mp.g; });
+    const [mx,my0]=M3.movePill, y0=my0+i*30, mp=pill3(mx,y0,v.id+' → '+sname(v.sector_id)+' '+((v.bay||0)+1)+'번 베이 · '+(v.eta_min||0)+'분',{minw:240,bg:'#2F6FE4',stroke:'#2F6FE4',fg:'#fff'});
+    top+='<line x1="'+(mx+4)+'" y1="'+(y0+mp.h/2)+'" x2="'+q[0].toFixed(1)+'" y2="'+q[1].toFixed(1)+'" stroke="#2a2c31" stroke-width="1"/>'+mp.g; });
   iso.querySelector('#isoOv').innerHTML=g+top;
 }
+/* 확대·축소·끌어서 이동: 휠(커서 위치 기준) · 끌기 · 두 번 클릭 = 전체 · 오른쪽 위 버튼. viewBox만 바꾼다(그림은 다시 그리지 않음) */
+function zoomable(sv,base){
+  const z={b:base.slice(),v:base.slice()}, MAXZ=8;
+  const apply=()=>{ sv.setAttribute('viewBox',z.v.map(n=>+n.toFixed(2)).join(' ')); if(sv.style.display!=='none') $('#zoomLv').textContent=Math.round(z.b[2]/z.v[2]*100)+'%'; };
+  const clamp=()=>{ const [bx,by,bw,bh]=z.b; let [x,y,w,h]=z.v;
+    w=Math.min(bw,Math.max(bw/MAXZ,w)); h=w*bh/bw;
+    x=Math.min(bx+bw-w,Math.max(bx,x)); y=Math.min(by+bh-h,Math.max(by,y)); z.v=[x,y,w,h]; };
+  const pt=(cx,cy)=>{ const m=sv.getScreenCTM(); if(!m) return [z.v[0]+z.v[2]/2,z.v[1]+z.v[3]/2]; const p=new DOMPoint(cx,cy).matrixTransform(m.inverse()); return [p.x,p.y]; };
+  z.zoomAt=(f,px,py)=>{ const [x,y,w,h]=z.v; if(px==null){ px=x+w/2; py=y+h/2; } const nw=Math.min(z.b[2],Math.max(z.b[2]/MAXZ,w*f)), k=nw/w;
+    z.v=[px-(px-x)*k,py-(py-y)*k,nw,h*k]; clamp(); apply(); };
+  z.reset=()=>{ z.v=z.b.slice(); apply(); };
+  z.show=apply;
+  sv.addEventListener('wheel',e=>{ e.preventDefault(); const [px,py]=pt(e.clientX,e.clientY); z.zoomAt(e.deltaY<0?0.8:1.25,px,py); },{passive:false});
+  let drag=null, moved=false;
+  sv.addEventListener('pointerdown',e=>{ if(e.button!==0) return; e.preventDefault(); drag={x:e.clientX,y:e.clientY,v:z.v.slice()}; moved=false; });   // 끌 때 글자가 선택(파랗게)되지 않게
+  sv.addEventListener('selectstart',e=>e.preventDefault());
+  sv.addEventListener('pointermove',e=>{ if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
+    if(!moved&&Math.hypot(dx,dy)<4) return;
+    if(!moved){ moved=true; sv.classList.add('drag'); try{ sv.setPointerCapture(e.pointerId); }catch(_){} }
+    const m=sv.getScreenCTM(), sc=m?1/m.a:1; z.v=[drag.v[0]-dx*sc,drag.v[1]-dy*sc,drag.v[2],drag.v[3]]; clamp(); apply(); });
+  const up=()=>{ drag=null; sv.classList.remove('drag'); };
+  sv.addEventListener('pointerup',up); sv.addEventListener('pointercancel',up);
+  sv.addEventListener('click',e=>{ if(moved){ e.stopPropagation(); e.preventDefault(); moved=false; } },true);   // 끌기 끝의 클릭은 CAM 열기로 치지 않음
+  sv.addEventListener('dblclick',e=>{ e.preventDefault(); z.reset(); });
+  return z;
+}
+const ZOOM={plan:zoomable($('#mapSvg'),[0,0,S.map.width,S.map.height]),iso:zoomable(iso,ISO_VB)};
+document.querySelectorAll('[data-zm]').forEach(b=>b.addEventListener('click',()=>{ const z=ZOOM[mapView]; if(!z) return;
+  if(b.dataset.zm==='reset') z.reset(); else z.zoomAt(b.dataset.zm==='in'?0.8:1.25); }));
 iso.addEventListener('click',e=>{ const h=e.target.closest('[data-cam]'); if(h) openCam(h.dataset.cam); });
-let mapView='plan'; try{ mapView=localStorage.getItem('mapView')||'plan'; }catch(e){}
-function setMapView(m){ mapView=m; try{ localStorage.setItem('mapView',m); }catch(e){}
-  $('#mapSvg').style.display=m==='plan'?'':'none'; $('#isoSvg').style.display=m==='iso'?'':'none';
+let mapView='iso'; try{ mapView=localStorage.getItem('mapView2')||'iso'; }catch(e){}
+function setMapView(m){ mapView=m; try{ localStorage.setItem('mapView2',m); }catch(e){}
+  $('#mapSvg').style.display=m==='plan'?'':'none'; $('#isoSvg').style.display=m==='iso'?'':'none'; if(ZOOM[m]) ZOOM[m].show();
   document.querySelectorAll('[data-mv]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mv===m))); if(last) render(last); }
 document.querySelectorAll('[data-mv]').forEach(b=>b.addEventListener('click',()=>setMapView(b.dataset.mv)));
 const vehNodes={};
