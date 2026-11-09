@@ -293,10 +293,56 @@ CAMS = load("cams.json") if (DATA / "cams.json").exists() else {"dir": "영상",
 MEDIA = ROOT / CAMS.get("dir", "영상")
 
 
+def my_cams(request):
+    """이 사람이 볼 수 있는 카메라: 관제 = 전부 · 현장 = 담당 하역장(대기장 담당이면 CAM-04) — R17"""
+    u = me_of(request)
+    if not u or u.get("role") == "control" or u.get("no_auth"):
+        return None
+    mine = set(u.get("hoppers") or [])
+    return {c["camera"] for c in CAMS["cams"] if (c.get("sector_id") in mine) or (c.get("sector_id") is None and "YARD" in mine)}
+
+
 @app.get("/api/cams")
-async def cams():
-    return {"cams": cam_list(CAMS, MEDIA, stand_in=load_stand_in()), "time_scale": CAMS.get("time_scale", 1), "mode": "video" if rt.video else "sim",
+async def cams(request: Request):
+    allow = my_cams(request)
+    cl = [c for c in cam_list(CAMS, MEDIA, stand_in=load_stand_in()) if allow is None or c["camera"] in allow]
+    return {"cams": cl, "time_scale": CAMS.get("time_scale", 1), "mode": "video" if rt.video else "sim",
             "near_miss": {k: CAMS.get("near_miss", {}).get(k) for k in ("level_sec", "rules")}}
+
+
+NM_RECENT_MIN = 3     # CAM 새 창 빨간 테두리: 아차사고가 기록된 뒤 이만큼(시뮬레이션 분) 유지
+
+
+@app.get("/api/cams/live")
+async def cams_live(request: Request):
+    """CAM 4채널 새 창(R17)이 1초마다 읽는 채널별 상태: 호퍼 혼잡 · 시뮬레이션 그림용 하역장 · 위험(안전 경고 · 최근 아차사고).
+    관제 화면 전체 상태(/ws)는 관제 전용이라, 새 창은 현장 담당자도 볼 수 있게 이 작은 응답만 쓴다."""
+    allow = my_cams(request)
+    st = rt.state()
+    names = {c["id"]: c for c in load("sectors.json")["cams"]}
+    yard = [{k: v.get(k) for k in ("id", "state", "urgent", "track_id", "wait_min", "judge")} for v in st["vehicles"] if v["state"] in ("yard", "arrived")]
+    out = []
+    for cid, c in names.items():
+        if allow is not None and cid not in allow:
+            continue
+        sec = next((x for x in st["sectors"] if x["id"] == c.get("sector_id")), None) if c.get("sector_id") else None
+        risk = None
+        if sec:
+            sa = next((x for x in st.get("safety_open", []) if x.get("sector_id") == sec["id"]), None)
+            if sa:
+                risk = {"kind": "safety", "level": "L3", "text": "안전 경고 · " + (sa.get("rule_text") or "덤프 반경") + " 안 작업자", "ts": sa.get("ts")}
+        nm = [x for x in st.get("near_miss", []) if x.get("cam_id") == cid and x.get("t") is not None and 0 <= st["t"] - x["t"] <= NM_RECENT_MIN]
+        if nm and not risk:
+            x = max(nm, key=lambda x: ({"L1": 1, "L2": 2, "L3": 3}.get(x.get("level"), 0), x["t"]))
+            risk = {"kind": "near_miss", "level": x.get("level"), "ts": x.get("ts"),
+                    "text": f"아차사고 {x.get('level')} · {x.get('rule')} · 최소 {x.get('min_dist_m')}m"}
+        out.append({"id": cid, "name": c["name"], "sector_id": c.get("sector_id"), "risk": risk,
+                     "sector": sec, "status": (sec["status"] if sec else "up"),
+                     "level": (sec["level"] if sec else None), "congestion_pct": (sec["congestion_pct"] if sec else None),
+                     "summary": (f"대기 {st['counts']['yard']}대 · 호출 이동 {st['counts']['moving']}대" if not sec else
+                                 f"하역 {len(sec['working'])}/{sec['bays']} · 대기 {len(sec['queue'])}")})
+    return {"clock": st["clock"], "t": st["t"], "running": st["running"], "speed": st.get("speed"), "cams": out,
+            "yard_vehicles": yard if (allow is None or "CAM-04" in allow) else []}
 
 
 def load_stand_in():
@@ -462,6 +508,12 @@ async def ws(socket: WebSocket):
 @app.get("/")
 async def index():
     return FileResponse(WEB / "index.html")
+
+
+@app.get("/cams")
+async def cams_page():
+    """CAM 4채널 새 창(R17) — 권한은 auth guard(관제 · 현장)"""
+    return FileResponse(WEB / "cams.html")
 
 
 @app.get("/login")
