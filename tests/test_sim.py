@@ -304,6 +304,7 @@ for sid_ in "ABC":
     x_ = rx_.force_safety(sid_)
     if x_:
         rx_.driver_stopped(x_["vehicle_id"])          # 기사 앱 [멈췄어요] (R12)
+        rx_.safety_seen(x_["id"])                     # 관제 확인(깜빡임 멈춤 · 중지 유지) — 3D 매핑 요청서
         rx_.safety_resolve(x_["id"], "ack" if not any(e["type"] == "SAFETY_ACK" for e in rx_.rec.events) else "dismiss")
 rx_.ingest({"type": "NEAR_MISS", "source": "cam", "cam_id": "CAM-01", "sector_id": "A", "payload": {"id": "NM-test", "rule": "덤프 반경", "level": "L1"}})   # 아차사고(R15, 영상)
 types_r4 = {e["type"] for e in ra.rec.events} | {e["type"] for e in rx_.rec.events}

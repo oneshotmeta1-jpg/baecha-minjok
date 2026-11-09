@@ -163,6 +163,8 @@ class Runtime:
             self.rec.force_safety(a["sector_id"]); self.fifo.force_safety(a["sector_id"])
         elif k == "safety":
             self.rec.safety_resolve(a["id"], a["how"], self.safety_acks.get(a["id"], {}).get("ack_sec"))
+        elif k == "safety_seen":
+            self.rec.safety_seen(a["id"])
         elif k == "ingest":
             self._ingest_one(a["ev"])
         self.rec.replan(); self.fifo.replan()
@@ -445,6 +447,20 @@ class Runtime:
         n0 = len(self.rec.safety)
         self._record("safety_force", sector_id=sid)
         return self.rec.safety[-1] if len(self.rec.safety) > n0 else None
+
+    def safety_seen(self, sid_):
+        """[관제 확인]: 깜빡임 멈춤 · 빨간색 고정. 하차 중지와 후속 호출 보류는 유지(해제 = safety_resolve).
+        상태(safety_open[].seen)가 실시간으로 모든 화면에 퍼진다 — 어느 화면에서 눌러도 세 곳이 함께 바뀐다."""
+        x = next((x for x in self.rec.safety if x["id"] == sid_), None)
+        if not x or x["status"] != "open":
+            return None
+        if x.get("seen"):
+            return x
+        self._record("safety_seen", id=sid_)
+        wall = self.safety_wall.get(sid_)
+        self._ui("SAFETY_SEEN", x["vehicle_id"], x["sector_id"],
+                 {"id": sid_, "seen_sec": round(self.clock() - wall, 1) if wall is not None else None})
+        return x
 
     def safety_resolve(self, sid_, how):
         """[확인] 또는 [오탐지]. 하차 중지가 풀리고, 확인까지 걸린 실제 초를 남긴다."""

@@ -365,6 +365,7 @@ class Sim:
         x = {"id": f"SA-{self.safety_seq}", "t": self.t, "ts": self.hhmm(self.t) + f":{sec_off:02d}", "sector_id": sid,
              "bay": v["bay"], "vehicle_id": v["id"], "key": self.key(v), "cargo": v["cargo"], "cam_id": self.sec_cfg[sid]["cam_id"],
              "dist_m": dist or 3.0, "radius_m": self.safety_cfg().get("radius_m", 5), "status": "open", "repeat": repeat,
+             "seen": False, "seen_at": None,
              "resolved_t": None, "resolved_at": None, "ack_sec": None, "how": None, "persist": False, "prev": prev,
              "rule": rule, "rule_text": "후진 경로" if rule == "reverse" else "덤프 반경"}
         self.safety.append(x)
@@ -512,6 +513,14 @@ class Sim:
         v["safety_plan"] = None
         x = self.safety_raise(v, 3.0)
         x["persist"] = False
+        return x
+
+    def safety_seen(self, sid_):
+        """관제 확인(3D 매핑 요청서 3-4): 깜빡임만 멈춘다. 안전 중지 · 후속 호출 보류는 그대로(해제는 safety_resolve)."""
+        x = next((x for x in self.safety if x["id"] == sid_), None)
+        if not x or x["status"] != "open" or x.get("seen"):
+            return x
+        x.update(seen=True, seen_at=self.hhmm(self.t), seen_t=self.t)
         return x
 
     def safety_resolve(self, sid_, how, ack_sec=None):

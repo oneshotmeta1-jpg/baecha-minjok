@@ -145,6 +145,14 @@ main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.42fr) min
 .chip.down{background:var(--red);color:#fff} .chip.blue{background:var(--blue-bg);color:var(--blue)} .chip.dark{background:var(--ink);color:#fff}
 
 .realv{display:inline-block;margin-left:6px;padding:0 6px;border-radius:6px;background:#E6F4EA;color:#137333;font-size:11px;font-weight:700}
+/* 3D 매핑 카드 · 안전 띠 깜빡임 (3D 매핑 요청서) */
+#m3card{flex:none}
+#dlgRows tr.hl td{background:#FFF4D6}
+#dlgRows tr[data-tid]{cursor:default}
+.sstrip.blink{animation:sbBand 1s ease-in-out infinite}
+@keyframes sbBand{0%,100%{background:#E5383B}50%{background:#A51D22}}
+@media (prefers-reduced-motion:reduce){.sstrip.blink{animation:none}}
+.sstrip .seen{background:#fff;color:var(--red);font-weight:800;font-size:11.5px;border-radius:999px;padding:2px 8px;flex:none}
 /* ① 맵 */
 #mapBd{display:flex;flex-direction:column;gap:6px;overflow:hidden}
 #mapSvg{flex:1;min-height:0;width:100%}
@@ -794,6 +802,7 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
 <!-- 하역장 상세 -->
 <div class="view" id="view-cam" hidden>
   <div class="mon-bar"><a class="pill-btn" href="#monitor">← 관제 화면</a><h1 id="camTitle">하역장 상세</h1><span id="camStat" class="mapsum"></span><button class="pill-btn" id="roiGo" type="button" hidden>구역(ROI) 다시 그리기</button><span class="sp"></span><span class="chs" id="camChs" role="group" aria-label="카메라 전환"></span></div>
+  <div class="sstrip" id="sstrip2" hidden role="alert" style="margin:0 0 10px"></div>
   <div class="cam-grid">
     <section class="card" aria-label="CAM 크게 보기">
       <div class="hd"><h2 id="camName">CAM</h2><span class="chip blue" id="camSrc">추론 결과 재생 (시뮬레이션)</span><span class="sp"></span><span class="ovt" id="ovToggles" role="group" aria-label="겹쳐 그리기"><button data-ov="box" aria-pressed="true">박스</button><button data-ov="id" aria-pressed="true">추적 ID</button><button data-ov="zone" aria-pressed="true">구역 선</button><button data-ov="radius" aria-pressed="true">덤프 하역 반경</button></span></div>
@@ -802,6 +811,7 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
         <p class="cap">판정 규칙: 박스 아래 중심점이 베이·대기선 구역 안에 3초 이상 있으면 진입으로 본다. 덤프트럭 전체 박스의 세로/가로 비율이 0.6 이상이면 적재함 상승(하차 중)으로 판정한다. 아차사고: 사람 발끝이 위험 구역(덤프 반경 · 후진 경로)에 있고 그 베이 트럭 조건이 맞으면 빨간 강조 — 이어진 시간 1초 L2 경고, 2초 L3 하차 중지(가정값). 대기장(CAM-04)은 사람과 움직이는 트럭 사이를 선과 거리(m, 사람 키 1.7m 기준)로 표시 — 3m 이하 L1 · 2m 이하 L2 · 1m 이하 L3(가정값). 합성 사람은 꺼져 있다. 영상이 없는 채널은 시뮬레이터가 만든 합성 화면이다.</p></div>
     </section>
     <div class="cam-side">
+      <div id="m3card" aria-label="3D 매핑"></div>
       <section class="card" aria-label="탐지 목록" style="flex:1">
         <div class="hd"><h2>탐지 목록</h2><span class="cap" id="dlgCount"></span></div>
         <div class="bd"><table><thead><tr><th>ID</th><th>차량</th><th>구역</th><th class="r">체류</th><th class="r">적재함</th><th>판정</th></tr></thead><tbody id="dlgRows"></tbody></table></div>
@@ -820,6 +830,8 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
 </div>
 
 <script src="/web/cam_view.js"></script>
+<script src="/web/map3d.js"></script>
+<script src="/web/safety-blink.js"></script>
 <script>
 (async function(){
 'use strict';
@@ -1045,7 +1057,7 @@ function drawIso(s){
   s.sectors.forEach(x=>{ const id=x.id; if(!M3.bay[id]) return; const lv=x.status==='down'?'down':x.level;
     g+='<polygon data-cam="'+x.cam_id+'" points="'+M3.yard[id].map(p=>p.join(',')).join(' ')+'" fill="'+(x.status==='down'?'rgba(215,38,61,.12)':'transparent')+'" style="cursor:pointer"><title>'+esc(x.name)+' CAM 보기</title></polygon>';
     const [px,py,anc]=M3.yardPill[id], t=x.name+' 야드 · '+(x.status==='down'?'정지':LV_TEXT[x.level]+' '+x.congestion_pct+'%');
-    const p=pill3(px,py,t,{fs:13,minw:186,dot:LVC[lv],attr:' data-cam="'+x.cam_id+'" style="cursor:pointer"'}); top+=lead(px+p.w*0.55,py+(anc[1]>py?p.h:0),anc[0],anc[1])+p.g;
+    const p=pill3(px,py,t,{fs:13,minw:186,dot:LVC[lv],attr:' data-cam="'+x.cam_id+'" data-ypill="'+id+'" style="cursor:pointer"'}); top+=lead(px+p.w*0.55,py+(anc[1]>py?p.h:0),anc[0],anc[1])+p.g;
     x.working.forEach(w=>{ const q=M3.bay[id][w.bay]||M3.bay[id][0];
       if(w.safety){ g+='<ellipse cx="'+q[0]+'" cy="'+(q[1]+2)+'" rx="22" ry="13" fill="rgba(215,38,61,.14)" stroke="#D7263D" stroke-width="1.5" stroke-dasharray="4 3"/><g transform="translate('+(q[0]+14)+','+(q[1]-10)+') scale(.5)"><circle cy="-8" r="6" fill="#D7263D"/><rect x="-5" y="-2" width="10" height="20" rx="4" fill="#D7263D"/></g>';
         const wx=Math.max(40,q[0]-215), wp=pill3(wx,q[1]-22,'작업자 · '+(w.safety_rule||'덤프 하역 반경')+' 안',{minw:180,bg:'#D7263D',stroke:'#D7263D',fg:'#fff'});
@@ -1077,7 +1089,7 @@ function drawIso(s){
 /* 확대·축소·끌어서 이동: 휠(커서 위치 기준) · 끌기 · 두 번 클릭 = 전체 · 오른쪽 위 버튼. viewBox만 바꾼다(그림은 다시 그리지 않음) */
 function zoomable(sv,base){
   const z={b:base.slice(),v:base.slice()}, MAXZ=8;
-  const apply=()=>{ sv.setAttribute('viewBox',z.v.map(n=>+n.toFixed(2)).join(' ')); if(sv.style.display!=='none') $('#zoomLv').textContent=Math.round(z.b[2]/z.v[2]*100)+'%'; };
+  const apply=()=>{ sv.setAttribute('viewBox',z.v.map(n=>+n.toFixed(2)).join(' ')); if(sv.style.display!=='none') $('#zoomLv').textContent=Math.round(z.b[2]/z.v[2]*100)+'%'; if(typeof onMapViewChange==='function') onMapViewChange(); };
   const clamp=()=>{ const [bx,by,bw,bh]=z.b; let [x,y,w,h]=z.v;
     w=Math.min(bw,Math.max(bw/MAXZ,w)); h=w*bh/bw;
     x=Math.min(bx+bw-w,Math.max(bx,x)); y=Math.min(by+bh-h,Math.max(by,y)); z.v=[x,y,w,h]; };
@@ -1100,6 +1112,22 @@ function zoomable(sv,base){
   sv.addEventListener('dblclick',e=>{ e.preventDefault(); z.reset(); });
   return z;
 }
+/* 안전 경고 깜빡임 — 관제 화면 배치도(web/safety-blink.js). 위치는 구내 관제 맵의 베이 좌표(평면도는 야드 중심)에서 바로 계산하므로
+   [팀 확인 필요]의 '배치도 위 % 위치'를 따로 적어 둘 필요가 없다. 확대·이동·창 크기가 바뀌면 다시 계산한다. */
+const SBO=window.SafetyBlink?SafetyBlink.attach($('#mapBd')):null; let sboKey='';
+function relPct(r,R){ return {x:(r.left+r.width/2-R.left)/R.width*100,y:(r.top+r.height/2-R.top)/R.height*100}; }
+function overviewSafety(s){
+  if(!SBO) return; const bd=$('#mapBd'), R=bd.getBoundingClientRect(), out=[];
+  if(view==='monitor'&&R.width) (s.safety_open||[]).forEach(x=>{ let pt=null, box=null;
+    if(mapView==='iso'){ const q=(M3.bay[x.sector_id]||[])[x.bay||0], m=iso.getScreenCTM(), pill=iso.querySelector('[data-ypill="'+x.sector_id+'"]');
+      if(q&&m){ const p=new DOMPoint(q[0],q[1]).matrixTransform(m); pt={x:(p.x-R.left)/R.width*100,y:(p.y-R.top)/R.height*100}; }
+      if(pill){ const r=pill.getBoundingClientRect(); box={x:(r.left-R.left)/R.width*100-.6,y:(r.top-R.top)/R.height*100-.8,w:r.width/R.width*100+1.2,h:r.height/R.height*100+1.6}; } }
+    else { const sh=secShape[x.sector_id]; if(sh&&sh.poly){ const r=sh.poly.getBoundingClientRect(); pt=relPct(r,R); box={x:(r.left-R.left)/R.width*100,y:(r.top-R.top)/R.height*100,w:r.width/R.width*100,h:r.height/R.height*100}; } }
+    if(pt&&pt.x>=0&&pt.x<=100&&pt.y>=0&&pt.y<=100) out.push({id:x.id,x:+pt.x.toFixed(1),y:+pt.y.toFixed(1),box:box&&{x:+box.x.toFixed(1),y:+box.y.toFixed(1),w:+box.w.toFixed(1),h:+box.h.toFixed(1)},ack:!!x.seen}); });
+  const k=JSON.stringify(out); if(k===sboKey) return; sboKey=k; SBO.set(out);   // 바뀔 때만 다시 그림(깜빡임이 끊기지 않게)
+}
+function onMapViewChange(){ if(last) overviewSafety(last); }
+addEventListener('resize',onMapViewChange);
 const ZOOM={plan:zoomable($('#mapSvg'),[0,0,S.map.width,S.map.height]),iso:zoomable(iso,ISO_VB)};
 document.querySelectorAll('[data-zm]').forEach(b=>b.addEventListener('click',()=>{ const z=ZOOM[mapView]; if(!z) return;
   if(b.dataset.zm==='reset') z.reset(); else z.zoomAt(b.dataset.zm==='in'?0.8:1.25); }));
@@ -1198,10 +1226,66 @@ function drawBig(st){
     $('#camStat').innerHTML='<span class="chip '+lv+'">'+LV_TEXT[lv]+(sec.status==='down'?'':' '+sec.congestion_pct+'%')+'</span><span class="chip">하역 중 <b class="num">'+sec.working.length+'/'+sec.bays+'</b> · 대기 <b class="num">'+sec.queue.length+'</b></span>'+(nSafe?'<span class="chip crit">안전 경고 <b class="num">'+nSafe+'</b></span>':''); drawBays(st,sec); loadCamEv(sec.id,st.clock); }
   else { $('#camStat').innerHTML='<span class="chip">대기장 <b class="num">'+st.counts.yard+'대</b></span><span class="chip">호출 이동 <b class="num">'+st.counts.moving+'대</b></span>'; $('#camBays').innerHTML=''; loadCamEv(null,st.clock); }
   const live=isLive(camId); setBigLive(live); $('#roiGo').hidden=false; drawNearMiss(st);
-  const det=live?[]:(sec?renderHopperCam(cv,c,sec,byId,hhmm(st.clock)):renderYardCam(cv,c,st,hhmm(st.clock)));
-  $('#dlgCount').textContent='이 프레임 · '+det.length+'대';
-  $('#dlgRows').innerHTML=det.length?det.map(d=>'<tr><td class="num">#'+esc(d.id)+'</td><td class="plate">'+esc(d.veh)+'</td><td>'+esc(d.zone)+'</td><td class="r num">'+Math.floor(d.stay)+'분</td><td class="r num">'+(d.deg?d.deg+'°':'—')+'</td><td>'+esc(d.judge)+'</td></tr>').join(''):'<tr><td colspan="6" class="empty">이 채널에 잡힌 차량이 없습니다.</td></tr>';
+  // 탐지 목록: 영상 채널도 시뮬레이션 상태(추적 ID)로 채운다 → 3D 매핑 카드 핀 ID(#n)와 같은 값
+  const det=live?stateDet(c,st,sec):(sec?renderHopperCam(cv,c,sec,byId,hhmm(st.clock)):renderYardCam(cv,c,st,hhmm(st.clock)));
+  $('#dlgCount').textContent=(live?'시뮬레이션 상태 · ':'이 프레임 · ')+det.length+'대';
+  const dk=JSON.stringify(det.map(d=>[d.id,d.veh,d.zone,Math.floor(d.stay),d.deg,d.judge]));
+  if(dk!==dlgKey){ dlgKey=dk;
+    $('#dlgRows').innerHTML=det.length?det.map(d=>'<tr data-tid="#'+esc(d.id)+'"><td class="num">#'+esc(d.id)+'</td><td class="plate">'+esc(d.veh)+'</td><td>'+esc(d.zone)+'</td><td class="r num">'+Math.floor(d.stay)+'분</td><td class="r num">'+(d.deg?d.deg+'°':'—')+'</td><td>'+esc(d.judge)+'</td></tr>').join(''):'<tr><td colspan="6" class="empty">이 채널에 잡힌 차량이 없습니다.</td></tr>';
+    if(m3Hover) hlRow(m3Hover); }
+  drawM3(st,c,sec);
 }
+let dlgKey='';
+function stateDet(c,st,sec){ // renderHopperCam · renderYardCam과 같은 행 (그리지 않고 상태만)
+  if(sec) return sec.working.map(w=>({id:w.track_id,veh:w.vehicle_id,zone:'베이 '+(w.bay+1),stay:w.elapsed_min,deg:w.dump_deg,judge:w.judge+(w.delayed?' · 지연':'')}))
+    .concat((sec.queue_info||[]).map(q=>({id:q.track_id,veh:q.vehicle_id,zone:'대기선',stay:q.since_call_min,deg:0,judge:'하차 대기 · 정지'})));
+  return st.vehicles.filter(v=>v.state==='yard'||v.state==='arrived').map(v=>({id:v.track_id,veh:v.id,zone:v.state==='arrived'?'계근대':'대기장',stay:v.wait_min||0,deg:0,judge:v.judge}));
+}
+
+/* ---------- 3D 매핑 카드 (구역 상세 오른쪽 · 탐지 목록 위) — web/map3d.js ----------
+   상태 → state: 하차 중 안전 경고 = danger(후진 경로면 reverse) · 지연 = delay · 적재함 상승 = unload · 베이에 들어옴 = enter · 호출 이동 = call
+   대기장: 긴급 = urgent · 대기 초과 = overdue · 승인 대기 = approval · 그 밖 = wait(순번 배지)
+   [팀 확인 필요] 대기 초과 기준 = 설정 › 목표 대기(target_min) · 작업자 위치 = 베이 번호 기준 가정 위치(호모그래피 변환 미정) */
+const ZONE_OF={'CAM-01':'A','CAM-02':'B','CAM-03':'C','CAM-04':'W'};
+let M3C=null, m3Key='', m3At=0, m3Hover=null, m3Sec=null;
+const bayX3=n=>1.5+(n-1)*9;   // map3d.js 베이 위치와 같은 식
+function m3Data(st,sec){
+  const so=st.safety_open||[], veh=Object.fromEntries(st.vehicles.map(v=>[v.id,v])), items=[], bays={};
+  if(sec){
+    sec.working.forEach(w=>{ const n=w.bay+1, sa=so.find(x=>x.vehicle_id===w.vehicle_id), rev=sa&&sa.rule==='reverse';
+      const state=sa?(rev?'reverse':'danger'):w.delayed?'delay':(w.dump_deg>=15?'unload':'enter');
+      const it={id:'#'+w.track_id,bay:n,state,plate:w.vehicle_id,ratio:w.delay_x,
+        detail:sa?(sa.ts+' 감지 · 하차 중지 요청(가상)'+(sa.seen?' · 관제 확인 '+sa.seen_at:'')):('경과 '+mmss(w.elapsed_min)+' / 예측 '+Math.round(w.std)+'분')};
+      if(sa){ it.ack=!!sa.seen; it.worker=rev?[bayX3(n)+4.2,16.2]:[bayX3(n)+6.4,9.6]; bays[n]='stop'; }
+      items.push(it); });
+    const mv=sec.moving.map(id=>veh[id]).filter(Boolean).sort((a,b)=>(a.eta_min||0)-(b.eta_min||0));
+    if(mv[0]) items.push({id:'#'+mv[0].track_id,state:'call',plate:mv[0].id,detail:(mv[0].eta_min||0)+'분 뒤 도착 · '+((mv[0].bay||0)+1)+'번 베이'+(mv.length>1?' · 외 '+(mv.length-1)+'대 이동 중':'')});
+    for(let n=1;n<=sec.bays;n++) if(!sec.working.some(w=>w.bay+1===n)) bays[n]=mv.some(v=>(v.bay||0)+1===n)?'reserved':'empty';
+  } else {
+    const rank=Object.fromEntries((st.queue||[]).map(q=>[q.vehicle_id,q])), over=((cfg.settings||{}).wait||{}).target_min||15;
+    st.vehicles.filter(v=>v.state==='yard'||v.state==='arrived').slice(0,12).forEach((v,i)=>{ const q=rank[v.id]||{};
+      const state=v.urgent?'urgent':((v.wait_min||0)>over?'overdue':(q.awaiting?'approval':'wait'));
+      items.push({id:'#'+v.track_id,slot:i+1,order:q.rank,state,plate:v.id,detail:'대기 '+Math.floor(v.wait_min||0)+'분'+(q.rank?' · 순번 '+q.rank:'')+(q.call_at?' · 호출 '+q.call_at:'')}); });
+  }
+  return {items,bays};
+}
+function drawM3(st,c,sec){
+  if(!window.Map3D||!$('#m3card')) return;
+  const z=ZONE_OF[c.id]||'A';
+  if(!M3C){ M3C=Map3D.mount($('#m3card'),{zone:z,height:168,storageKey:'map3d.on'});
+    M3C.onHover=id=>{ m3Hover=id; hlRow(id); };
+    M3C.onAck=()=>{ (last&&last.safety_open||[]).filter(x=>!x.seen&&(!m3Sec||x.sector_id===m3Sec)).forEach(x=>seenSafety(x.id)); }; }   // 카드 헤더 배지 = 관제 확인
+  if(M3C.zone!==z){ M3C.setZone(z); m3Key=''; }
+  m3Sec=sec?sec.id:null;
+  const d=m3Data(st,sec), key=JSON.stringify([z,d.items.map(i=>[i.id,i.state,i.bay,i.slot,i.order,i.ack,i.plate,i.ratio]),d.bays]);
+  if(key===m3Key&&Date.now()-m3At<5000) return;          // 바뀐 게 없으면 다시 그리지 않음(깜빡임·마우스 강조 유지) · 말풍선 시간은 5초마다
+  m3Key=key; m3At=Date.now(); M3C.update(d.items,d.bays);
+  const sub=$('#m3card .m3-s'); if(sub) sub.textContent+=' · 시뮬레이션 값';
+  if(m3Hover) M3C.highlight(m3Hover);
+}
+function hlRow(id){ document.querySelectorAll('#dlgRows tr[data-tid]').forEach(r=>r.classList.toggle('hl',id!=null&&r.dataset.tid===id)); }
+$('#dlgRows').addEventListener('mouseover',e=>{ const r=e.target.closest('tr[data-tid]'); if(r&&M3C){ m3Hover=r.dataset.tid; M3C.highlight(m3Hover); hlRow(m3Hover); } });
+$('#dlgRows').addEventListener('mouseleave',()=>{ m3Hover=null; if(M3C) M3C.highlight(null); hlRow(null); });
 
 /* 아차사고 기록 (R15) — 영상 NEAR_MISS · 이 카메라 것만 · [장면] = 그 영상 시각으로 이동 */
 const NM_LV={L1:'L1 주의',L2:'L2 경고',L3:'L3 하차 중지'};
@@ -1334,11 +1418,16 @@ function render(s){
   const B=BADGE!=null?BADGE:openN; $('#navAlert').hidden=!B; $('#navAlert').textContent=cap99(B);
   const so=s.safety_open||[], bn=(s.panel_open||0)+so.length;
   const BB=BADGE!=null?BADGE:bn; $('#bellCnt').hidden=!BB; $('#bellCnt').textContent=cap99(BB); $('#bellCnt').style.background=so.length?'var(--red)':'';
-  const ss=$('#sstrip');
-  if(so.length&&view==='monitor'){ const x=so[0];
-    ss.innerHTML='<span class="l3">L3 자동 실행</span><b>'+esc(sname(x.sector_id))+' · '+esc(x.cargo)+' 덤프 하차 반경 진입</b><span class="sx">'+esc(x.cam_id)+' · 적재함 올린 '+esc(x.vehicle_id)+' 뒤 '+x.dist_m+'m 안 작업자 1명 · 운전자 하차 중지 요청됨(가상) · '+esc(x.ts)+(x.repeat?' · 다시 감지':'')+(so.length>1?' · 외 '+(so.length-1)+'건':'')+'</span><span class="sp"></span>'+
-      '<button class="w" data-sack="'+esc(x.id)+'">확인</button><button data-sdis="'+esc(x.id)+'">취소 · 오탐지</button>'; ss.hidden=false; }
-  else ss.hidden=true;
+  // 상단 안전 띠(관제 화면 · 구역 상세): 관제 확인 전 1초 깜빡임 → [관제 확인] 뒤 빨간색 고정(안전 중지 유지) → [해제 · 하차 재개]
+  const x0=so.find(x=>!x.seen)||so[0], bandHTML=x0?(
+    (x0.seen?'<span class="seen">관제 확인됨 '+esc(x0.seen_at||'')+'</span><b>안전 중지 유지 · '+esc(sname(x0.sector_id))+' '+((x0.bay??0)+1)+'번 베이</b>'
+            :'<span class="l3">L3 자동 실행</span><b>'+esc(sname(x0.sector_id))+' '+((x0.bay??0)+1)+'번 베이 · '+(x0.rule==='reverse'?'후진 경로 작업자':'작업자 · 덤프 하역 반경 안')+'</b>')+
+    '<span class="sx">'+esc(x0.cam_id)+' · '+esc(x0.vehicle_id)+(x0.rule==='reverse'?'':' 뒤 '+x0.dist_m+'m')+' · 운전자 하차 중지 요청됨(가상) · '+esc(x0.ts)+(x0.repeat?' · 다시 감지':'')+(so.length>1?' · 외 '+(so.length-1)+'건':'')+'</span><span class="sp"></span>'+
+    (x0.seen?'':'<button class="w" data-sseen="'+esc(x0.id)+'">관제 확인</button>')+'<button'+(x0.seen?' class="w"':'')+' data-sack="'+esc(x0.id)+'">해제 · 하차 재개</button><button data-sdis="'+esc(x0.id)+'">오탐지</button>'):'';
+  [['#sstrip','monitor'],['#sstrip2','cam']].forEach(([sel,vw])=>{ const ss=$(sel), on=!!x0&&view===vw;
+    if(on&&ss.dataset.k!==bandHTML){ ss.innerHTML=bandHTML; ss.dataset.k=bandHTML; }
+    ss.hidden=!on; ss.classList.toggle('blink',on&&so.some(x=>!x.seen)); });
+  overviewSafety(s);
   if(view==='dock') renderOrders(s);
   if(view==='cam'){ drawBig(s); return; }
   if(view!=='monitor'){ renderAlerts(); return; }
@@ -1465,7 +1554,7 @@ function renderPanel(d){
   } else {
     h+='<div class="psec">지금 확인할 것 <span class="badge">'+d.safety_open.length+'</span></div>';
     h+=d.safety_open.length?d.safety_open.map(x=>'<div class="pcard safe"><div class="l1"><span class="tt"><b>'+esc(d.sector_names[x.sector_id])+' · '+esc(x.cargo)+' 덤프 반경 안 작업자</b> <span class="cap" style="color:var(--red)">미확인'+(x.repeat?' · 위험 계속 감지 중':'')+'</span></span></div>'+
-      '<div class="l2"><span class="why">'+esc(x.cam_id)+' · '+esc(x.vehicle_id)+' 적재함 상승 중 · '+x.dist_m+'m · L3 자동 실행 (앱 경고 · 하차 중지 요청, 가상) · '+esc(x.ts)+'</span><button class="mini" data-sdis="'+esc(x.id)+'">오탐지</button><button class="mini dark" data-sack="'+esc(x.id)+'">확인</button></div></div>').join('')
+      '<div class="l2"><span class="why">'+esc(x.cam_id)+' · '+esc(x.vehicle_id)+' 적재함 상승 중 · '+x.dist_m+'m · L3 자동 실행 (앱 경고 · 하차 중지 요청, 가상) · '+esc(x.ts)+'</span><button class="mini" data-sdis="'+esc(x.id)+'">오탐지</button><button class="mini dark" data-sack="'+esc(x.id)+'">해제 · 하차 재개</button></div></div>').join('')
       :'<div class="empty">지금 확인할 안전 경고가 없습니다.</div>';
     h+='<p class="pnote">확인해도 같은 위험이 계속 감지되면 다시 위로 올라와요 · 안전 경고는 금액으로 계산하지 않아요 · 반경 '+((d.safety_open[0]||{}).radius_m||5)+'m는 가정값(확인 필요)</p>';
     h+='<div class="psec">오늘 확인한 것 <span class="cap">'+d.safety_done.length+'</span></div>';
@@ -1490,9 +1579,11 @@ $('#panelBody').addEventListener('click',async e=>{
   }catch(err){}
   loadPanel(); refresh();
 });
-$('#sstrip').addEventListener('click',async e=>{ const sa=e.target.closest('[data-sack]'), sd=e.target.closest('[data-sdis]');
+async function seenSafety(id){ try{ await postJ('/api/safety/'+encodeURIComponent(id)+'/seen'); }catch(err){} refresh(); }   // 서버에 기록 → 실시간 상태로 모든 화면 · 다른 접속자에게
+['#sstrip','#sstrip2'].forEach(sel=>$(sel).addEventListener('click',async e=>{ const sn=e.target.closest('[data-sseen]'), sa=e.target.closest('[data-sack]'), sd=e.target.closest('[data-sdis]');
+  if(sn){ seenSafety(sn.dataset.sseen); return; }
   try{ if(sa) await postJ('/api/safety/'+encodeURIComponent(sa.dataset.sack)+'/ack'); else if(sd) await postJ('/api/safety/'+encodeURIComponent(sd.dataset.sdis)+'/dismiss'); }catch(err){}
-  refresh(); if(panelOpen) loadPanel(); });
+  refresh(); if(panelOpen) loadPanel(); }));
 $('#safetyBtn').addEventListener('click',async()=>{ try{ await postJ('/api/events/safety?sector_id='+encodeURIComponent($('#downSel').value)); }catch(e){ alert('그 호퍼에서 하차 중인 차량이 없어요. 다른 호퍼를 고르거나 잠시 뒤에 눌러 보세요.'); } refresh(); });
 
 function renderAlerts(){

@@ -366,6 +366,15 @@ async def panel2():
     return rt.panel2()
 
 
+@app.post("/api/safety/{sid}/seen")
+async def safety_seen(sid: str):
+    """관제 확인: 깜빡임 멈춤 · 빨간색 고정 · 안전 중지 유지 (해제는 /ack · /dismiss)"""
+    x = rt.safety_seen(sid)
+    if not x:
+        raise HTTPException(404, "열린 안전 경고가 없습니다")
+    return {"ok": True, "seen_at": x.get("seen_at")}
+
+
 @app.post("/api/safety/{sid}/ack")
 async def safety_ack(sid: str):
     if not rt.safety_resolve(sid, "ack"):
