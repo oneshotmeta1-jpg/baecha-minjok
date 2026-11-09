@@ -784,7 +784,7 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
 
 <!-- 하역장 상세 -->
 <div class="view" id="view-cam" hidden>
-  <div class="mon-bar"><a class="pill-btn" href="#monitor">← 관제 화면</a><h1 id="camTitle">하역장 상세</h1><span id="camStat" class="mapsum"></span><span class="sp"></span><span class="chs" id="camChs" role="group" aria-label="카메라 전환"></span></div>
+  <div class="mon-bar"><a class="pill-btn" href="#monitor">← 관제 화면</a><h1 id="camTitle">하역장 상세</h1><span id="camStat" class="mapsum"></span><button class="pill-btn" id="roiGo" type="button" hidden>구역(ROI) 다시 그리기</button><span class="sp"></span><span class="chs" id="camChs" role="group" aria-label="카메라 전환"></span></div>
   <div class="cam-grid">
     <section class="card" aria-label="CAM 크게 보기">
       <div class="hd"><h2 id="camName">CAM</h2><span class="chip blue" id="camSrc">추론 결과 재생 (시뮬레이션)</span><span class="sp"></span><span class="ovt" id="ovToggles" role="group" aria-label="겹쳐 그리기"><button data-ov="box" aria-pressed="true">박스</button><button data-ov="id" aria-pressed="true">추적 ID</button><button data-ov="zone" aria-pressed="true">구역 선</button><button data-ov="radius" aria-pressed="true">덤프 하역 반경</button></span></div>
@@ -814,6 +814,10 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
 (async function(){
 'use strict';
 const $=s=>document.querySelector(s);
+/* 실시간 화면은 0.1초마다 다시 그린다. 내용이 같으면 그대로 두어야 누르는 사이 버튼이 바뀌어 클릭이 사라지지 않는다. */
+const _ih=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');
+function stableHTML(el){ if(!el||el.__stable) return; el.__stable=true; let last=null;
+  Object.defineProperty(el,'innerHTML',{configurable:true,get(){ return _ih.get.call(el); },set(v){ v=String(v); if(v===last) return; last=v; _ih.set.call(el,v); }}); }
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const NS='http://www.w3.org/2000/svg';
 const el=(tag,attrs,text)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text!=null)e.textContent=text;return e;};
@@ -833,6 +837,9 @@ window.fetch=async(u,o)=>{ const r=await _fetch(u,o); if(r.status===401&&String(
 const ME=await (await fetch('/api/me')).json().catch(()=>null);
 if(ME&&ME.must_change_pw){ location.replace('/login?change=1'); return; }       // 임시 비밀번호 → 먼저 바꾸기 (R14)
 const cfg=await (await fetch('/api/config')).json();
+['#camStat','#camBays','#camChs','#camEv','#sideR','#orderTable','#mapSum','#sstrip','#nmList','#alerts','#hoppers','#dlgRows','#panelBody','#dockBase','#dockMsg','#roiChs','#kWait','#kAvg','#kUtil','#kTrips']
+  .forEach(id=>stableHTML(document.querySelector(id)));
+
 const S=cfg.sectors;
 if(S.site) $('#siteName').textContent=S.site.name+' · 시뮬레이션';
 $('#downSel').innerHTML=S.sectors.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('');
@@ -1234,9 +1241,9 @@ function drawBig(st){
   $('#camChs').innerHTML=S.cams.map(x=>'<button class="pill-btn'+(x.id===camId?' dark':'')+'" data-cam="'+x.id+'" aria-pressed="'+(x.id===camId)+'">'+esc(x.id+' · '+x.name)+'<span class="srcd'+(isLive(x.id)?' on':'')+'">'+(isLive(x.id)?'LIVE':'시뮬')+'</span></button>').join('');
   if(sec){ const lv=sec.status==='down'?'down':sec.level;
     const nSafe=sec.working.filter(w=>w.safety).length;
-    $('#camStat').innerHTML='<span class="chip '+lv+'">'+LV_TEXT[lv]+(sec.status==='down'?'':' '+sec.congestion_pct+'%')+'</span><span class="chip">하역 중 <b class="num">'+sec.working.length+'/'+sec.bays+'</b> · 대기 <b class="num">'+sec.queue.length+'</b></span>'+(nSafe?'<span class="chip crit">안전 경고 <b class="num">'+nSafe+'</b></span>':'')+'<a class="pill-btn" href="#settings" data-roi="1">구역(ROI) 다시 그리기</a>'; drawBays(st,sec); loadCamEv(sec.id,st.clock); }
+    $('#camStat').innerHTML='<span class="chip '+lv+'">'+LV_TEXT[lv]+(sec.status==='down'?'':' '+sec.congestion_pct+'%')+'</span><span class="chip">하역 중 <b class="num">'+sec.working.length+'/'+sec.bays+'</b> · 대기 <b class="num">'+sec.queue.length+'</b></span>'+(nSafe?'<span class="chip crit">안전 경고 <b class="num">'+nSafe+'</b></span>':''); drawBays(st,sec); loadCamEv(sec.id,st.clock); }
   else { $('#camStat').innerHTML='<span class="chip">대기장 <b class="num">'+st.counts.yard+'대</b></span><span class="chip">호출 이동 <b class="num">'+st.counts.moving+'대</b></span>'; $('#camBays').innerHTML=''; loadCamEv(null,st.clock); }
-  const live=isLive(camId); setBigLive(live); drawNearMiss(st);
+  const live=isLive(camId); setBigLive(live); $('#roiGo').hidden=false; drawNearMiss(st);
   const det=live?[]:(sec?renderHopperCam(cv,c,sec,byId,hhmm(st.clock)):renderYardCam(cv,c,st,hhmm(st.clock)));
   $('#dlgCount').textContent='이 프레임 · '+det.length+'대';
   $('#dlgRows').innerHTML=det.length?det.map(d=>'<tr><td class="num">#'+esc(d.id)+'</td><td class="plate">'+esc(d.veh)+'</td><td>'+esc(d.zone)+'</td><td class="r num">'+Math.floor(d.stay)+'분</td><td class="r num">'+(d.deg?d.deg+'°':'—')+'</td><td>'+esc(d.judge)+'</td></tr>').join(''):'<tr><td colspan="6" class="empty">이 채널에 잡힌 차량이 없습니다.</td></tr>';
@@ -1288,7 +1295,7 @@ async function loadCamEv(sid,clock){
     :'<li class="cap">최근 10분 동안 이벤트가 없습니다.</li>';
 }
 let roiWant=null;
-$('#camStat').addEventListener('click',e=>{ if(e.target.closest('[data-roi]')){ roiWant=camId; setTimeout(()=>{ const b=document.querySelector('[data-stab=roi]'); if(b) b.click(); },60); } });
+$('#roiGo').addEventListener('click',()=>{ roiWant=camId; location.hash='#settings'; setTimeout(()=>{ const b=document.querySelector('[data-stab=roi]'); if(b) b.click(); },60); });
 
 /* 큰 화면 영상 재생 · 겹치기 · ×1/×4/×8 (시안 SectorCam) */
 let bigLiveId=null;
