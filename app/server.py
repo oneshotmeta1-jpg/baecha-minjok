@@ -34,6 +34,13 @@ VERSION = "v12"
 TICK = 0.1  # 실제 초
 
 import os  # noqa: E402
+from app import sim as sim_mod  # noqa: E402
+from app.cams import video_near_miss  # noqa: E402
+try:                 # 실제 영상 아차사고(R16) — 시뮬레이션 모드에서도 영상 한 바퀴마다 기록
+    _cams0 = load("cams.json")
+    sim_mod.VIDEO_NM[:] = video_near_miss(_cams0, ROOT / _cams0.get("dir", "영상"))
+except Exception as _e:   # 영상·탐지 결과가 없으면 그냥 비운다
+    print("영상 아차사고 목록 없음:", _e)
 # DOCK_MEMORY=1: 테스트에서 이 모듈을 가져와도 이벤트 DB · 가정값 파일을 건드리지 않게 메모리에서만
 rt = Runtime(seed=7) if os.environ.get("DOCK_MEMORY") else Runtime(seed=7, db_path=DATA / "events.db", assumptions_path=DATA / "assumptions.json")
 clients: set = set()

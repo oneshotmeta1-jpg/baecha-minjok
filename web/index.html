@@ -144,6 +144,7 @@ main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.42fr) min
 .chip.ok{background:var(--green-bg);color:var(--green)} .chip.warn{background:var(--orange-bg);color:var(--orange)} .chip.crit{background:var(--red-bg);color:var(--red)}
 .chip.down{background:var(--red);color:#fff} .chip.blue{background:var(--blue-bg);color:var(--blue)} .chip.dark{background:var(--ink);color:#fff}
 
+.realv{display:inline-block;margin-left:6px;padding:0 6px;border-radius:6px;background:#E6F4EA;color:#137333;font-size:11px;font-weight:700}
 /* ① 맵 */
 #mapBd{display:flex;flex-direction:column;gap:6px;overflow:hidden}
 #mapSvg{flex:1;min-height:0;width:100%}
@@ -797,7 +798,7 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
       <div class="hd"><h2 id="camName">CAM</h2><span class="chip blue" id="camSrc">추론 결과 재생 (시뮬레이션)</span><span class="sp"></span><span class="ovt" id="ovToggles" role="group" aria-label="겹쳐 그리기"><button data-ov="box" aria-pressed="true">박스</button><button data-ov="id" aria-pressed="true">추적 ID</button><button data-ov="zone" aria-pressed="true">구역 선</button><button data-ov="radius" aria-pressed="true">덤프 하역 반경</button></span></div>
       <div class="bd"><div class="vwrap" id="bigWrap"><video id="bigVid" muted loop playsinline preload="auto" hidden></video><canvas id="bigCam" width="1280" height="720"></canvas></div><div class="vctl" id="vctl" hidden><span class="chip live">LIVE(영상)</span><span class="num" id="vTime">00:00 / 00:00</span><button class="pill-btn" id="vPlay">일시정지</button><span class="seg" role="group" aria-label="재생 속도"><button data-rate="1" aria-pressed="true">×1</button><button data-rate="4" aria-pressed="false">×4</button><button data-rate="8" aria-pressed="false">×8</button></span><span class="cap" id="vNote"></span></div>
         <div class="bays3" id="camBays"></div>
-        <p class="cap">판정 규칙: 박스 아래 중심점이 베이·대기선 구역 안에 3초 이상 있으면 진입으로 본다. 덤프트럭 전체 박스의 세로/가로 비율이 0.6 이상이면 적재함 상승(하차 중)으로 판정한다. 아차사고: 사람 발끝이 위험 구역(덤프 반경 · 후진 경로)에 있고 그 베이 트럭 조건이 맞으면 빨간 강조 — 이어진 시간 1초 L2 경고, 2초 L3 하차 중지(가정값). 영상이 없는 채널은 시뮬레이터가 만든 합성 화면이다.</p></div>
+        <p class="cap">판정 규칙: 박스 아래 중심점이 베이·대기선 구역 안에 3초 이상 있으면 진입으로 본다. 덤프트럭 전체 박스의 세로/가로 비율이 0.6 이상이면 적재함 상승(하차 중)으로 판정한다. 아차사고: 사람 발끝이 위험 구역(덤프 반경 · 후진 경로)에 있고 그 베이 트럭 조건이 맞으면 빨간 강조 — 이어진 시간 1초 L2 경고, 2초 L3 하차 중지(가정값). 대기장(CAM-04)은 사람과 움직이는 트럭 사이를 선과 거리(m, 사람 키 1.7m 기준)로 표시 — 3m 이하 L1 · 2m 이하 L2 · 1m 이하 L3(가정값). 합성 사람은 꺼져 있다. 영상이 없는 채널은 시뮬레이터가 만든 합성 화면이다.</p></div>
     </section>
     <div class="cam-side">
       <section class="card" aria-label="탐지 목록" style="flex:1">
@@ -972,8 +973,17 @@ S.sectors.forEach(s=>{ const t=secShape[s.id]; if(t&&t.poly&&t.poly.parentNode){
 const yardLbl=[...svg.querySelectorAll('text')].find(t=>t.textContent==='차량 대기장');
 function pill(x,y,txt,fill,col,bold){ const g=el('g',{transform:'translate('+x.toFixed(1)+','+y.toFixed(1)+')'}); const t=el('text',{x:10,y:15,'font-size':14,'font-weight':bold?800:700,fill:col,'font-family':'Inter,Noto Sans KR,sans-serif'},txt);
   g.appendChild(el('rect',{x:0,y:0,width:txt.length*8.6+20,height:22,rx:11,fill,stroke:'#fff','stroke-width':2})); g.appendChild(t); return g; }
+function yardNM(s){ // 최근 10분(시뮬레이션) 안 대기장 아차사고 중 가장 높은 단계 · 가장 최근
+  const now=s.t, xs=(s.near_miss||[]).filter(x=>x.sector_id==null&&x.t!=null&&now-x.t<=10&&now>=x.t);
+  if(!xs.length) return null; const r={L3:3,L2:2,L1:1}; return xs.slice().sort((a,b)=>(r[b.level]-r[a.level])||(b.t-a.t))[0]; }
+function nmText(x){ return '아차사고 '+x.level+' · 움직이는 트럭↔사람 '+x.min_dist_m+'m · '+x.ts; }
 function drawOverlay(s){
   ovLayer.innerHTML='';
+  const ynm=yardNM(s), yz=S.zones.find(z=>z.id==='YARD');
+  if(ynm&&yz){ const b=bbox(yz.poly), cx=(b[0]+b[2])/2, cy=(b[1]+b[3])/2, col=ynm.level==='L3'?'#D7263D':ynm.level==='L2'?'#E8590C':'#C99400';
+    const g=el('g',{'data-cam':ynm.cam_id,style:'cursor:pointer'}); g.appendChild(el('title',{},'대기장 아차사고 — 눌러서 '+ynm.cam_id+' 장면 보기'));
+    g.appendChild(el('circle',{cx,cy,r:Math.max(26,(b[2]-b[0])*0.35),fill:'rgba(215,38,61,.14)',stroke:col,'stroke-width':3,'stroke-dasharray':'6 4'}));
+    g.appendChild(pill(cx-20,b[3]+8,nmText(ynm),col,'#fff',true)); ovLayer.appendChild(g); }
   if(yardLbl) yardLbl.textContent='차량 대기장 · '+s.counts.yard+'대';
   s.sectors.forEach(x=>{ const sc=S.sectors.find(y=>y.id===x.id), b=bbox(sc.poly);
     secShape[x.id].pct.textContent=x.status==='down'?'정지':LV_TEXT[x.level]+' '+x.congestion_pct+'%';
@@ -998,6 +1008,7 @@ const M3={
   delayPill:{A:[150,372],B:[674,448],C:[560,535]},
   queue:{A:[[430,383],[412,380],[394,376]],B:[[604,377],[620,370],[637,366]],C:[[452,455],[432,456],[412,457]]},
   lot:i=>i<6?[695+25.3*i,368+6.3*i]:[676+25.3*(i-6),396+6.3*(i-6)], lotPill:[811,447,[805,430]],
+  lotPoly:[[683.0,345.7],[850.8,387.4],[812.3,446.2],[644.4,404.4]], lotCenter:[747,396], nmPill:[860,410],
   route:{A:[[664.6,372.3],[632.4,364.3],[594.8,348.3],[593.1,318.3],[551.7,308.0],[486.7,321.4],[419.7,354.2]],
          B:[[664.6,372.3],[632.4,364.3],[597.3,384.6]],
          C:[[664.6,372.3],[632.4,364.3],[597.3,384.6],[572.2,388.2],[535.3,442.4],[492.8,454.1]]},
@@ -1046,6 +1057,12 @@ function drawIso(s){
   const yard=s.vehicles.filter(v=>v.state==='yard'||v.state==='arrived');
   yard.slice(0,12).forEach((v,i)=>{ const q=M3.lot(i); g+=truck3(q[0],q[1],{ring:v.urgent?'#D7263D':null}); });
   const [lx,ly,la]=M3.lotPill, lp=pill3(lx,ly,'차량 대기장 · '+s.counts.yard+'대',{fs:13,minw:148,dot:'#8A8F95'}); top+=lead(lx+6,ly+lp.h/2,la[0],la[1])+lp.g;
+  const ynm=yardNM(s);   // 대기장 아차사고(R16, 실제 영상 CAM-04)
+  if(ynm){ const col=ynm.level==='L3'?'#D7263D':ynm.level==='L2'?'#E8590C':'#C99400', [cx,cy]=M3.lotCenter;
+    g+='<g data-cam="'+esc(ynm.cam_id)+'" style="cursor:pointer"><title>대기장 아차사고 — 눌러서 '+esc(ynm.cam_id)+' 장면 보기</title><polygon points="'+M3.lotPoly.map(p=>p.join(',')).join(' ')+'" fill="rgba(215,38,61,.16)" stroke="'+col+'" stroke-width="2" stroke-dasharray="5 4"/>'+
+      '<g transform="translate('+cx+','+(cy-4)+') scale(.6)"><circle cy="-8" r="6" fill="'+col+'"/><rect x="-5" y="-2" width="10" height="20" rx="4" fill="'+col+'"/></g></g>';
+    const np=pill3(M3.nmPill[0],M3.nmPill[1],nmText(ynm),{minw:250,bg:col,stroke:col,fg:'#fff',attr:' data-cam="'+esc(ynm.cam_id)+'" style="cursor:pointer"'});
+    top+=lead(M3.nmPill[0]+6,M3.nmPill[1]+np.h/2,cx,cy)+np.g; }
   s.vehicles.filter(v=>v.state==='moving'&&v.sector_id&&M3.route[v.sector_id]).slice(0,3).forEach((v,i)=>{
     const sec=s.sectors.find(x=>x.id===v.sector_id), dest=M3.bay[v.sector_id][v.bay||0], pts=M3.route[v.sector_id].concat([dest]);
     const f=sec&&sec.travel_min?1-(v.eta_min||0)/sec.travel_min:0.5, q=along(pts,f);
@@ -1085,6 +1102,7 @@ const ZOOM={plan:zoomable($('#mapSvg'),[0,0,S.map.width,S.map.height]),iso:zooma
 document.querySelectorAll('[data-zm]').forEach(b=>b.addEventListener('click',()=>{ const z=ZOOM[mapView]; if(!z) return;
   if(b.dataset.zm==='reset') z.reset(); else z.zoomAt(b.dataset.zm==='in'?0.8:1.25); }));
 iso.addEventListener('click',e=>{ const h=e.target.closest('[data-cam]'); if(h) openCam(h.dataset.cam); });
+svg.addEventListener('click',e=>{ const h=e.target.closest('[data-cam]'); if(h) openCam(h.dataset.cam); });   // 평면도 대기장 아차사고 표식 → CAM-04
 let mapView='iso'; try{ mapView=localStorage.getItem('mapView2')||'iso'; }catch(e){}
 function setMapView(m){ mapView=m; try{ localStorage.setItem('mapView2',m); }catch(e){}
   $('#mapSvg').style.display=m==='plan'?'':'none'; $('#isoSvg').style.display=m==='iso'?'':'none'; if(ZOOM[m]) ZOOM[m].show();
@@ -1119,7 +1137,9 @@ function drawVehicles(vs,road){
 /* ---------- CAM (측면 시점 합성 화면 + 판정 오버레이) ---------- */
 /* ---------- 영상 채널 (R9): /api/cams → 영상이 있으면 LIVE(영상), 없으면 시뮬레이션 그림 ---------- */
 const VC={}; let VSCALE=1;
-try{ const r=await (await fetch('/api/cams')).json(); (r.cams||[]).forEach(c=>{ if(c.source==='video') VC[c.camera]=c; }); VSCALE=r.time_scale||1; }catch(e){}
+let APR=null;   // 접근 규칙 ③(R16) 기준값 — 서버 판정(vision/near_miss.py)과 같은 값으로 CAM 화면에 거리선을 그린다
+try{ const r=await (await fetch('/api/cams')).json(); (r.cams||[]).forEach(c=>{ if(c.source==='video') VC[c.camera]=c; }); VSCALE=r.time_scale||1;
+  APR=((r.near_miss||{}).rules||[]).find(x=>x.key==='approach'&&x.enabled)||null; }catch(e){}
 const isLive=id=>!!VC[id];
 const DET={};
 async function loadDet(id){ if(id in DET) return DET[id]; DET[id]=null; const c=VC[id]; if(c&&c.det_url){ try{ DET[id]=await (await fetch(c.det_url)).json(); }catch(e){} } return DET[id]; }
@@ -1154,6 +1174,17 @@ function drawOv(cv,id,t,small){
   if(danger.size){ const z=[...danger.values()][0], msg='아차사고 위험 · '+(/후진/.test(z.rule||'')?'후진 경로':'적재함 상승 중 덤프 반경')+' 안 사람';
     ctx.font='800 '+Math.round(fs*1.1)+'px Inter,Noto Sans KR,sans-serif'; const mw=ctx.measureText(msg).width+20; ctx.fillStyle='#D7263D'; ctx.fillRect(fw/2-mw/2,8,mw,fs*1.1+14); ctx.fillStyle='#fff'; ctx.fillText(msg,fw/2-mw/2+10,8+fs*1.1+5);
     ctx.font='700 '+fs+'px Inter,Noto Sans KR,sans-serif'; }
+  // 접근(R16 규칙 ③): 사람 발끝 ↔ '움직이는' 트럭 박스 가장 가까운 점 · 사람 키(1.7m)로 m 환산 · 3m 이하만 선과 거리
+  if(APR&&(APR.cams||[]).includes(id)){ const near=approachPairs(DET[id],f0,t);
+    near.forEach(n=>{ const lv=n.d<=APR.l3_m?'L3':n.d<=APR.l2_m?'L2':'L1', col=lv==='L3'?'#FF2D46':lv==='L2'?'#FF8A3D':'#FFD23F';
+      ctx.lineWidth=lw*2.2; ctx.strokeStyle=col; ctx.beginPath(); ctx.moveTo(n.p[0],n.p[1]); ctx.lineTo(n.q[0],n.q[1]); ctx.stroke();
+      ctx.beginPath(); ctx.arc(n.p[0],n.p[1],lw*3,0,Math.PI*2); ctx.fillStyle=col; ctx.fill();
+      const lab=n.d.toFixed(1)+'m · '+lv, w2=ctx.measureText(lab).width+12, lx=Math.min(fw-w2-4,n.p[0]+lw*4), ly=n.p[1]+fs+8;
+      ctx.fillStyle=col; ctx.fillRect(lx,ly-fs-4,w2,fs+8); ctx.fillStyle='#141414'; ctx.fillText(lab,lx+6,ly); });
+    const top=near.slice().sort((a,b)=>a.d-b.d)[0];
+    if(top&&top.d<=APR.l2_m){ const msg='아차사고 위험 · 움직이는 트럭과 사람 '+top.d.toFixed(1)+'m';
+      ctx.font='800 '+Math.round(fs*1.1)+'px Inter,Noto Sans KR,sans-serif'; const mw=ctx.measureText(msg).width+20; ctx.fillStyle='#D7263D'; ctx.fillRect(fw/2-mw/2,8,mw,fs*1.1+14); ctx.fillStyle='#fff'; ctx.fillText(msg,fw/2-mw/2+10,8+fs*1.1+5);
+      ctx.font='700 '+fs+'px Inter,Noto Sans KR,sans-serif'; } }
   if(!OV.box) return;
   const TB=f.objects.filter(o=>o.cls==='truck').map(o=>o.bbox);
   const inner=b=>TB.some(q=>q!==b&&(q[2]-q[0])*(q[3]-q[1])>(b[2]-b[0])*(b[3]-b[1])&&Math.max(0,Math.min(b[2],q[2])-Math.max(b[0],q[0]))*Math.max(0,Math.min(b[3],q[3])-Math.max(b[1],q[1]))>=0.8*(b[2]-b[0])*(b[3]-b[1]));
@@ -1165,6 +1196,18 @@ function drawOv(cv,id,t,small){
     const lab=(OV.id?'#'+o.track_id+' · ':'')+(out?'구역 밖':truck?(up?'적재함↑ '+rr.toFixed(2):'트럭 '+rr.toFixed(2)):'사람'+(o.stand_in?'(합성)':'')+(dz?' · 위험':''))+(inZ&&!small?' · '+inZ.name.split(' ')[0]+' '+(inZ.name.split(' ')[1]||''):'');
     const tw2=ctx.measureText(lab).width+10; ctx.fillStyle=col; ctx.fillRect(b[0],Math.max(0,b[1]-fs-8),tw2,fs+8); ctx.fillStyle='#141414'; ctx.fillText(lab,b[0]+5,Math.max(fs,b[1]-6)); });
 }
+function approachPairs(d,f,t){ // 서버 규칙과 같게: 최근 move_win_sec 동안 접지점 이동 ≥ max(move_px, 너비×move_frac)인 트럭만 · 사람마다 가장 가까운 것
+  if(!d||!f) return []; const F=d.frames, w=APR.move_win_sec||1; let lo=0,hi=F.length-1; while(lo<hi){ const m=(lo+hi+1)>>1; if(F[m].t<=t-w) lo=m; else hi=m-1; }
+  const past=F[lo], ft=b=>[(b[0]+b[2])/2,b[3]], out=[];
+  const mov=f.objects.filter(o=>o.cls==='truck').filter(o=>{ if(!past||t-past.t<w*0.6) return false;
+    const b=o.bbox, ow=b[2]-b[0], a=ft(b);   // 같은 ID가 없으면 1초 전 가장 많이 겹친 박스
+    let q=past.objects.find(x=>x.cls==='truck'&&x.track_id===o.track_id);
+    if(!q){ let bi=0; past.objects.filter(x=>x.cls==='truck').forEach(x=>{ const c=x.bbox, ix=Math.max(0,Math.min(b[2],c[2])-Math.max(b[0],c[0]))*Math.max(0,Math.min(b[3],c[3])-Math.max(b[1],c[1])); if(ix>bi){ bi=ix; q=x; } }); }
+    if(!q) return false; const c=ft(q.bbox); return Math.hypot(a[0]-c[0],a[1]-c[1])>=Math.max(APR.move_px,ow*APR.move_frac); });
+  f.objects.filter(o=>o.cls==='person').forEach(o=>{ const b=o.bbox, h=b[3]-b[1]; if(h<20) return; const p=ft(b), mpp=APR.person_h_m/h; let best=null;
+    mov.forEach(m=>{ const c=m.bbox, q=[Math.min(Math.max(p[0],c[0]),c[2]),Math.min(Math.max(p[1],c[1]),c[3])], dd=Math.hypot(p[0]-q[0],p[1]-q[1])*mpp; if(!best||dd<best.d) best={d:dd,p,q}; });
+    if(best&&best.d<=APR.dist_m) out.push(best); });
+  return out; }
 function medRatio(d,t,tid,now){ // 같은 추적 ID의 최근 1초 세로/가로 중앙값(한 프레임 흔들림 무시 · 변환기와 같은 규칙)
   if(!d) return now; const F=d.frames, r=[]; let lo=0,hi=F.length-1; while(lo<hi){ const m=(lo+hi+1)>>1; if(F[m].t<=t) lo=m; else hi=m-1; }
   for(let i=lo;i>=0&&t-F[i].t<=1;i--) F[i].objects.forEach(o=>{ if(o.track_id===tid&&o.cls==='truck'){ const b=o.bbox; r.push((b[3]-b[1])/Math.max(1,b[2]-b[0])); } });
@@ -1295,15 +1338,16 @@ function drawBig(st){
 
 /* 아차사고 기록 (R15) — 영상 NEAR_MISS · 이 카메라 것만 · [장면] = 그 영상 시각으로 이동 */
 const NM_LV={L1:'L1 주의',L2:'L2 경고',L3:'L3 하차 중지'};
+const NM_LV_YARD={L1:'L1 주의',L2:'L2 경고',L3:'L3 위험'};   // 대기장 접근(③)은 하차가 없어 '하차 중지'가 아님
 let nmKey='';
 function drawNearMiss(st){
   const rows=(st.near_miss||[]).filter(x=>x.cam_id===camId).slice().reverse(), key=camId+'|'+rows.map(x=>x.id).join(',');
   if(key===nmKey) return; nmKey=key;
   $('#nmCount').textContent=rows.length?rows.length+'건':'';
-  $('#nmList').innerHTML=rows.length?rows.map(x=>'<div class="nm-row"><span class="num cap">'+esc(x.ts)+'</span><span class="nm-lv '+esc(x.level)+'">'+esc(NM_LV[x.level]||x.level)+'</span>'+
-      '<span>'+(x.rule_no?['','①','②','③','④','⑤'][x.rule_no]+' ':'')+esc(x.rule)+' · 베이 '+esc(x.bay)+'<span class="cap" style="display:block">'+esc(x.vehicle_id||'')+' · 영상 '+esc(x.duration_s)+'초 머묾 · 최소 '+esc(x.min_dist_m)+'m <span class="assumed">가정</span>'+(x.source==='stand_in'?'<span class="stand">합성 사람</span>':'')+'</span></span>'+
+  $('#nmList').innerHTML=rows.length?rows.map(x=>'<div class="nm-row"><span class="num cap">'+esc(x.ts)+'</span><span class="nm-lv '+esc(x.level)+'">'+esc((x.rule_key==='approach'?NM_LV_YARD:NM_LV)[x.level]||x.level)+'</span>'+
+      '<span>'+(x.rule_no?['','①','②','③','④','⑤'][x.rule_no]+' ':'')+esc(x.rule)+(x.bay!=null?' · 베이 '+esc(x.bay):' · 대기장')+'<span class="cap" style="display:block">'+esc(x.vehicle_id||'')+(x.truck_speed_kmh?' · 트럭 '+esc(x.truck_speed_kmh)+'km/h':'')+' · 영상 '+esc(x.duration_s)+'초 · 최소 '+esc(x.min_dist_m)+'m <span class="assumed">가정</span>'+(x.source==='stand_in'?'<span class="stand">합성 사람</span>':'<span class="realv">실제 영상</span>')+'</span></span>'+
       (isLive(camId)&&x.snapshot_t!=null?'<button class="mini" data-nmt="'+x.snapshot_t+'">장면</button>':'<span></span>')+'</div>').join('')
-    :'<div class="empty">'+(isLive(camId)?'이 카메라에서 기록된 아차사고가 없습니다. 영상 모드 서버(--video)에 tools/ingest_videos.py로 넣으면 기록됩니다.':'영상이 연결된 채널에서만 기록됩니다.')+'</div>';
+    :'<div class="empty">'+(isLive(camId)?(APR&&(APR.cams||[]).includes(camId)?'아직 기록된 아차사고가 없습니다. 영상 장면이 지나가면 기록됩니다.':'이 카메라 영상에는 사람이 나오지 않아 아차사고가 기록되지 않습니다(합성 사람 꺼짐).'):'영상이 연결된 채널에서만 기록됩니다.')+'</div>';
 }
 $('#nmList').addEventListener('click',e=>{ const b=e.target.closest('[data-nmt]'); if(!b) return; const v=$('#bigVid'); if(v.hidden) return; v.currentTime=Math.max(0,+b.dataset.nmt-1); v.pause(); $('#vPlay').textContent='재생'; });
 

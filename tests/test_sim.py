@@ -426,6 +426,14 @@ check("시연 시나리오: 3번 눌러도 같은 숫자", demos[0] == demos[1] 
       f"₩{demos[0]['won']:,} · {demos[0]['effect_min']}분 · {demos[0]['vehicles']}대")
 
 # ---------- R8: 안전 경고 (덤프 반경 작업자 · L3 자동 실행) ----------
+import app.sim as _SM  # noqa: E402
+_load0 = _SM.load
+def _load_syn(name):        # R16부터 합성 작업자는 기본 꺼짐(data/sectors.json safety.synthetic=false) → 켠 설정으로 기존 동작 확인
+    d = _load0(name)
+    if name == "sectors.json":
+        d["safety"]["synthetic"] = True
+    return d
+_SM.load = _load_syn
 r8 = Runtime(7)
 r8.advance(240)
 nat = r8.rec.safety
@@ -433,6 +441,9 @@ check("안전 경고가 하루에 드물게 생김 (시드 고정, 아무도 안
       f"{len(nat)}건 · " + " ".join(x["ts"][:5] for x in nat))
 r8b = Runtime(7); r8b.advance(240)
 check("같은 시드 → 같은 시각에 같은 안전 경고", [(x["ts"], x["vehicle_id"]) for x in r8b.rec.safety] == [(x["ts"], x["vehicle_id"]) for x in nat])
+_SM.load = _load0
+r8c = Runtime(7); r8c.advance(240)
+check("R16 기본: 합성 작업자 꺼짐 → 무작위 안전 경고 없음([위험 시연]은 그대로)", not r8c.rec.safety)
 r9 = Runtime(7); r9.advance(60)
 xs = None
 for sid_ in "ABC":
@@ -489,6 +500,9 @@ check("비전 변환: 대기장 도착 → 베이 진입 → 덤프 반경 경�
 import tempfile  # noqa: E402
 from app.cams import cam_list  # noqa: E402
 cfg9 = json.loads((ROOT / "data" / "cams.json").read_text(encoding="utf-8"))
+_fx9 = json.loads((ROOT / "tests" / "zones_fixture.json").read_text(encoding="utf-8"))   # 판정 테스트는 고정 구역(현장 편집과 무관)
+for _c9 in cfg9["cams"]:
+    _c9["zones"] = _fx9[_c9["camera"]]
 with tempfile.TemporaryDirectory() as td:
     cl = cam_list(cfg9, Path(td))
 check("영상 채널: 영상 파일이 없으면 4채널 모두 시뮬레이션으로", len(cl) == 4 and all(c["source"] == "sim" and c["video_url"] is None for c in cl))

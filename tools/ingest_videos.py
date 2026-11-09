@@ -8,7 +8,8 @@
 - 화면의 영상 반복 재생은 이벤트를 다시 넣지 않는다. 같은 파일을 두 번 실행해도 서버가 event_id로 중복을 거른다(결과 "duplicate").
 - 영상에는 계근 신호가 없어서, 영상에 처음 나온 차마다 GATE_IN을 1분 앞에 넣는다(원료·적재량은 가정, payload.assumed=true).
 - 영상 시각은 data/cams.json time_scale배로 늘린다(15초 클립 → 10분).
-- 아차사고(R15): 사람이 안 나오는 호퍼 영상에는 data/stand_in.json의 합성 사람을 섞어 판정한다(NEAR_MISS payload.source = stand_in).
+- 아차사고(R15·R16): 영상에 나온 실제 사람으로 판정한다(대기장 CAM-04 접근 규칙 ③ 등, payload.source = video).
+  data/cams.json near_miss.stand_in = true일 때만 호퍼 영상에 data/stand_in.json의 합성 사람을 섞는다(source = stand_in).
 """
 import argparse
 import hashlib
@@ -37,8 +38,9 @@ def build(start, cfg=None, sectors=None, settings=None, play=1, stand_in=None):
     settings = settings or json.loads((ROOT / "data" / "settings.json").read_text(encoding="utf-8"))
     bc = {s["id"]: s.get("bay_cargo") or s["cargo"] for s in sectors["sectors"]}
     mix = [c for c, n in settings["fleet"]["cargo_mix"].items() for _ in range(n)]
-    stand_in = near_miss.load_stand_in() if stand_in is None else stand_in
     nm_cfg = near_miss.config(cfg)
+    if stand_in is None:
+        stand_in = near_miss.load_stand_in() if near_miss.stand_in_on(nm_cfg) else {"cams": {}}
     out, report = [], []
     for c in cfg["cams"]:
         det = ROOT / cfg["dir"] / (Path(c["video"]).stem + ".det.json")

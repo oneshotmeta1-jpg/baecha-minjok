@@ -15,6 +15,7 @@
     - 3초 동안 접지점이 거의 안 움직이면 VEHICLE_STOPPED
     - 아차사고(R15, vision/near_miss.py): 사람 발끝이 위험 구역(덤프 반경 · 후진 경로)에 있고 그 베이 트럭 조건이 맞으면
       L1 → (1초) L2 → (2초) L3. 위험이 끝날 때 NEAR_MISS 한 건, L3에 오르는 순간 SAFETY_ALERT(하차 중지 요청).
+    - 접근(R16, 규칙 ③): 대기장 카메라에서 사람과 움직이는 트럭이 3m 이하로 가까워지면 NEAR_MISS(zone=yard, SAFETY_ALERT 없음).
 """
 import argparse
 import json
@@ -72,6 +73,7 @@ def convert(data, start, rois=None, scale=1.0, flush=False, nm_cfg=None):
     out = []
     trk = {}            # (cam, track) → {zone, cand, since, last_pt, pt_since, stopped, bay_t}
     nm = near_miss.Tracker(nm_cfg or near_miss.config(), lambda *a: ev(*a), m_per_px=rois.get("m_per_px"))
+    nm_win = near_miss.rule(nm.cfg, "approach").get("move_win_sec", 1.0)
     alias = {}          # (cam, 추적 ID) → 같은 트럭으로 본 처음 ID
     seen = {}           # (cam, 대표 ID) → (마지막 시각, 마지막 박스)
     area0 = rois["frame"][0] * rois["frame"][1]
@@ -139,6 +141,10 @@ def convert(data, start, rois=None, scale=1.0, flush=False, nm_cfg=None):
                     s["up"] = c_up
                 raised = s.get("up", False)
                 s["box"] = b
+                mv = s.setdefault("mv", [])               # (t, 접지점) 최근 1초 — 접근 규칙의 '움직이는 트럭'
+                mv.append((t, pt))
+                while mv and t - mv[0][0] > nm_win:
+                    mv.pop(0)
                 trucks[k] = (zid, raised, s)
                 move(t, fr["cam_id"], sid, o["track_id"], s, zid)
                 d = ((pt[0] - s["pt"][0]) ** 2 + (pt[1] - s["pt"][1]) ** 2) ** 0.5
@@ -155,6 +161,7 @@ def convert(data, start, rois=None, scale=1.0, flush=False, nm_cfg=None):
                 continue
             b = [o["bbox"][0] * kx, o["bbox"][1] * ky, o["bbox"][2] * kx, o["bbox"][3] * ky]
             nm.see(t, fr["cam_id"], sid, o, b, zones, trucks, px_scale=kx)
+            nm.approach(t, fr["cam_id"], o, b, zones, trucks, px_scale=kx)
         nm.end_frame(t, fr["cam_id"])
     nm.close_all()
     if flush and data["frames"]:            # 영상 한 번 = 반입 한 번: 끝날 때 하차장에 남은 차는 이탈로 닫는다
