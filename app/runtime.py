@@ -9,6 +9,7 @@ import copy
 import csv
 import io
 import json
+import re
 import sqlite3
 import time
 from datetime import timedelta
@@ -97,6 +98,7 @@ class Runtime:
     def reset(self):
         self.actions = []        # 시뮬레이션에 영향을 주는 행동 {t, kind, ...} — 재계산 때 다시 넣는다
         self.driver_stops = {}   # 안전 경고 id → 운전자 [멈췄어요] 시각
+        self.unload_checks = {}  # "차량#회차" → 운전자 하역 완료 확인 {answer: ok|late|not_yet, actual_min, detected_min, ...} (재계산 때 유지)
         self.approved = set()    # "차량#회차"
         self.changes = []        # 순번 변경 기록
         self.ignored = set()     # 무시한 제안
@@ -307,7 +309,8 @@ class Runtime:
         v = self.rec.vehicles.get(plate)
         trips = [d for d in self.rec.done_trips if d["id"] == plate]
         out = {"plate": plate, "clock": st["clock"], "trips_today": len(trips), "vehicle": None, "queue": None, "safety": None,
-               "accept": [], "steps": [], "last_trip": trips[-1] if trips else None, "sim_truck": plate in self.rec.truck and not self.rec.truck[plate].get("extra")}
+               "accept": [], "steps": [], "last_trip": trips[-1] if trips else None, "sim_truck": plate in self.rec.truck and not self.rec.truck[plate].get("extra"),
+               "unload_check": self.unload_check_view(plate)}
         if not v or v["gone"]:
             return out
         sv = next((x for x in st["vehicles"] if x["id"] == plate), None)
@@ -317,9 +320,17 @@ class Runtime:
                           "sector_id": v["sector"], "sector": names.get(v["sector"]), "bay": (v["bay"] + 1) if v.get("bay") is not None else None,
                           "eta_min": sv.get("eta_min") if sv else None, "acked": v.get("acked"), "order": v.get("order"),
                           "progress_pct": work["progress_pct"] if work else None, "remain_min": work["remain_min"] if work else None,
-                          "dump_deg": work["dump_deg"] if work else None, "travel_min": None}
+                          "dump_deg": work["dump_deg"] if work else None, "travel_min": None,
+                          "await": ({"detected_min": round(v.get("detected_min") or 0, 1), "since": self.rec.hhmm(v["await_t"]),
+                                     "not_yet": self.rec.hhmm(v["not_yet_t"]) if v.get("not_yet_t") is not None else None,
+                                     "wait_left": round(max(0, (5.0 if v.get("not_yet_t") is None else 20.0) - (self.rec.t - (v["await_t"] if v.get("not_yet_t") is None else v["not_yet_t"]))), 1)}
+                                    if v["state"] == "working" and v.get("await_t") is not None and not v.get("unload_ok") else None)}
         if v["sector"]:
             out["vehicle"]["travel_min"] = next((x["travel_min"] for x in st["sectors"] if x["id"] == v["sector"]), None)
+            z = self.zone_view(v["sector"], st)
+            if z:
+                out["zone"] = {"id": z["id"], "name": z["name"], "my_bay": (v["bay"] + 1) if v.get("bay") is not None else None,
+                               "bays": z["bay_list"]}
         q = next((r for r in st["queue"] if r["vehicle_id"] == plate), None)
         if q:          # PC 순번표의 같은 행 그대로 (새 숫자를 만들지 않음)
             out["queue"] = {"rank": q["rank"], "ahead": q["rank"] - 1, "call_at": q["call_at"], "wait_min": q["wait_min"], "status": q["status"],
@@ -335,6 +346,162 @@ class Runtime:
                         {"k": "진입 · 하역중", "t": hm(v["work_start"]) if v.get("work_start") is not None and v["state"] in ("working", "done") else None},
                         {"k": "이탈", "t": hm(v["done_t"]) if v.get("done_t") is not None and v["state"] == "done" else None}]
         return out
+
+    # ---------- 운전자 하역 완료 확인 → 하차 예상 시간 추천 ----------
+    def _last_done(self, plate):
+        ds = [d for d in self.rec.done_trips if d["id"] == plate]
+        return ds[-1] if ds else None
+
+    def unload_check_view(self, plate):
+        """기사 앱: 시스템이 하역 완료로 본 마지막 운행 — 운전자가 아직 확인 안 했으면(또는 '아직 안 끝났어요') 확인 카드"""
+        d = self._last_done(plate)
+        if not d:
+            return None
+        key = f"{d['id']}#{d['trip']}"
+        c = self.unload_checks.get(key)
+        if (c and c["answer"] in ("ok", "late", "skip")) or d.get("unload_ok") == "timeout":
+            return None
+        hm = self.rec.hhmm
+        return {"key": key, "cargo": d["cargo"], "load_t": d["load_t"], "sector": self.rec.sec_cfg.get(d["sector"], {}).get("name", d["sector"]),
+                "bay": (d["bay"] + 1) if d.get("bay") is not None else None, "start": hm(d["work_start"]), "end": hm(d["work_start"] + d["unload_min"]),
+                "detected_min": round(d["unload_min"], 1), "pred_min": round(d["pred"], 1), "answer": c["answer"] if c else None,
+                "not_yet_at": c.get("at") if c else None, "elapsed_min": round(self.rec.t - d["work_start"], 1),
+                "can_late": self.rec.t - (d["work_start"] + d["unload_min"]) <= self.UNLOAD_LATE_WIN}
+
+    UNLOAD_LATE_WIN = 20     # 감지한 완료 뒤 이 분 안에서만 [아직 안 끝났어요] · [지금 끝났어요] (오래 지나 누르면 실제 시간이 아님)
+
+    def driver_unload(self, plate, answer, demo=False, actual=None):
+        v = self.rec.vehicles.get(plate)
+        if v and not v["gone"] and v["state"] == "working" and v.get("await_t") is not None and not v.get("unload_ok"):
+            return self._unload_live(v, answer)
+        return self._unload_after(plate, answer, demo, actual)
+
+    def _unload_live(self, v, answer):
+        """하역 중(100%)에 기다리는 확인: 시뮬레이션 이벤트로 넣어 다시 계산해도 같다 → [맞아요]/[지금 끝났어요]면 그때 이탈"""
+        if answer not in ("ok", "not_yet", "done_now"):
+            return None, "알 수 없는 답이에요."
+        if answer == "done_now" and v.get("not_yet_t") is None:
+            return None, "먼저 [아직 안 끝났어요]를 누른 뒤 다 내리면 [지금 끝났어요]를 눌러요."
+        if answer == "not_yet" and v.get("not_yet_t") is not None:
+            return None, "이미 [아직 안 끝났어요]를 눌렀어요. 다 내리면 [지금 끝났어요]를 눌러 주세요."
+        r = self.app_event("UNLOAD_CONFIRMED", v["id"], sector_id=v["sector"], payload={"answer": answer, "detected_min": v.get("detected_min")})
+        if r != "ok":
+            return None, "지금은 확인할 수 없어요."
+        key = f"{v['id']}#{v['trip']}"
+        base = {"key": key, "plate": v["id"], "cargo": v["cargo"], "sector": v["sector"], "detected_min": round(v.get("detected_min") or 0, 1),
+                "pred_min": round(v["std"], 1), "t": self.rec.t, "at": self.rec.hhmm(self.rec.t), "demo": False}
+        if answer == "not_yet":
+            rec = dict(base, answer="not_yet", actual_min=None)
+        else:
+            rec = dict(base, answer="ok" if answer == "ok" else "late",
+                       actual_min=round(v.get("detected_min") if answer == "ok" else self.rec.t - v["work_start"], 1),
+                       not_yet_at=(self.unload_checks.get(key) or {}).get("at"))
+        self.unload_checks[key] = rec
+        return rec, None
+
+    def _unload_after(self, plate, answer, demo=False, actual=None):
+        """[맞아요, 끝났어요] ok = 감지한 하차 시간이 맞음 · [아직 안 끝났어요] not_yet · 그 뒤 [지금 끝났어요] done_now = 지금까지가 실제 하차 시간"""
+        d = self._last_done(plate)
+        if not d:
+            return None, "확인할 하역이 없어요."
+        key = f"{d['id']}#{d['trip']}"
+        c = self.unload_checks.get(key)
+        if c and c["answer"] in ("ok", "late", "skip"):
+            return None, "이미 확인했어요."
+        if answer not in ("ok", "not_yet", "done_now", "skip"):
+            return None, "알 수 없는 답이에요."
+        if answer in ("not_yet", "done_now") and self.rec.t - (d["work_start"] + d["unload_min"]) > self.UNLOAD_LATE_WIN:
+            return None, f"완료로 감지된 지 {self.UNLOAD_LATE_WIN}분이 넘어서 실제 끝난 시각을 받을 수 없어요. [맞아요] 또는 [건너뛰기]를 눌러 주세요."
+        if answer == "skip":           # 기억 안 남 — 통계에 넣지 않고 카드만 닫음
+            self.unload_checks[key] = {"key": key, "plate": plate, "cargo": d["cargo"], "answer": "skip", "actual_min": None, "demo": demo,
+                                       "detected_min": round(d["unload_min"], 1), "t": self.rec.t, "at": self.rec.hhmm(self.rec.t)}
+            return self.unload_checks[key], None
+        t, base = self.rec.t, {"key": key, "plate": plate, "cargo": d["cargo"], "sector": d["sector"], "detected_min": round(d["unload_min"], 1),
+                               "pred_min": round(d["pred"], 1), "t": self.rec.t, "at": self.rec.hhmm(self.rec.t), "demo": demo}
+        if answer == "not_yet":
+            rec = dict(base, answer="not_yet", actual_min=None)
+        else:
+            act = d["unload_min"] if answer == "ok" else (actual if actual is not None else t - d["work_start"])
+            rec = dict(base, answer="ok" if answer == "ok" else "late", actual_min=round(max(act, d["unload_min"] if answer != "ok" else 0), 1),
+                       not_yet_at=c.get("at") if c else None)
+        self.unload_checks[key] = rec
+        self._ui("UNLOAD_CONFIRMED", plate, d["sector"], {"key": key, "answer": rec["answer"], "detected_min": rec["detected_min"],
+                                                          "actual_min": rec["actual_min"], "demo": demo})
+        return rec, None
+
+    def demo_unload_checks(self):
+        """시연: 끝난 운행 중 아직 확인 안 된 것에 운전자 확인을 채운다(시드 고정). 70%는 감지 시간이 맞고,
+        30%는 '아직 안 끝났어요' 뒤 1~4분 더 걸림(시스템이 일찍 완료로 본 경우). 기록에 demo=true."""
+        import random
+        n = 0
+        for d in self.rec.done_trips:
+            key = f"{d['id']}#{d['trip']}"
+            if key in self.unload_checks and self.unload_checks[key]["answer"] in ("ok", "late", "skip"):   # 운전자가 답한 것(건너뛰기 포함)은 덮지 않음
+                continue
+            rnd = random.Random(f"{self.seed}|uc|{key}")
+            late = rnd.random() < 0.3
+            act = d["unload_min"] + (rnd.uniform(1, 4) if late else 0)
+            rec = {"key": key, "plate": d["id"], "cargo": d["cargo"], "sector": d["sector"], "detected_min": round(d["unload_min"], 1),
+                   "pred_min": round(d["pred"], 1), "t": self.rec.t, "at": self.rec.hhmm(self.rec.t), "demo": True,
+                   "answer": "late" if late else "ok", "actual_min": round(act, 1), "not_yet_at": None}
+            self.unload_checks[key] = rec
+            n += 1
+        return n
+
+    def unload_stats(self):
+        """설정 › 예측값: 원료별 운전자 확인 하차 시간(중앙값) vs 지금 예측 · 목표 → 추천(3건 이상 · 1분 이상 차이)"""
+        out = []
+        for cargo in self.assumptions["std_times"]:
+            cs = [c for c in self.unload_checks.values() if c["cargo"] == cargo and c["answer"] in ("ok", "late")]
+            pred, target = round(self.rec.pred_of(cargo), 1), self.assumptions["std_times"][cargo]
+            if not cs:
+                out.append({"cargo": cargo, "n": 0, "pred": pred, "target": target})
+                continue
+            xs = sorted(c["actual_min"] for c in cs)
+            med = xs[len(xs) // 2] if len(xs) % 2 else round((xs[len(xs) // 2 - 1] + xs[len(xs) // 2]) / 2, 1)
+            det = round(sum(c["detected_min"] for c in cs) / len(cs), 1)
+            late = sum(c["answer"] == "late" for c in cs)
+            reco = round(med) if len(cs) >= 3 and abs(med - pred) >= 1 else None
+            out.append({"cargo": cargo, "n": len(cs), "median": round(med, 1), "min": xs[0], "max": xs[-1], "detected": det, "late": late,
+                        "demo": sum(c["demo"] for c in cs), "pred": pred, "target": target, "reco": reco,
+                        "text": (f"운전자 확인 {len(cs)}건 실제 중앙값 {med:g}분 · 지금 예측 {pred:g}분 → {reco}분으로" if reco is not None else None)})
+        allc = [c for c in self.unload_checks.values() if c["answer"] in ("ok", "late")]
+        return {"by_cargo": out, "n": len(allc), "late": sum(c["answer"] == "late" for c in allc), "demo": sum(c["demo"] for c in allc),
+                "pending": sum(c["answer"] == "not_yet" for c in self.unload_checks.values()), "min_n": 3}
+
+    # ---------- 모바일 3D 매핑: 구역(호퍼) 하나의 베이 · 차량 상태 (PC 3D 매핑 카드와 같은 규칙) ----------
+    def zone_view(self, sid, st):
+        """web/map3d.js에 넘길 items · bays와, 기사 앱 구역 맵용 베이별 상태. 상태 규칙은 관제 화면 m3Data와 같다."""
+        sec = next((x for x in st["sectors"] if x["id"] == sid), None)
+        if not sec:
+            return None
+        so, veh = st.get("safety_open", []), {v["id"]: v for v in st["vehicles"]}
+        bx = lambda n: 1.5 + (n - 1) * 9                     # map3d.js 베이 위치 식
+        items, bays, by_bay = [], {}, {}
+        for w in sec["working"]:
+            n = w["bay"] + 1
+            sa = next((x for x in so if x["vehicle_id"] == w["vehicle_id"]), None)
+            rev = bool(sa and sa.get("rule") == "reverse")
+            state = ("reverse" if rev else "danger") if sa else ("delay" if w["delayed"] else ("unload" if w["dump_deg"] >= 15 else "enter"))
+            it = {"id": f"#{w['track_id']}", "bay": n, "state": state, "plate": w["vehicle_id"], "ratio": w.get("delay_x"),
+                  "detail": (f"{sa.get('ts')} 감지 · 하차 중지 요청(가상)" if sa else f"경과 {int(w['elapsed_min'])}분 / 예측 {round(w['std'])}분")}
+            if sa:
+                it.update(ack=bool(sa.get("seen")), worker=[bx(n) + 4.2, 16.2] if rev else [bx(n) + 6.4, 9.6])
+                bays[n] = "stop"
+            items.append(it)
+            by_bay[n] = state
+        mv = sorted([veh[i] for i in sec["moving"] if i in veh], key=lambda v: v.get("eta_min") or 0)
+        if mv:
+            items.append({"id": f"#{mv[0]['track_id']}", "state": "call", "plate": mv[0]["id"],
+                          "detail": f"{mv[0].get('eta_min') or 0}분 뒤 도착 · {(mv[0].get('bay') or 0) + 1}번 베이" + (f" · 외 {len(mv) - 1}대" if len(mv) > 1 else "")})
+        for n in range(1, sec["bays"] + 1):
+            if n not in by_bay:
+                bays[n] = "reserved" if any((v.get("bay") or 0) + 1 == n for v in mv) else "empty"
+        bc = self.rec.sec_cfg[sid].get("bay_cargo") or []
+        return {"id": sid, "name": sec["name"], "status": sec["status"], "items": items, "bays": bays,
+                "bay_list": [{"n": n, "cargo": bc[n - 1] if n - 1 < len(bc) else None,
+                              "state": "stop" if bays.get(n) == "stop" else by_bay.get(n) or bays.get(n)} for n in range(1, sec["bays"] + 1)],
+                "queue": len(sec["queue"]), "moving": len(mv)}
 
     def accept_bays(self, cargo):
         """원료 → 받을 수 있는 하역장 · 베이 (sectors.json bay_cargo)"""
@@ -390,9 +557,12 @@ class Runtime:
                 "safety": [dict(x, sector_name=self.rec.sec_cfg[x["sector_id"]]["name"], driver_stopped=self.driver_stops.get(x["id"]))
                            for x in p2["safety_open"] if x.get("sector_id") in mine],
                 "safety_done": [x for x in p2.get("safety_done", []) if x.get("sector_id") in mine][:5],
-                "approvals": [x for x in p2["approvals"] if x.get("sector_id") in mine],
+                "approvals": [dict(x, cargo=x.get("cargo") or (self.rec.vehicles.get(x["vehicle_id"]) or {}).get("cargo"),
+                                   accept=sorted({b["sector_id"] for b in self.accept_bays(x.get("cargo") or (self.rec.vehicles.get(x["vehicle_id"]) or {}).get("cargo"))}))
+                              for x in p2["approvals"] if x.get("sector_id") in mine],     # accept = 이 원료를 받는 호퍼(하역장 바꾸기 후보)
                 "checks": [g for g in p2["checks"] if g.get("sector_id") in mine],
-                "auto_approve": p2["auto_approve"], "effect_total": st.get("effect_total")}
+                "auto_approve": p2["auto_approve"], "effect_total": st.get("effect_total"), "reasons": REASONS,
+                "zones": [z for z in (self.zone_view(x["id"], st) for x in secs) if z]}
 
     def field_owns(self, hoppers, vehicle_id=None, safety_id=None, alert_id=None):
         """현장 담당자가 이 차 · 안전 경고 · 알림을 처리해도 되는지(담당 하역장 기준)"""
@@ -508,12 +678,14 @@ class Runtime:
     def impact(self, vid, sid):
         return self.rec.impact(vid, sid)
 
-    def change(self, vid, sid, reason, memo=""):
+    def change(self, vid, sid, reason, memo="", by="관제", by_name=None):
         v = self.rec.vehicles.get(vid)
         if not v or v["state"] != "yard":
             return None, "대기장에 있는 차량만 바꿀 수 있습니다"
         if reason not in REASONS:
             return None, "변경 사유를 골라 주세요"
+        if reason == "기타" and not (memo or "").strip():
+            return None, "'기타'는 메모에 이유를 적어 주세요"
         p = next((p for p in self.rec.plan if p["vehicle_id"] == vid), None)
         imp = self.rec.impact(vid, sid)
         if not self.rec.override(vid, sid):
@@ -521,12 +693,12 @@ class Runtime:
         self.actions.append({"kind": "override", "t": self.rec.t, "vehicle_id": vid, "sector_id": sid})
         c = {"ts": self.rec.hhmm(self.rec.t), "t": self.rec.t, "vehicle_id": vid, "trip": v["trip"], "cargo": v["cargo"],
              "from": p["sector_id"] if p else None, "to": sid, "reason": reason, "memo": memo.strip()[:200],
-             "delta_min": imp["delta_min"], "cost_won": imp["cost_won"]}
+             "delta_min": imp["delta_min"], "cost_won": imp["cost_won"], "by": by, "by_name": by_name}
         self.changes.append(c)
         self.store.change(c)
         self.approved.discard(self._key(vid))
         self._ui("ORDER_CHANGED", vid, sid, {"from": c["from"], "to": sid, "reason": reason, "memo": c["memo"],
-                                             "delta_min": imp["delta_min"], "cost_won": imp["cost_won"]})
+                                             "delta_min": imp["delta_min"], "cost_won": imp["cost_won"], "by": by})
         return c, None
 
     def order_status(self, vid):
@@ -744,7 +916,11 @@ class Runtime:
             name = self.rec.sec_cfg[sid]["name"] if sid in self.rec.sec_cfg else sid
             sugg.append({"key": key, "cargo": cargo, "old": old, "new": new,
                          "text": f"{name}에서 '{reason}' 변경이 {len(cs)}건 반복됐어요. {cargo} 하차 표준시간을 {old:g}분 → {new:g}분으로 올리면 추천이 실제와 가까워져요."})
-        return {"counts": counts, "total": len(self.changes), "suggestions": sugg}
+        by = {}
+        for c in self.changes:
+            by[c.get("by") or "관제"] = by.get(c.get("by") or "관제", 0) + 1
+        return {"counts": counts, "total": len(self.changes), "suggestions": sugg, "by": by,
+                "memos": [c["memo"] for c in reversed(self.changes) if c.get("memo")][:5]}
 
     def apply_suggestion(self, key):
         for s in self.feedback()["suggestions"]:
@@ -1070,7 +1246,7 @@ class Runtime:
         eff = eff if eff is not None else self.effects()
         rows = []
         for a in self.rec.alerts_all:
-            if a["kind"] == "호출":
+            if a["kind"] in ("호출", "아차사고"):          # 아차사고는 아래 '안전'에서 기록 한 건씩
                 continue
             rel = a.get("related", [])
             es = [eff[k] for k in rel if k in eff]
@@ -1103,6 +1279,20 @@ class Runtime:
                          "suggest": "L3 자동 실행: 앱 경고 · 하차 중지 요청 (가상)", "handling": how + (f" · {ack}초" if ack is not None else ""),
                          "expected": None, "actual": None, "has_vehicles": False, "sector_id": x["sector_id"], "vehicle_id": x["vehicle_id"],
                          "group": "안전", "ack": x["status"] != "open", "actual_note": "금액 없음"})
+        alerts = {a["id"]: a for a in self.rec.alerts_all}
+        for x in self.rec.near_miss:                     # 아차사고(영상 NEAR_MISS · 대기장 접근 등)도 '안전'으로 — CAM 상세 아차사고 기록과 같은 건
+            lv, yard = x.get("level") or "", x.get("sector_id") is None
+            where = "대기장" if yard else f"{self.rec.sec_cfg.get(x['sector_id'], {}).get('name', x['sector_id'])} {x.get('bay')}번 베이"
+            m = re.search(r"-R(\d+)$", x["id"])
+            rep = f" · 같은 영상 장면 {m.group(1)}회차" if m and int(m.group(1)) > 1 else ""
+            a = alerts.get(x.get("alert_id"))
+            how = ("확인함" if a["ack"] else "미확인") if a else "기록"
+            rows.append({"id": x["id"], "ts": (x.get("ts") or "")[:5], "t": x["t"], "level": {"L3": "crit", "L2": "warn"}.get(lv, "info"), "kind": "아차사고",
+                         "text": f"{where} · {x.get('rule')} {lv} · 최소 {x.get('min_dist_m')}m · {x.get('vehicle_id') or ''} "
+                                 f"({'합성 사람' if x.get('source') == 'stand_in' else '실제 영상'} {x.get('cam_id') or ''}){rep}",
+                         "suggest": "대기장 보행 동선 · 운전자 서행 확인 (CAM 장면 보기)" if yard else "덤프 반경 · 후진 경로 작업자 동선 확인 (CAM 장면 보기)",
+                         "handling": how, "expected": None, "actual": None, "has_vehicles": False, "sector_id": x.get("sector_id"),
+                         "vehicle_id": x.get("vehicle_id"), "group": "안전", "ack": how != "미확인", "actual_note": "금액 없음", "cam_id": x.get("cam_id")})
         rows.sort(key=lambda r: -r["t"])
         return rows
 
@@ -1303,6 +1493,7 @@ class Runtime:
                  "impact": "순번 계산에 바로 반영"} for e in sim.pred_log]
         hist = sorted([dict(h, t=-1) for h in self.history] + auto, key=lambda h: h["at"], reverse=True)[:12]
         return {"values": self.assumptions, "preds": preds, "pred_at": sim.hhmm(sim.pred_at), "pred_every": 5, "pred_min_n": 3,
+                "unload": self.unload_stats(),
                 "travel": [round(min(travel), 1), round(max(travel), 1)], "target_suggestions": tsug, "history": hist,
                 "judge": self.judge_counts(), "suggestions": self.feedback()["suggestions"],
                 "congestion_hold_min": sim.settings["congestion"]["crit_hold_min"], "clock": sim.hhmm(sim.t)}

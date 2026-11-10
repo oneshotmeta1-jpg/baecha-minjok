@@ -306,6 +306,8 @@ for sid_ in "ABC":
         rx_.driver_stopped(x_["vehicle_id"])          # 기사 앱 [멈췄어요] (R12)
         rx_.safety_seen(x_["id"])                     # 관제 확인(깜빡임 멈춤 · 중지 유지) — 3D 매핑 요청서
         rx_.safety_resolve(x_["id"], "ack" if not any(e["type"] == "SAFETY_ACK" for e in rx_.rec.events) else "dismiss")
+if rx_.rec.done_trips:
+    rx_.driver_unload(rx_.rec.done_trips[0]["id"], "ok")      # 기사 앱 하역 완료 확인(UNLOAD_CONFIRMED)
 rx_.ingest({"type": "NEAR_MISS", "source": "cam", "cam_id": "CAM-01", "sector_id": "A", "payload": {"id": "NM-test", "rule": "덤프 반경", "level": "L1"}})   # 아차사고(R15, 영상)
 types_r4 = {e["type"] for e in ra.rec.events} | {e["type"] for e in rx_.rec.events}
 check("CALL_PENDING · APPROVAL_MODE 이벤트가 나옴", {"CALL_PENDING", "APPROVAL_MODE"} <= types_r4)

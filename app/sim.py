@@ -20,6 +20,8 @@ STEP = 0.25            # 시뮬레이션 한 걸음(분)
 PRED_MIN_N = 3         # 예측 하차시간을 실측 평균으로 바꾸는 최소 건수 (그 전에는 기본 표준시간)
 PRED_EVERY = 5         # 예측값 다시 계산 간격(분)
 GATE_HOLD = 1.0        # 계근·등록에 걸리는 시간(분)
+UNLOAD_WAIT = 5.0      # 기사 앱 차량: 하역 완료 감지 뒤 운전자 [맞아요]를 기다리는 시간(분) — 넘으면 알림 후 이탈(시연이 멈추지 않게)
+UNLOAD_NOT_YET_MAX = 20.0   # [아직 안 끝났어요] 뒤 [지금 끝났어요]를 기다리는 최대 시간(분)
 ACK_WAIT = 3.0         # 기사 앱 차량: 호출 뒤 [이동 시작](CALL_ACK)을 기다리는 시간(분) — 넘으면 알림 후 출발(시연이 멈추지 않게)
 VEHICLE = "덤프 25.5t"
 PLATE_HEAD = ["80", "81", "82", "83", "85", "86", "87", "88"]
@@ -357,6 +359,7 @@ class Sim:
                 self.alert("crit" if p["level"] == "L3" else "warn", "아차사고",
                            f"대기장 {x['cam_id']} · 움직이는 트럭 {x['vehicle_id']}과 작업자 {p.get('min_dist_m')}m ({p['level']}, 실제 영상)",
                            "대기장 보행 동선·운전자 서행 확인 (CAM-04 장면 보기)")
+                self.near_miss[-1]["alert_id"] = self.alerts_all[-1]["id"]     # 알림 이력 '안전'에서 확인 여부를 보여 주려고
 
     def safety_raise(self, v, dist=None, repeat=0, prev=None, rule="dump"):
         sid = v["sector"]
@@ -406,7 +409,8 @@ class Sim:
                                 "under_unload": v["work_elapsed"] > v["target"] + 1e-9,
                                 "delayed": "delay" in v["flags"], "late": v["work_start"] > v["due_t"],
                                 "yard_t": v["yard_t"], "call_t": v["call_t"], "work_start": v["work_start"],
-                                "unload_end": v.get("done_t"), "urgent": v["urgent"], "approval": v.get("approval")})
+                                "unload_end": v.get("done_t"), "urgent": v["urgent"], "approval": v.get("approval"),
+                                "detected_min": v.get("detected_min"), "unload_ok": v.get("unload_ok")})
 
     # ---------- 영상 모드: 이벤트로 상태 바꾸기 ----------
     def _sector_of_bay(self, sid, bay):
@@ -471,6 +475,17 @@ class Sim:
                 q_idx = sum(1 for o in self.vehicles.values() if o["state"] == "queue" and o["sector"] == sid)
                 v.update(state="queue", sector=sid, queue_idx=q_idx, xy=self.queue_xy(sid, q_idx))
             return "ok"
+        if typ == "UNLOAD_CONFIRMED":                     # 기사 앱 하역 완료 확인 (ok · not_yet · done_now)
+            if v["state"] == "working" and v.get("await_t") is not None and not v.get("unload_ok"):
+                a = p.get("answer")
+                if a in ("ok", "done_now"):
+                    v["unload_ok"] = a
+                elif a == "not_yet" and v.get("not_yet_t") is None:
+                    v["not_yet_t"] = t
+                else:
+                    return "ignored"
+                return "ok"
+            return "ignored"
         if typ == "CALL_ACK":
             if v["state"] == "moving" and not v.get("acked"):
                 v["acked"] = True
@@ -679,16 +694,33 @@ class Sim:
                               payload={"stand_in": "cam"})
             elif v["state"] == "working":
                 held = self.safety_open_for(v)
+                waiting_ok = v.get("await_t") is not None and v.get("not_yet_t") is None and not v.get("unload_ok")   # 완료 감지 · 운전자 답 기다림
                 if self.sectors[s_id]["up"] and not held:
                     v["work_elapsed"] += STEP
                 self.safety_tick(v, held)
-                if v["work_elapsed"] > v["target"] * st["delay"]["factor"] and "delay" not in v["flags"]:
+                if v["work_elapsed"] > v["target"] * st["delay"]["factor"] and "delay" not in v["flags"] and not waiting_ok:
                     v["flags"].add("delay")
                     self.alert("warn", "하차 지연",
                                f"{v['id']} {v['cargo']} 하차 {int(v['work_elapsed'])}분 (목표 {v['target']:g}분의 {st['delay']['factor']}배 초과)",
                                f"{self.sec_cfg[s_id]['name']} 다음 호출 보류, 적재함 들러붙음·호퍼 막힘 확인",
                                sector_id=s_id, vehicle=v, related=self.planned_keys(s_id, 1))
-                if v["work_elapsed"] >= v["base"] * v["work_factor"] and not self.driven:
+                if v["work_elapsed"] >= v["base"] * v["work_factor"] and not self.driven and v.get("app") and self.mode == "recommend" \
+                        and not v.get("unload_ok"):
+                    # 기사 앱 차량: 하역 완료로 감지해도 바로 나가지 않고 운전자 [맞아요, 다 내렸어요]를 기다린다 (UNLOAD_CONFIRMED source app)
+                    if v.get("await_t") is None:
+                        v["await_t"], v["detected_min"] = t, round(v["work_elapsed"], 2)
+                    if v.get("not_yet_t") is None and t - v["await_t"] >= UNLOAD_WAIT:
+                        v["unload_ok"] = "timeout"
+                        self.alert("info", "하역 완료 확인 없음", f"{v['id']} 하역 완료 감지 뒤 {UNLOAD_WAIT:g}분 동안 운전자 확인 없음 → 이탈 처리",
+                                   "운전자에게 앱 확인 요청", sector_id=s_id, vehicle=v)
+                    elif v.get("not_yet_t") is not None and t - v["not_yet_t"] >= UNLOAD_NOT_YET_MAX:
+                        v["unload_ok"] = "timeout"
+                        self.alert("warn", "하역 완료 확인 없음", f"{v['id']} [아직 안 끝났어요] 뒤 {UNLOAD_NOT_YET_MAX:g}분 · 완료 확인 없음 → 이탈 처리",
+                                   "베이 · 적재함 상태 현장 확인", sector_id=s_id, vehicle=v)
+                if v["work_elapsed"] >= v["base"] * v["work_factor"] and not self.driven \
+                        and (not v.get("app") or self.mode != "recommend" or v.get("unload_ok")):
+                    if v.get("unload_ok") in ("ok", "timeout") and v.get("detected_min") is not None:
+                        v["work_elapsed"] = v["detected_min"]       # [맞아요] · 답 없음 = 감지한 시각에 끝남(확인 기다린 시간은 하차 시간 아님)
                     cam = self.sec_cfg[s_id]["cam_id"]
                     self.emit("BAY_EXIT", "sim", vehicle=v, sector_id=s_id,
                               payload={"stand_in": "cam", "bay": v["bay"] + 1, "load_t": v["load_t"],

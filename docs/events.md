@@ -84,6 +84,7 @@
 | `SAFETY_ALERT` | 영상(합성) · 시뮬레이터 | 안전 경고: 적재함 상승 중 덤프 반경(가정 5m, rois.json REAR 구역) 안 작업자 → L3 자동 실행(기사 앱 경고 · 하차 중지 요청, 가상). 하차 진행이 멈춤 (payload: id, level=L3, rule, dist_m, bay, dump_deg, repeat, action, stand_in) |
 | `NEAR_MISS` | 영상(R15, vision/near_miss.py) | 아차사고 한 건: 사람 발끝이 위험 구역에 있고 규칙 조건(① 적재함 상승 중 덤프 반경 · ② 베이 진입 30초 안 후진 경로)이 이어진 동안을 한 건으로, 끝날 때 한 번. 단계 L1 주의 → 1초 L2 경고 → 2초 L3(그 순간 `SAFETY_ALERT`로 하차 중지 요청). payload: id, rule, rule_no, level, duration_s, min_dist_m, zone_id, bay, person_track, snapshot_t, clip[시작, 끝](영상 초), source = video · stand_in(합성 사람), assumed |
 | `SAFETY_ACK` | 맵 위 안전 띠 · 알림 패널 안전 탭 | 관제·현장 담당자가 안전 경고 확인 또는 오탐지 → 하차 재개 (payload: id, how = 확인/오탐지, ack_sec = 뜬 뒤 확인까지 실제 초, repeat). 같은 위험이 계속 감지되면 SAFETY_ALERT(repeat=1)가 다시 온다 |
+| `UNLOAD_CONFIRMED` | 기사 앱 하역 완료 확인 [맞아요, 끝났어요] · [아직 안 끝났어요] · [지금 끝났어요] | 시스템이 하역 완료로 본 운행을 운전자가 확인 (payload: key = 차량#회차, answer = ok · not_yet · late, detected_min = 감지한 하차 시간, actual_min = 확인한 실제 하차 시간, demo). 설정 › 예측값의 '하차 예상 시간 추천'(원료별 중앙값, 3건 이상)에 씀 |
 | `SAFETY_SEEN` | 상단 안전 띠 [관제 확인] · 3D 매핑 카드 헤더 배지 | 관제가 안전 경고를 봤다는 확인 — 관제 화면 배치도 · 구역 3D 매핑 카드 · 상단 띠의 깜빡임을 멈추고 빨간색 고정. **안전 중지 · 후속 호출 보류는 유지**(해제는 `SAFETY_ACK`). payload: id, seen_sec = 뜬 뒤 확인까지 실제 초. (3D 매핑 요청서 3-5의 `safety_ack` = 이것, `safety_clear` = `SAFETY_ACK` — 팀 확인 필요) |
 | `DRIVER_STOPPED` | 기사 앱 안전 경고 화면 [멈췄어요] | 운전자가 하역을 멈췄다고 알림 (payload: id = 안전 경고). 하역 재개는 여전히 관제·현장의 SAFETY_ACK |
 | `ALERT` | 배정 엔진 | 알림 발생 (payload: level, kind, text, action, related = 제안이 영향을 주는 반입 "차량#회차" 목록) |

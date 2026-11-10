@@ -116,7 +116,7 @@ tr.editing td{background:#FAFAF8}
 .al-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--gap)}
 .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .filters select{border:1px solid var(--line-2);border-radius:999px;padding:6px 10px;font:inherit;font-size:13px;background:var(--card)}
-.lvl{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px}
+.lvl{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;display:inline-block}   /* '아차사고'가 두 줄로 꺾이지 않게 */
 .lvl.crit{background:var(--red-bg);color:var(--red)} .lvl.warn{background:var(--orange-bg);color:var(--orange)} .lvl.info{background:var(--blue-bg);color:var(--blue)}
 tr.unacked td:first-child{box-shadow:inset 3px 0 0 var(--red)}
 .sp{flex:1}
@@ -153,6 +153,28 @@ main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.42fr) min
 @keyframes sbBand{0%,100%{background:#E5383B}50%{background:#A51D22}}
 @media (prefers-reduced-motion:reduce){.sstrip.blink{animation:none}}
 .sstrip .seen{background:#fff;color:var(--red);font-weight:800;font-size:11.5px;border-radius:999px;padding:2px 8px;flex:none}
+.ureco{align-items:flex-start} .ureco .ub{display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex:none}
+/* 실제 운영 체험(×1) 안내 카드 */
+.rtg{position:fixed;left:16px;bottom:16px;z-index:40;width:380px;max-width:calc(100vw - 32px);max-height:calc(100vh - 120px);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 28px rgba(0,0,0,.18);font-size:13px}
+.rtg[hidden]{display:none}
+.rtg-h{position:sticky;top:0;background:#fff;display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.rtg-h b{font-size:14px;white-space:nowrap} .rtg-x1{font-size:11px;font-weight:800;background:#141414;color:#fff;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.rtg-btn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 9px;font:600 12px inherit;cursor:pointer;white-space:nowrap;flex:none}
+.rtg.min .rtg-b{display:none}
+.rtg-b{padding:10px 12px 12px;display:flex;flex-direction:column;gap:10px}
+.rtg-sec{font-size:11.5px;font-weight:800;color:var(--muted);letter-spacing:.02em}
+.rtg-veh{font-weight:800} .rtg-veh small{font-weight:600;color:var(--muted);margin-left:4px}
+.rtg ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.rtg ol li{display:grid;grid-template-columns:20px 1fr auto;gap:6px;align-items:start;padding:5px 6px;border-radius:8px;color:var(--muted)}
+.rtg ol li i{font-style:normal;font-weight:800;text-align:center}
+.rtg ol li.done{color:var(--ink-2)} .rtg ol li.done i{color:#16A06E}
+.rtg ol li.now{background:#EEF3FE;color:var(--ink)} .rtg ol li.now i{color:#2F6FDE}
+.rtg ol li .d{display:block;font-size:12px;color:var(--ink-2);margin-top:1px}
+.rtg ol li .tm{font-variant-numeric:tabular-nums;font-size:11.5px;color:var(--muted)}
+.rtg .next div{display:grid;grid-template-columns:62px 1fr;gap:6px;padding:3px 0;border-bottom:1px solid var(--line)} .rtg .next div:last-child{border-bottom:0}
+.rtg .next span{font-variant-numeric:tabular-nums;font-weight:700}
+.rtg .todo{background:#FFF6E5;border-radius:10px;padding:8px 10px}
+.rtg .note{color:var(--muted);font-size:12px;line-height:1.5;margin:0;padding-left:16px}
 /* ① 맵 */
 #mapBd{display:flex;flex-direction:column;gap:6px;overflow:hidden}
 #mapSvg{flex:1;min-height:0;width:100%}
@@ -403,7 +425,7 @@ textarea.sin{width:100%;text-align:left;min-height:54px;resize:vertical}
 .tile4 .bd2{display:inline-flex;font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 8px;background:var(--blue-bg);color:var(--blue);width:max-content}
 .tile4 .bd2.bad{background:var(--orange-bg);color:var(--orange)}
 .tile4 svg{grid-row:1/4;grid-column:2;width:130px;height:56px}
-.srcb{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) 62px 82px;gap:2px 12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+.srcb{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) 62px 82px;gap:2px 12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;background:#fff;color:var(--ink)}
 .srcb .nm b{display:block;font-size:13px} .srcb .nm span{font-size:11.5px;color:var(--muted)}
 .srcb .t{height:10px;background:var(--soft-2);border-radius:5px;overflow:hidden} .srcb .t i{display:block;height:100%;border-radius:5px;background:var(--blue)}
 .srcb .t i.add{background:#E8590C}
@@ -545,7 +567,7 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
 #bigWrap{max-width:calc((100vh - 300px) * 16 / 9);margin:0 auto}
 #bigWrap.live #bigCam{max-height:none}
 .vctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:13px} .vctl .num{font-weight:700;min-width:96px}
-.chip.live,.srcb{background:#D7263D;color:#fff}
+.chip.live,.cam .srcb{background:#D7263D;color:#fff}   /* LIVE 배지만 빨강 — 운영 분석 '절감이 어디서 나왔나' 줄(.srcb)과 이름이 겹쳐 줄 전체가 빨개지던 것 */
 .ovt{display:inline-flex;gap:4px;flex-wrap:wrap} .ovt button{border:1px solid var(--line,#E3E3E0);background:#fff;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;color:var(--muted)}
 .ovt button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
 .cam{position:relative} .cam .srcb{position:absolute;top:8px;right:8px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;z-index:2}
@@ -586,7 +608,7 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
     </button>
     <div class="menu" id="simMenu" role="menu" aria-label="시뮬레이션" hidden>
       <button class="pill-btn dark" id="runBtn" role="menuitem">시작</button>
-      <label class="mrow"><span>배속</span><select class="pill-btn" id="speedSel" aria-label="배속"><option value="30">×30</option><option value="60" selected>×60</option><option value="120">×120</option><option value="300">×300</option></select></label>
+      <label class="mrow"><span>배속</span><select class="pill-btn" id="speedSel" aria-label="배속"><option value="1">×1 실제 속도</option><option value="5" title="기사 앱 하역 완료 확인 버튼이 약 60초 떠 있어 여유 있게 누를 수 있는 배속">×5 기사 앱 확인용</option><option value="30">×30</option><option value="60" selected>×60</option><option value="120">×120</option><option value="300">×300</option></select></label>
       <button class="pill-btn" id="resetBtn" role="menuitem">초기화</button>
     </div>
   </div>
@@ -597,6 +619,8 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
       <button class="pill-btn danger" id="downBtn" role="menuitem">하역장 정지</button>
       <button class="pill-btn" id="urgentBtn" role="menuitem">긴급 입고 넣기</button>
       <button class="pill-btn danger" id="safetyBtn" role="menuitem" title="고른 호퍼에서 하차 중인 차에 덤프 반경 작업자 경고를 만든다(시연)">안전 경고</button>
+      <button class="pill-btn" id="ucDemoBtn" role="menuitem" title="끝난 운행에 운전자 하역 완료 확인을 채운다(시연 데이터 표시) — 설정 › 하차 예상 시간 추천 보기">운전자 하역 확인 채우기</button>
+      <button class="pill-btn dark" id="realBtn" role="menuitem" title="배속을 ×1(실제 시간)로 바꾸고, 차 한 대가 대기장 → 호출 → 하차 → 출차하는 동안 실제로 몇 분씩 걸리는지 안내 카드로 따라간다">실제 운영 체험 (×1)</button>
       <p class="mnote" id="demoState"></p>
     </div>
   </div>
@@ -629,6 +653,11 @@ body.free .recfoot{position:sticky;bottom:0;background:var(--card);border-radius
     <a href="#alerts" class="cap" id="panelAll" style="margin-top:4px">처리한 알림 · 이력 ›</a></div>
 </aside>
 
+<aside class="rtg" id="rtGuide" hidden aria-label="실제 운영 체험 안내">
+  <div class="rtg-h"><b>실제로 쓰면 이렇게 돼요</b><span class="rtg-x1">×1</span><span class="sp"></span>
+    <button class="rtg-btn" id="rtMin" title="접기/펼치기" aria-expanded="true">접기</button><button class="rtg-btn" id="rtClose" title="체험 끝내기 — 배속을 원래대로">끝내기</button></div>
+  <div class="rtg-b" id="rtBody"></div>
+</aside>
 <div class="view" id="view-monitor">
 <div class="mon-bar"><h1>원료 하역장 현황</h1><span class="simnote" id="monNote">시뮬레이션 값</span><div class="sstrip" id="sstrip" hidden role="alert"></div><span class="sp"></span>
   <button class="pill-btn" id="camsWinBtn2" title="CAM 4채널을 별도 창으로 크게 (두 번째 모니터용)">CAM 4채널 새 창 ↗</button>
@@ -921,7 +950,15 @@ S.roads.forEach(r=>{
 /* 계근대·대기장·원료야드 (위치·크기는 가정, 상자는 기호) */
 const zoneBox=(z,fill,stroke)=>{const b=bbox(z.poly);svg.appendChild(el('polygon',{points:pts(z.poly),fill,stroke,'stroke-width':2.5}));T((b[0]+b[2])/2,b[1]-9,z.name,Object.assign({'font-size':17,'font-weight':700,fill:'#141414'},HALO));};
 if(S.ore) zoneBox(S.ore,'rgba(156,91,71,.13)','#B08A7A');
-S.zones.forEach(z=>zoneBox(z,'rgba(255,255,255,.92)','#9AA0A6'));
+S.zones.forEach(z=>{
+  if(!z.cam_id){ zoneBox(z,'rgba(255,255,255,.92)','#9AA0A6'); return; }
+  const g=el('g',{tabindex:0,role:'button','aria-label':z.name+' CAM 크게 보기','data-cam':z.cam_id,style:'cursor:pointer'});
+  const b=bbox(z.poly);
+  g.appendChild(el('polygon',{points:pts(z.poly),fill:'rgba(255,255,255,.92)',stroke:'#9AA0A6','stroke-width':2.5}));
+  g.appendChild(el('text',{x:(b[0]+b[2])/2,y:b[1]-9,'font-size':17,'font-weight':700,fill:'#141414','text-anchor':'middle','font-family':'Inter,Noto Sans KR,sans-serif',stroke:'#F3F2EE','stroke-width':4,'paint-order':'stroke'},z.name));
+  g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openCam(z.cam_id);}});
+  svg.appendChild(g);
+});
 const secShape={};
 S.sectors.forEach(s=>{
   const g=el('g',{class:'hop',tabindex:0,role:'button','aria-label':s.name+' CAM 크게 보기'});
@@ -1070,7 +1107,8 @@ function drawIso(s){
   });
   const yard=s.vehicles.filter(v=>v.state==='yard'||v.state==='arrived');
   yard.slice(0,12).forEach((v,i)=>{ const q=M3.lot(i); g+=truck3(q[0],q[1],{ring:v.urgent?'#D7263D':null}); });
-  const [lx,ly,la]=M3.lotPill, lp=pill3(lx,ly,'차량 대기장 · '+s.counts.yard+'대',{fs:13,minw:148,dot:'#8A8F95'}); top+=lead(lx+6,ly+lp.h/2,la[0],la[1])+lp.g;
+  g+='<polygon data-cam="CAM-04" points="'+M3.lotPoly.map(p=>p.join(',')).join(' ')+'" fill="transparent" style="cursor:pointer"><title>차량 대기장 CAM 보기</title></polygon>';
+  const [lx,ly,la]=M3.lotPill, lp=pill3(lx,ly,'차량 대기장 · '+s.counts.yard+'대',{fs:13,minw:148,dot:'#8A8F95',attr:' data-cam="CAM-04" style="cursor:pointer"'}); top+=lead(lx+6,ly+lp.h/2,la[0],la[1])+lp.g;
   const ynm=yardNM(s);   // 대기장 아차사고(R16, 실제 영상 CAM-04)
   if(ynm){ const col=ynm.level==='L3'?'#D7263D':ynm.level==='L2'?'#E8590C':'#C99400', [cx,cy]=M3.lotCenter;
     g+='<g data-cam="'+esc(ynm.cam_id)+'" style="cursor:pointer"><title>대기장 아차사고 — 눌러서 '+esc(ynm.cam_id)+' 장면 보기</title><polygon points="'+M3.lotPoly.map(p=>p.join(',')).join(' ')+'" fill="rgba(215,38,61,.16)" stroke="'+col+'" stroke-width="2" stroke-dasharray="5 4"/>'+
@@ -1395,7 +1433,8 @@ $('#logoutBtn').addEventListener('click',()=>fetch('/api/auth/logout',{method:'P
 let last=null;
 function render(s){
   last=s;
-  $('#clock').textContent=hhmm(s.clock);
+  $('#clock').textContent=s.speed===1?(s.clock||'').slice(11,19):hhmm(s.clock);   // ×1 실제 속도는 15초마다 바뀌어 초까지
+  rtGuide(s);
   $('#runBtn').textContent=s.running?'일시정지':'시작'; $('#spdTxt').textContent='×'+s.speed; $('#runDot').classList.toggle('on',!!s.running);
   $('#simChip').setAttribute('aria-label','시뮬레이션 '+hhmm(s.clock)+' ×'+s.speed+(s.running?' 진행 중':' 멈춤')+' · 메뉴 열기');
   const downs=s.sectors.filter(x=>x.status==='down'); $('#demoDot').hidden=!downs.length; $('#demoState').textContent=downs.length?'진행 중: '+downs.map(x=>x.name+' 정지').join(' · '):'';
@@ -1495,11 +1534,11 @@ function yardCard(s){
     const ch=r.urgent?vchip('긴급','#FFE9DD','#B8420A'):hold?vchip('보류','#F3F3F1','#3C4043'):appr?vchip('승인 대기','#FFE9DD','#B8420A'):vchip(r.rank===1?'다음 호출':r.rank+'번','#F3F3F1','#3C4043');
     const note=(r.urgent&&r.rank===1?'다음 호출 · ':'')+esc(sname(r.sector_id))+' · '+(r.call_at||'—');
     return vrow(r.vehicle_id,r.load_t+'t · '+r.cargo,ch,note,r.urgent?'#B8420A':null); }).join('');
-  return '<a class="hpc yc" href="#dock" aria-label="차량 대기장 · 순번 보기">'+
-    '<div class="top"><div><div class="nm">차량 대기장</div><div class="role">CAM-04(후보) · 순번은 순번·배정</div></div><span class="lvb" style="background:#F3F3F1;color:#3C4043">대기 '+c.yard+'대</span></div>'+
+  return '<div class="hpc yc" data-cam="CAM-04" tabindex="0" role="button" aria-label="차량 대기장 영상 보기">'+
+    '<div class="top"><div><div class="nm">차량 대기장</div><div class="role">대기장 · CAM-04</div></div><span class="lvb" style="background:#F3F3F1;color:#3C4043">대기 '+c.yard+'대</span></div>'+
     (isLive('CAM-04')?'<div class="ythumb" data-thumb="CAM-04"></div>':'')+
     '<div class="t3s">'+tile3('대기',c.yard,'대')+tile3('호출 이동',c.moving,'대')+tile3('평균 대기',k.yard_avg_wait||0,'분')+'</div>'+
-    (li?'<ul class="vl">'+li+'</ul>':'<span class="cap">대기장에서 기다리는 차량이 없습니다.</span>')+'</a>';
+    (li?'<ul class="vl">'+li+'</ul>':'<span class="cap">대기장에서 기다리는 차량이 없습니다.</span>')+'</div>';
 }
 let yThumb=null;
 function renderSides(s){
@@ -1605,12 +1644,75 @@ $('#hoppers').addEventListener('keydown',e=>{const h=e.target.closest('[data-cam
 const post=u=>fetch(u,{method:'POST'}).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); });
 const refresh=()=>fetch('/api/state').then(r=>r.json()).then(render).catch(()=>{});
 $('#runBtn').addEventListener('click',()=>post(last&&last.running?'/api/sim/pause':'/api/sim/start').then(refresh));
-$('#speedSel').addEventListener('change',e=>post('/api/sim/speed?value='+e.target.value).then(refresh));
+$('#speedSel').addEventListener('change',e=>{ if(e.target.value!=='1'&&RT.on){ RT.on=false; rtSave(); } post('/api/sim/speed?value='+e.target.value).then(refresh); });   // ×1이 아닌 배속을 고르면 실제 운영 체험 끝
 $('#resetBtn').addEventListener('click',()=>post('/api/sim/reset').then(()=>{ dockMsg=''; Object.keys(vehNodes).forEach(id=>{vehNodes[id].remove();delete vehNodes[id];}); refresh(); }));
 $('#downSel').addEventListener('change',()=>last&&render(last));
 $('#downBtn').addEventListener('click',()=>{ const id=$('#downSel').value, x=last&&last.sectors.find(y=>y.id===id);
   post('/api/events/'+(x&&x.status==='down'?'sector_up':'sector_down')+'?sector_id='+encodeURIComponent(id)).then(refresh); });
 $('#urgentBtn').addEventListener('click',()=>post('/api/events/urgent').then(refresh));
+
+/* ---------- 실제 운영 체험 (×1) ----------
+   배속을 ×1(시뮬레이션 1분 = 실제 1분)로 바꾸고, 차 한 대를 골라 대기장 → 호출 → 이동 → 하차 → 출차를 실제 시각으로 따라간다.
+   카드에 '앞으로 10분 동안 일어날 일'과 '지금 담당자가 할 일'을 함께 보여 줘서, 실제 현장에 붙였을 때 화면이 얼마나 천천히 · 언제 바뀌는지 체감하게 한다. */
+const RT={on:false,vid:null,log:{},prev:null,prevSpeed:60,min:false};
+try{ Object.assign(RT,JSON.parse(localStorage.getItem('rtGuide')||'{}')); }catch(e){}
+const rtSave=()=>{ try{ localStorage.setItem('rtGuide',JSON.stringify({on:RT.on,prevSpeed:RT.prevSpeed,min:RT.min})); }catch(e){} };
+const toMin=hm=>{ const [h,m]=(hm||'0:0').split(':').map(Number); return h*60+m; };
+const inMin=(from,to)=>{ const d=Math.round(to-from); return d<=0?'곧':'약 '+d+'분 뒤'; };
+async function rtStart(){ RT.on=true; RT.vid=null; RT.log={}; if(last&&last.speed!==1) RT.prevSpeed=last.speed; rtSave();
+  await post('/api/sim/speed?value=1'); if(last&&!last.running) await post('/api/sim/start'); closeDD(); refresh(); }
+async function rtStop(){ RT.on=false; rtSave(); $('#rtGuide').hidden=true; await post('/api/sim/speed?value='+(RT.prevSpeed||60)); refresh(); }
+$('#realBtn').addEventListener('click',rtStart);
+$('#ucDemoBtn').addEventListener('click',async()=>{ closeDD(); try{ const r=await post('/api/events/driver_checks'); alert('끝난 운행 '+r.filled+'건에 운전자 확인을 채웠어요(시연 데이터). 설정 › 기준값·단가 › ① 예측값에서 추천을 볼 수 있어요.'); }catch(e){} if(view==='settings') pollView(true); });
+$('#rtClose').addEventListener('click',rtStop);
+$('#rtMin').addEventListener('click',()=>{ RT.min=!RT.min; rtSave(); $('#rtGuide').classList.toggle('min',RT.min); $('#rtMin').textContent=RT.min?'펼치기':'접기'; $('#rtMin').setAttribute('aria-expanded',String(!RT.min)); });
+const RT_STEPS=[['yard','대기장 도착 · 순번 추천'],['moving','호출 → 호퍼로 이동'],['queue','호퍼 앞 대기선'],['working','하차'],['done','하차 끝 · 출차(계근대 출)']];
+function rtPick(s){
+  const vs=s.vehicles, q=Object.fromEntries((s.queue||[]).map(x=>[x.vehicle_id,x]));
+  return vs.filter(v=>v.state==='yard').sort((a,b)=>((q[a.id]||{}).rank||99)-((q[b.id]||{}).rank||99))[0]
+    ||vs.filter(v=>v.state==='moving').sort((a,b)=>(a.eta_min||0)-(b.eta_min||0))[0]||vs.find(v=>v.state==='queue')||vs.find(v=>v.state==='working')||null; }
+function rtGuide(s){
+  const g=$('#rtGuide'); if(!RT.on){ g.hidden=true; return; }
+  if(s.speed!==1){ g.hidden=true; return; }      // 배속이 바뀌는 중(또는 다른 배속) — 체험 끝은 배속 메뉴에서 다른 값을 고를 때
+  g.hidden=false; g.classList.toggle('min',RT.min);
+  const now=toMin(hhmm(s.clock)), clk=(s.clock||'').slice(11,19);
+  let v=RT.vid&&s.vehicles.find(x=>x.id===RT.vid);
+  if(!v){ const n=rtPick(s); if(n){ RT.prev=RT.vid; RT.vid=n.id; RT.log={}; v=n; } }
+  const q=v&&(s.queue||[]).find(x=>x.vehicle_id===v.id), sec=v&&s.sectors.find(x=>x.id===v.sector_id), w=sec&&sec.working.find(x=>x.vehicle_id===v.id);
+  const cur=v?RT_STEPS.findIndex(x=>x[0]===v.state):-1;
+  if(v&&cur>=0&&!RT.log[v.state]) RT.log[v.state]=clk;
+  const det=k=>{ if(!v) return '';
+    if(k==='yard') return (q?q.rank+'번째 · 대기 '+Math.floor(v.wait_min||0)+'분 · 호출 예정 '+esc(q.call_at||'—')+' ('+(q.call_at?inMin(now,toMin(q.call_at)):'—')+') · 현장 '+esc(q.status||''):'순번 계산 중');
+    if(k==='moving') return esc(sname(v.sector_id))+' '+((v.bay||0)+1)+'번 베이로 · '+inMin(0,v.eta_min||0)+' 도착';
+    if(k==='queue') return '앞 차 하차가 끝나면 베이 진입';
+    if(k==='working') return w?('경과 '+Math.floor(w.elapsed_min)+'분 / 예측 '+Math.round(w.std)+'분 · '+(w.remain_min>0?'약 '+Math.ceil(w.remain_min)+'분 남음':'곧 끝')+(w.safety?' · 안전 중지':'')+(w.delayed?' · 지연':'')):'';
+    if(k==='done') return '계근대(출) → 원료야드 상차 → 다음 반입';
+    return ''; };
+  // 앞으로 10분: 호출 · 도착 · 하차 끝
+  const nx=[];
+  (s.queue||[]).forEach(x=>{ if(x.call_at){ const m=toMin(x.call_at)-now; if(m>=0&&m<=10) nx.push([m,x.call_at,esc(x.vehicle_id)+' 호출 → '+esc(sname(x.sector_id))+(x.status==='승인 대기'?' (현장 승인 필요)':'')]); } });
+  s.vehicles.filter(x=>x.state==='moving'&&x.eta_min!=null&&x.eta_min<=10).forEach(x=>nx.push([x.eta_min,'',esc(x.id)+' '+esc(sname(x.sector_id))+' 도착']));
+  s.sectors.forEach(sc=>sc.working.forEach(x=>{ if(x.remain_min<=10&&!x.safety) nx.push([x.remain_min,'',esc(x.vehicle_id)+' '+esc(sc.name)+' '+(x.bay+1)+'번 베이 하차 끝']); }));
+  nx.sort((a,b)=>a[0]-b[0]);
+  const fmt=m=>{ const t=now+Math.max(0,Math.ceil(m)); return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'); };
+  // 지금 담당자가 할 일
+  const appr=(s.queue||[]).filter(x=>x.status==='승인 대기').length, so=(s.safety_open||[]), crit=(s.alerts||[]).filter(a=>!a.ack&&a.level==='crit'&&a.kind!=='호출').length;
+  const todo=[so.length?'안전 경고 '+so.length+'건 — '+(so.some(x=>!x.seen)?'[관제 확인] 후 현장 확인되면 [해제]':'현장 확인되면 [해제 · 하차 재개]'):'',
+              appr?'현장 승인 대기 '+appr+'건 — 현장 담당자 앱(또는 순번·배정 탭)':'', crit?'확인 안 한 중요 알림 '+crit+'건 — 종 아이콘':''].filter(Boolean);
+  const kp=s.kpi||{}, ct=s.counts||{};
+  $('#rtBody').innerHTML=
+    '<div class="rtg-sec">따라가는 차량 · 지금 '+esc(clk)+'</div>'+
+    (v?'<div class="rtg-veh">'+esc(v.id)+'<small>'+esc(v.cargo)+' '+esc(v.load_t)+'t'+(v.sector_id?' · '+esc(sname(v.sector_id)):'')+(RT.prev?' · 앞 차 '+esc(RT.prev)+' 출차 완료':'')+'</small></div>'+
+      '<ol>'+RT_STEPS.map(([k,t],i)=>'<li class="'+(i<cur?'done':i===cur?'now':'')+'"><i>'+(i<cur?'✓':i===cur?'▶':'○')+'</i><span>'+t+(i===cur?'<span class="d">'+det(k)+'</span>':'')+'</span><span class="tm">'+(RT.log[k]?esc(RT.log[k].slice(0,5)):'')+'</span></li>').join('')+'</ol>'
+      :'<div class="cap">지금 따라갈 차량이 없어요(대기장 · 이동 · 하차 중인 차 없음). 다음 차가 들어오면 자동으로 따라가요.</div>')+
+    '<div class="rtg-sec">앞으로 10분</div><div class="next">'+(nx.length?nx.slice(0,6).map(x=>'<div><span>'+(x[1]||fmt(x[0]))+'</span>'+x[2]+'</div>').join(''):'<div><span>—</span>10분 안에 예정된 호출 · 도착 · 하차 끝이 없어요</div>')+'</div>'+
+    '<div class="todo"><b>지금 담당자가 할 일</b><br>'+(todo.length?todo.map(esc).join('<br>'):'없음 — 화면은 이벤트가 올 때만 바뀌니 다른 일을 해도 돼요(알림이 오면 종 · 띠로 알려 줌).')+'</div>'+
+    '<div class="rtg-sec">알아 둘 점</div><ul class="note">'+
+      '<li>×1 = 실제 시간. 시뮬레이션 한 걸음(15초)마다 화면이 바뀌어요 — 차 한 대가 들어와서 나갈 때까지 보통 20~40분.</li>'+
+      '<li>하차 시간은 원료별 표준값(설정 › 기준값, 가정)이고, 대기장 → 호퍼 이동은 실제 도로 길이 기준 1~6분이에요.</li>'+
+      '<li>오늘 지금까지 반입 '+(ct.trips_done||0)+'회 · 대기장 '+(ct.yard||0)+'대 · 평균 대기 '+(kp.done_avg_wait||0)+'분 (시뮬레이션 값).</li>'+
+      '<li>실제 현장에서는 CCTV 영상 탐지 · 계근 · 기사 앱이 이 이벤트들을 보내고(영상 모드), 순번 · 알림 · 화면은 지금과 같은 규칙으로 움직여요.</li></ul>';
+}
 $('#alerts').addEventListener('click',e=>{ const b=e.target.closest('[data-ack]'); if(b) post('/api/alerts/'+encodeURIComponent(b.dataset.ack)+'/ack').then(refresh); });
 
 /* ================= 탭 (#monitor · #dock · #analysis · #alerts) ================= */
@@ -1751,7 +1853,20 @@ function renderPredCol(d){
   $('#setPred').innerHTML='<b style="font-size:13px">예측 하차시간 = 오늘 실측 평균</b>'+d.preds.map(x=>'<div class="prow"><span><b>'+esc(x.cargo)+'</b><span class="cap">'+
       (x.fixed?'바꿔보기에서 고정 · <button class="mini" data-unfix="'+esc(x.cargo)+'">자동으로</button>':x.auto?x.n+'건 실측':'실측 '+x.n+'건 · '+d.pred_min_n+'건 미만이라 기본값 '+x.base+'분')+'</span></span><span class="pv num">'+x.pred+'분</span></div>').join('')+
     '<b style="font-size:13px;display:block;margin-top:10px">예측 이동시간</b><div class="prow"><span><b>대기장 → 베이</b><span class="cap">지도 경로 거리 ÷ 구내 제한속도 × 감속</span></span><span class="pv num">'+d.travel[0]+'~'+d.travel[1]+'분</span></div>'+
-    '<p class="cap" style="margin:10px 0 0">마지막 계산 '+esc(d.pred_at)+' · '+d.pred_every+'분마다 다시 계산 · <a href="#analysis" data-gotorec>건별 기록 ›</a></p>';
+    '<p class="cap" style="margin:10px 0 0">마지막 계산 '+esc(d.pred_at)+' · '+d.pred_every+'분마다 다시 계산 · <a href="#analysis" data-gotorec>건별 기록 ›</a></p>'+unloadReco(d.unload);
+}
+/* 하차 예상 시간 추천 — 기사 앱 '하역 완료 확인'(맞아요 / 아직 안 끝났어요 → 지금 끝났어요)으로 모은 실제 하차 시간 */
+function unloadReco(u){
+  if(!u) return '';
+  const rows=u.by_cargo.filter(x=>x.n);
+  let h='<b style="font-size:13px;display:block;margin-top:14px">하차 예상 시간 추천 <span class="cap" style="font-weight:600">운전자 확인 기준</span></b>';
+  if(!rows.length) return h+'<p class="cap" style="margin:4px 0 0">아직 운전자 확인이 없어요. 기사 앱에서 하역이 완료로 감지되면 운전자가 [맞아요] · [아직 안 끝났어요 → 지금 끝났어요]로 실제 시간을 알려 줘요. 원료별 '+u.min_n+'건 이상 모이면 추천해요.'+(u.pending?' · 끝나기 기다리는 중 '+u.pending+'건':'')+'</p>';
+  h+='<p class="cap" style="margin:4px 0 6px">확인 '+u.n+'건 · 그중 시스템이 일찍 완료로 본 것 '+u.late+'건'+(u.demo?' · <span class="assumed">시연 데이터 '+u.demo+'건</span>':'')+(u.pending?' · 끝나기 기다리는 중 '+u.pending+'건':'')+'</p>';
+  h+=rows.map(x=>'<div class="prow ureco"><span><b>'+esc(x.cargo)+'</b><span class="cap">'+x.n+'건 · 실제 '+x.min+'~'+x.max+'분 · 중앙값 <b>'+x.median+'분</b> · 감지 평균 '+x.detected+'분'+(x.late?' · 일찍 완료 판단 '+x.late+'건':'')+'<br>지금 예측 '+x.pred+'분 · 목표 '+x.target+'분</span>'+
+      (x.reco!=null?'<span class="ub"><button class="mini dark" data-pfix="'+esc(x.cargo)+'" data-pv="'+x.reco+'" title="순번 · 호출 계산에 쓰는 예측 하차 시간을 이 값으로 고정(바꿔보기 고정과 같음 · [자동으로]로 되돌림)">예측 '+x.reco+'분으로</button>'+
+        (Math.abs(x.reco-x.target)>=1?'<button class="mini" data-tset="'+esc(x.cargo)+'" data-tv="'+x.reco+'" title="판정용 목표 하차시간도 바꿈">목표도 '+x.reco+'분</button>':'')+'</span>'
+       :'<span class="cap">'+(x.n<u.min_n?u.min_n+'건 모이면 추천':'예측과 1분 안 · 그대로')+'</span>')+'</div>').join('');
+  return h;
 }
 function buildForm(d){
   const a=d.values, act=Object.fromEntries(d.preds.map(x=>[x.cargo,x]));
@@ -1788,8 +1903,9 @@ async function saveSettings(body){
     try{ cfg.settings=(await getJ('/api/config')).settings; }catch(e){} await refresh(); pollView(true); }catch(e){ setMsg='다시 계산하지 못했습니다: '+e.message; pollView(true); }
 }
 $('#setValues').addEventListener('click',e=>{
-  const t=e.target.closest('[data-tset]'), u=e.target.closest('[data-unfix]'), g=e.target.closest('[data-goroi]'), rc=e.target.closest('[data-gotorec]');
-  if(t) saveSettings({std_times:{[t.dataset.tset]:Number(t.dataset.tv)}});
+  const t=e.target.closest('[data-tset]'), u=e.target.closest('[data-unfix]'), g=e.target.closest('[data-goroi]'), rc=e.target.closest('[data-gotorec]'), pf=e.target.closest('[data-pfix]');
+  if(pf) saveSettings({pred_override:{[pf.dataset.pfix]:Number(pf.dataset.pv)}});
+  else if(t) saveSettings({std_times:{[t.dataset.tset]:Number(t.dataset.tv)}});
   else if(u) saveSettings({pred_override:{[u.dataset.unfix]:null}});
   else if(g) document.querySelector('[data-stab=roi]').click();
   else if(rc){ anaTab='rec'; setTimeout(()=>document.querySelector('.seg [data-atab=rec]').click(),50); }
@@ -2178,7 +2294,8 @@ function renderAnalysis(a){
   const C=2*Math.PI*36, arc=pct==null?0:C*pct/100;
   $('#fbBox').innerHTML='<div style="display:flex;gap:14px;align-items:center"><svg class="donut" viewBox="0 0 88 88" aria-hidden="true"><circle cx="44" cy="44" r="36" fill="none" stroke="#E6EDFF" stroke-width="12"/><circle cx="44" cy="44" r="36" fill="none" stroke="#1D47B8" stroke-width="12" stroke-dasharray="'+arc+' '+C+'" transform="rotate(-90 44 44)" stroke-linecap="round"/></svg>'+
     '<div><span class="cap">추천 일치율 · '+(a.range==='today'?'오늘':'이 기간')+'</span><div><b class="num" style="font-size:28px">'+(pct==null?'—':pct+'%')+'</b> <span class="cap">'+(dec?dec+'건 중 '+a.decisions.approved+'건 그대로 승인':'승인·변경이 생기면 계산돼요')+'</span></div></div></div>'+
-    '<div class="bars" style="margin-top:10px"><b style="font-size:13px">'+(pct==null?'담당자가 바꾼 이유':'안 맞은 '+(100-pct)+'% · 담당자가 바꾼 이유')+'</b>'+Object.entries(fb.counts).map(([k,v])=>'<div class="b"><span>'+esc(k)+'</span><span class="t"><i style="width:'+(v/mx*100)+'%;background:#141414"></i></span><span class="num r">'+v+'</span></div>').join('')+'</div>'+
+    '<div class="bars" style="margin-top:10px"><b style="font-size:13px">'+(pct==null?'담당자가 바꾼 이유':'안 맞은 '+(100-pct)+'% · 담당자가 바꾼 이유')+'</b>'+
+      (fb.total?'<span class="cap" style="display:block;margin:2px 0 4px">변경 '+fb.total+'건 · 현장 앱 '+((fb.by||{})['현장']||0)+' · 관제 화면 '+((fb.by||{})['관제']||0)+(fb.memos&&fb.memos.length?' · 최근 메모: '+fb.memos.slice(0,2).map(m=>esc(m)).join(' / '):'')+'</span>':'')+Object.entries(fb.counts).map(([k,v])=>'<div class="b"><span>'+esc(k)+'</span><span class="t"><i style="width:'+(v/mx*100)+'%;background:#141414"></i></span><span class="num r">'+v+'</span></div>').join('')+'</div>'+
     (fb.suggestions.length?fb.suggestions.slice(0,1).map(x=>'<div class="sugg" style="margin-top:10px;background:var(--blue-bg);border:0"><b>⚙ 가정값 조정 제안</b><span>'+esc(x.text)+'</span><div style="display:flex;gap:6px"><button class="mini dark" data-apply="'+esc(x.key)+'">설정에서 적용</button><button class="mini" data-ignore="'+esc(x.key)+'">무시</button></div></div>').join('')
       :'<p class="cap" style="margin:10px 0 0">같은 호퍼에서 같은 사유가 3번 쌓이면 목표 조정을 제안해요.</p>');
   renderRecords(a);

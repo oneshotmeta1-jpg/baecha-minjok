@@ -594,6 +594,21 @@ async def driver_arrive(request: Request):
     return {"result": r, "message": "도착 확인됨" if r == "ignored" else "도착했어요"}
 
 
+@app.post("/api/driver/unload")
+async def driver_unload(request: Request, body: dict = Body(...)):
+    """하역 완료 확인: answer = ok(맞아요, 끝났어요) · not_yet(아직 안 끝났어요) · done_now(지금 끝났어요)"""
+    rec, err = rt.driver_unload(my_plate(request), body.get("answer"))
+    if err:
+        raise HTTPException(409, err)
+    return rec
+
+
+@app.post("/api/events/driver_checks")
+async def demo_driver_checks():
+    """시연: 끝난 운행에 운전자 하역 완료 확인을 채운다(시드 고정 · 기록에 시연 표시)."""
+    return {"filled": rt.demo_unload_checks()}
+
+
 @app.post("/api/driver/stopped")
 async def driver_stopped(request: Request):
     x = rt.driver_stopped(my_plate(request))
@@ -655,7 +670,8 @@ async def field_change(request: Request, body: dict = Body(...)):
     if sid not in my_hoppers(request):
         raise HTTPException(403, "담당 하역장으로만 바꿀 수 있어요.")
     need_sector(sid)
-    c, err = rt.change(vid, sid, body.get("reason", "현장 판단"), body.get("memo", ""))
+    me = me_of(request)
+    c, err = rt.change(vid, sid, body.get("reason", ""), body.get("memo", ""), by="현장", by_name=me.get("name"))
     if err:
         raise HTTPException(409, err)
     return c

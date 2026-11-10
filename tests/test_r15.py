@@ -258,6 +258,11 @@ SM.VIDEO_NM[:] = sav
 ids = [x["id"] for x in rs.rec.near_miss]
 check("시뮬레이션 모드: 실제 영상 아차사고를 영상 한 바퀴(11분)마다 기록 · 알림은 첫 회차만",
       ids == ["NM-X-R1", "NM-X-R2", "NM-X-R3"] and sum(a["kind"] == "아차사고" for a in rs.rec.alerts_all) == 1, str(ids))
+hist = rs.alerts_range("today")["rows"]
+safe_nm = [r for r in hist if r["group"] == "안전" and r["kind"] == "아차사고"]
+check("알림 이력: 아차사고는 '안전'에 기록마다 한 줄(첫 회차는 알림 확인 여부) · '운영'에는 없음",
+      [r["id"] for r in safe_nm] == ["NM-X-R3", "NM-X-R2", "NM-X-R1"] and safe_nm[-1]["handling"] == "미확인"
+      and not any(r["kind"] == "아차사고" and r["group"] != "안전" for r in hist), str([(r["id"], r["handling"]) for r in safe_nm]))
 rs2 = Runtime(7); rs2.advance(240)
 check("시뮬레이션 모드: 호퍼 합성 안전 경고(무작위 작업자) 꺼짐 · 서버 없이 만들면 영상 아차사고 목록도 비어 있음",
       not rs2.rec.safety and not rs2.rec.near_miss, f"{len(rs2.rec.safety)}건")

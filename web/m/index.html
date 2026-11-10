@@ -29,6 +29,7 @@ h1{font-size:24px;line-height:1.3;margin:0;letter-spacing:-.01em} h2{font-size:1
 .steps li span{margin-left:auto;font-variant-numeric:tabular-nums}
 .chips{display:flex;flex-wrap:wrap;gap:8px} .chips button{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:#fff;font:inherit;font-size:14px;font-weight:600;color:var(--ink-2)}
 .chips button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.chips button:disabled{opacity:.4} .btn:disabled{opacity:.45}
 .dock{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 30%);display:flex;flex-direction:column;gap:8px;max-width:430px;margin:0 auto}
 .dock .btn{width:100%;min-height:56px;font-size:16px}
 .btn.white{background:#fff;color:var(--ink);border-color:#fff} .btn.red{background:var(--red);border-color:var(--red);color:#fff}
@@ -54,6 +55,35 @@ h1{font-size:24px;line-height:1.3;margin:0;letter-spacing:-.01em} h2{font-size:1
 .snd{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#FFF1D6;color:#8A5A00;border-radius:16px;padding:10px 12px;font-size:13px;font-weight:600}
 .snd button{min-height:40px;border-radius:999px;border:0;background:#8A5A00;color:#fff;font:inherit;font-weight:700;padding:0 14px}
 .bell{position:relative;border:0;background:transparent;font-size:18px;min-width:44px;min-height:40px;cursor:pointer}
+.outb{border:1px solid rgba(0,0,0,.15);background:#fff;border-radius:999px;font:600 12.5px inherit;padding:6px 10px;min-height:34px;cursor:pointer;color:inherit}
+.uc{background:#FFF6E5;border:2px solid #F0A020}
+/* 모바일 3D 매핑 — 운전자: 호출 = 내 경로 하나(전체 맵) · 도착 = 내 베이 · 내 원료(구역 맵) / 현장: 담당 구역 3D 매핑(PC 카드와 같은 그림) */
+.mapc{background:#EAF1FD;border:1px solid #CFE0FA}
+.mapc .tag{display:inline-block;font-size:11.5px;font-weight:800;color:#1D47B8;background:#fff;border:1px solid #CFE0FA;border-radius:999px;padding:2px 9px;margin-bottom:6px}
+.mapc .foot{font-size:12.5px;color:#1D47B8;font-weight:600;margin-top:6px}
+.rmap{display:block;width:100%;height:auto;border-radius:12px;background:#F5F6F4}
+.zb{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:4px}
+.zb .b{border:1.5px solid #C9CDD2;background:#F4F4F1;border-radius:12px;padding:10px 6px 8px;text-align:center;min-height:86px;display:flex;flex-direction:column;align-items:center;gap:3px}
+.zb .b .n{font-weight:800;font-size:15px}
+.zb .b .st{font-size:12.5px;color:#55595D}
+.zb .b .cg{display:flex;align-items:center;gap:4px;font-size:12px;color:#55595D}
+.zb .b .cg i{width:10px;height:10px;border-radius:3px;border:1px solid rgba(0,0,0,.15)}
+.zb .b.mine{border:2.5px solid #2F6FDE;background:#fff;box-shadow:0 2px 8px rgba(47,111,222,.18)}
+.zb .b.mine .n{font-size:22px;color:#1D47B8} .zb .b .me{font-size:11.5px;font-weight:800;color:#fff;background:#2F6FDE;border-radius:999px;padding:1px 8px} .zb .b.mine .cg{font-size:14px;font-weight:800;color:#141414}
+.zb .b.stop{border-color:#E5383B;background:#FDECEC} .zb .b.stop .st{color:#E5383B;font-weight:700}
+.zb .rev{grid-column:var(--c);display:flex;flex-direction:column;align-items:center;color:#1D47B8;font-weight:700;font-size:13px}
+.zb .rev svg{display:block}
+.fzc{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap} .fzc button{border:1px solid #CFE0FA;background:#fff;border-radius:999px;padding:5px 12px;font:700 13px inherit;color:#1D47B8}
+.fzc button[aria-pressed="true"]{background:#1D47B8;color:#fff;border-color:#1D47B8}
+.fzq{margin-top:8px;border:1.5px solid #C9CDD2;background:#F4F4F1;border-radius:12px;padding:9px;text-align:center;font-weight:700;font-size:14px}
+/* 폰 폭: 3D 매핑 범례를 지도 아래로(지도를 넓게) */
+.mapc .m3{border:0;background:transparent}
+.mapc .m3-h{padding:0 2px}
+.mapc .m3-b{flex-direction:column;height:auto;padding:0 0 4px}
+.mapc .m3-map{flex:none;height:var(--m3h,170px);background:#F5F6F4}
+.mapc .m3-lg{width:auto;flex-direction:row;flex-wrap:wrap;gap:4px 12px;justify-content:flex-start}
+.mapc .m3-lg b{margin-left:4px}
+.uc h2{margin:0 0 4px} .uc .btns{display:flex;flex-direction:column;gap:8px;margin-top:10px}
 .bell .n{position:absolute;top:2px;right:2px;min-width:18px;height:18px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0 5px}
 .ib{background:#fff;border-radius:18px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;font-size:13.5px;cursor:pointer;border:0;width:100%;text-align:left;font:inherit;color:var(--ink)}
 .ib i{width:10px;height:10px;border-radius:50%;margin-top:6px;flex:none} .ib.unread b{font-weight:800} .ib:not(.unread){color:var(--muted)} .ib:not(.unread) b{font-weight:500}
@@ -67,6 +97,7 @@ h1{font-size:24px;line-height:1.3;margin:0;letter-spacing:-.01em} h2{font-size:1
 <div class="app" id="app"><div class="body"><div class="card"><h1>불러오는 중…</h1></div></div></div>
 <div class="toast" id="toast" role="status" hidden></div>
 <div class="nb" id="nb" role="alert" aria-live="assertive" hidden></div>
+<script src="/web/map3d.js"></script>
 <script>
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let ME=null, D=null, tab='home', busy=false, live=false, cargoSel=null, toastT=null;
@@ -76,7 +107,7 @@ async function api(u,o){ const r=await fetch(u,o); if(r.status===401){ location.
 const post=(u,b)=>api(u,{method:'POST',headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined});
 function bar(){ const u=(D&&D.notes&&D.notes.unread)||0;
   return '<div class="bar"><span><b>'+esc(ME.role_name)+'</b> · '+esc(ME.name)+'</span><span style="display:flex;align-items:center;gap:6px"><span class="live'+(live?' on':'')+'" title="실시간 연결"><i></i>'+(D&&D.clock?esc(D.clock.slice(11,16)):'')+'</span>'+
-    (ME.role==='driver'?'<button class="bell" id="inboxBtn" aria-label="알림함 · 안 읽음 '+u+'">🔔'+(u?'<span class="n">'+(u>99?'99+':u)+'</span>':'')+'</button>':'')+'</span></div>'+sndRow(); }
+    (ME.role==='driver'?'<button class="bell" id="inboxBtn" aria-label="알림함 · 안 읽음 '+u+'">🔔'+(u?'<span class="n">'+(u>99?'99+':u)+'</span>':'')+'</button><button class="outb" id="out">로그아웃</button>':'')+'</span></div>'+sndRow(); }
 function sndRow(){ return audioOn()?'':'<div style="padding:0 16px 6px"><div class="snd"><span>🔊 알림 소리 · 진동을 켜 주세요</span><button id="sndOn">켜기</button></div></div>'; }
 
 /* ---------- 운전자 ---------- */
@@ -92,11 +123,58 @@ function driver(){
 }
 function steps(cur){ const S=D.steps||[]; let now=S.findIndex(s=>!s.t); if(now<0) now=S.length;
   return '<div class="card"><h2>진행 상황</h2><ul class="steps">'+S.map((s,i)=>'<li class="'+(s.t?'on':'')+(i===now?' now':'')+'"><i></i>'+esc(s.k)+'<span>'+esc(s.t||'')+'</span></li>').join('')+'</ul></div>'; }
+/* 전체 맵 — 구내 관제 맵(web/assets/site_map_iso.svg)과 같은 좌표로 대기장 → 배정 호퍼 경로만 굵게. 내 위치는 그리지 않음(위치 신호 가정) */
+const RM={yard:{A:[[304.5,297.2],[442.4,331.5],[409.0,382.5],[271.0,348.2]],B:[[582.6,382.9],[711.4,414.9],[677.9,465.9],[549.1,433.8]],C:[[463.4,442.2],[578.4,470.8],[545.9,520.3],[430.9,491.7]]},
+  lot:[[683.0,345.7],[850.8,387.4],[812.3,446.2],[644.4,404.4]],
+  bay:{A:[[303,337],[349,350],[395,362]],B:[[583,423],[626,434],[669,445]],C:[[462,481],[500,490],[539,499]]},
+  route:{A:[[664.6,372.3],[632.4,364.3],[594.8,348.3],[593.1,318.3],[551.7,308.0],[486.7,321.4],[419.7,354.2]],
+         B:[[664.6,372.3],[632.4,364.3],[597.3,384.6]],
+         C:[[664.6,372.3],[632.4,364.3],[597.3,384.6],[572.2,388.2],[535.3,442.4],[492.8,454.1]]}};
+const BL={A:[20,-12,'start'],B:[-18,30,'end'],C:[18,36,'start']};   // 베이 이름표 위치(다른 호퍼 이름과 안 겹치게)
+const MATC={'석회석':'#D2CBBE','사문암':'#7F9478','규석':'#EEE7D4','밀스케일':'#4F4845','슬러지':'#7A5E43','집진더스트':'#8F8C89','분코크스':'#2E2E31','무연탄':'#222224'};   // map3d.js 원료 색
+const pts=a=>a.map(p=>p.join(',')).join(' ');
+function routeMap(v){
+  const sid=v.sector_id; if(!sid||!RM.route[sid]) return '';
+  const b=Math.max(0,(v.bay||1)-1), dest=RM.bay[sid][b]||RM.bay[sid][0], path=RM.route[sid].concat([dest]);
+  const cx=q=>q.reduce((a,p)=>a+p[0],0)/q.length, cy=q=>q.reduce((a,p)=>a+p[1],0)/q.length, top=q=>Math.min(...q.map(p=>p[1]));
+  let g='<svg class="rmap" viewBox="250 255 630 300" role="img" aria-label="대기장에서 '+esc(v.sector)+' '+(v.bay||'')+'번 베이까지 경로">';
+  ['A','B','C'].forEach(k=>{ g+='<polyline points="'+pts(RM.route[k])+'" fill="none" stroke="#D3D4CF" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/>'; });
+  ['A','B','C'].forEach(k=>{ const me=k===sid;
+    g+='<polygon points="'+pts(RM.yard[k])+'" fill="'+(me?'#fff':'#E4E4E0')+'" stroke="'+(me?'#2F6FDE':'#A9ACA8')+'" stroke-width="'+(me?3:1.5)+'"/>'; });
+  const bot=q=>Math.max(...q.map(p=>p[1]));
+  const lab=['A','B','C'].map(k=>{ const me=k===sid, y=k==='A'?top(RM.yard[k])-8:bot(RM.yard[k])+28;   // A는 위, B · C는 아래(경로 · 대기장과 안 겹치게)
+    return '<text x="'+cx(RM.yard[k]).toFixed(0)+'" y="'+y.toFixed(0)+'" text-anchor="middle" font-size="'+(me?30:24)+'" font-weight="800" fill="'+(me?'#1D47B8':'#7A7D80')+'" paint-order="stroke" stroke="#F5F6F4" stroke-width="6">호퍼 '+k+'</text>'; }).join('');
+  g+='<polygon points="'+pts(RM.lot)+'" fill="#E4E4E0" stroke="#A9ACA8" stroke-width="1.5"/><text x="'+cx(RM.lot).toFixed(0)+'" y="'+(cy(RM.lot)+6).toFixed(0)+'" text-anchor="middle" font-size="26" font-weight="800" fill="#55595D">대기장</text>';
+  g+='<polyline points="'+pts(path)+'" fill="none" stroke="#2F6FDE" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/>'+
+     '<circle cx="'+path[0][0]+'" cy="'+path[0][1]+'" r="9" fill="#fff" stroke="#2F6FDE" stroke-width="5"/>'+
+     '<circle cx="'+dest[0]+'" cy="'+dest[1]+'" r="14" fill="#2F6FDE" stroke="#fff" stroke-width="5"/>'+
+     '<text x="'+(dest[0]+BL[sid][0])+'" y="'+(dest[1]+BL[sid][1])+'" text-anchor="'+BL[sid][2]+'" font-size="24" font-weight="800" fill="#1D47B8" paint-order="stroke" stroke="#fff" stroke-width="6">'+(v.bay||'')+'번 베이</text>'+lab;
+  return g+'</svg>';
+}
+function zoneMap(){
+  const z=D.zone; if(!z||!z.bays) return '';
+  const ST={unload:'하역 중',enter:'진입',delay:'작업 지연',danger:'안전 중지',reverse:'안전 중지',stop:'안전 중지',empty:'비어 있음',reserved:'도착 예정'};
+  const me=z.bays.find(b=>b.n===z.my_bay)||{};
+  return '<div class="card mapc"><span class="tag">구역 맵 · '+esc(z.name)+'</span>'+
+    '<div class="zb">'+z.bays.map(b=>{ const mine=b.n===z.my_bay;
+      return '<div class="b'+(mine?' mine':'')+(!mine&&b.state==='stop'?' stop':'')+'"><span class="n">'+b.n+'번</span>'+(mine?'<span class="me">내 베이</span>':'')+
+        '<span class="st">'+(mine?'여기로 진입':esc(ST[b.state]||''))+'</span><span class="cg"><i style="background:'+(MATC[b.cargo]||'#ccc')+'"></i>'+esc(b.cargo||'')+'</span></div>'; }).join('')+
+    (z.my_bay?'<div class="rev" style="--c:'+z.my_bay+'"><svg width="22" height="40" viewBox="0 0 22 40" aria-hidden="true"><path d="M11 38V8" stroke="#2F6FDE" stroke-width="3" stroke-dasharray="5 4"/><path d="M3 14l8-11 8 11" fill="none" stroke="#2F6FDE" stroke-width="3" stroke-linejoin="round"/></svg>후진 진입</div>':'')+'</div>'+
+    '<div class="foot">내 원료 <i style="display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:-1px;background:'+(MATC[me.cargo]||'#ccc')+'"></i> '+esc(me.cargo||'')+' = '+(z.my_bay||'—')+'번 베이 · 섞임 방지 — 원료 색이 같은 베이에만 내려요</div></div>';
+}
+/* 하역 완료 확인: 시스템이 완료로 본 운행을 운전자가 직접 확인 → 실제 하차 시간 통계(설정 › 하차 예상 시간 추천) */
+function uCheck(){ const u=D.unload_check; if(!u) return '';
+  const where=esc(u.sector||'')+(u.bay?' '+u.bay+'번 베이':'');
+  if(u.answer==='not_yet') return '<div class="card uc"><h2>다 내리면 눌러 주세요</h2><span class="cap">'+where+' · '+esc(u.cargo)+' · 완료로 감지 '+esc(u.end)+' · \'아직 안 끝났어요\' '+esc(u.not_yet_at||'')+'</span>'+
+    '<div class="btns">'+(u.can_late?'<button class="btn dark" data-uc="done_now">지금 끝났어요</button>':'<span class="cap">완료 감지 뒤 20분이 지나 실제 끝난 시각은 받지 않아요.</span><button class="btn" data-uc="ok">감지 시각이 맞아요</button>')+'<button class="btn" data-uc="skip">기억 안 나요 · 건너뛰기</button></div></div>';
+  return '<div class="card uc"><h2>하역 완료 · 맞나요?</h2><span class="cap">'+where+' · '+esc(u.cargo)+' '+u.load_t+'t · '+esc(u.start)+' 진입 → '+esc(u.end)+' 완료로 감지 (하차 '+u.detected_min+'분 · 예측 '+u.pred_min+'분)</span>'+
+    '<div class="btns"><button class="btn dark" data-uc="ok">맞아요, 다 내렸어요</button>'+(u.can_late?'<button class="btn" data-uc="not_yet">아직 안 끝났어요</button>':'<button class="btn" data-uc="skip">기억 안 나요 · 건너뛰기</button>')+'</div>'+
+    '<span class="cap" style="margin-top:6px">누른 결과로 원료별 실제 하차 시간을 모아 예상 시간을 고쳐요.</span></div>'; }
 function vline(v){ return esc(v.cargo)+' '+v.load_t+'t'+(v.order?' · 오더 '+esc(v.order):''); }
 function register(){
   const cargos=(window.CARGOS||[]), top=['석회석','분코크스','밀스케일'], rest=cargos.filter(c=>!top.includes(c));
   const car=ME.vehicle||{};
-  let h=bar()+'<div class="body">';
+  let h=bar()+'<div class="body">'+uCheck();
   if(D.trips_today) h+='<div class="card" style="background:#DDF0E5"><b style="color:#1F7A4F">하역 완료 · 오늘 운행 '+D.trips_today+'회</b><span class="cap">'+(D.last_trip?esc(D.last_trip.cargo)+' '+D.last_trip.load_t+'t · '+esc(HN(D.last_trip.sector||''))+' · 대기 '+D.last_trip.wait_min+'분':'')+'</span></div>';
   h+='<div><h1>오늘 운행 등록</h1><p class="cap" style="margin:4px 0 0">운행할 때마다 싣고 온 원료를 등록해요. 가입 정보와 별개예요.</p></div>'+
     '<div class="card"><span class="cap">내 차량 · 가입 정보</span><b style="font-size:17px">'+esc(car.plate)+' · '+esc(car.tonnage||'')+' 덤프</b><span class="cap">'+esc(car.carrier||'')+'</span></div>'+
@@ -118,21 +196,31 @@ function waiting(v,q){
 }
 function called(v){
   return bar()+'<div class="body"><div class="card blue"><span style="font-size:13px;opacity:.85">호출 '+esc((D.steps[2]||{}).t||'')+' · '+vline(v)+'</span><h1>'+esc(v.sector)+' '+v.bay+'번 베이로 이동하세요</h1>'+
-    '<span style="opacity:.9;font-size:14px">도로로 나가 직진 · 약 '+(v.travel_min??'—')+'분 · 후진 진입</span></div>'+steps()+'</div>'+
+    '<span style="opacity:.9;font-size:14px">도로로 나가 직진 · 약 '+(v.travel_min??'—')+'분 · 후진 진입</span></div>'+
+    '<div class="card mapc"><span class="tag">전체 맵 · 내 경로</span>'+routeMap(v)+'<div class="foot">'+esc(v.sector)+' '+v.bay+'번 베이 · 약 '+(v.travel_min??'—')+'분 · 내 경로만 표시(위치 신호는 가정이라 내 위치는 안 그려요)</div></div>'+steps()+'</div>'+
     '<div class="dock"><button class="btn dark" id="ack">확인했어요 · 이동 시작</button></div>';
 }
 function arrive(v){
   return bar()+'<div class="body"><div class="card dark"><span class="cap">'+esc(D.plate)+' · 이동 중'+(v.eta_min!=null?' · 약 '+v.eta_min+'분 남음':'')+'</span><h1>'+esc(v.sector)+' '+v.bay+'번 베이에 도착했나요?</h1>'+
     '<span class="cap">위치 신호(가정)·영상으로 자동 확인되지만, 신호가 약하면 버튼으로 알려 주세요.</span></div>'+
-    '<div class="card"><h2>도착하면 진입 → 하역중</h2><span class="cap">'+v.bay+'번 베이('+esc(v.cargo)+')로 유도선을 따라 후진 진입한 뒤 적재함을 올리세요. 뒤에 사람이 있으면 경고가 와요.</span></div>'+steps()+'</div>'+
+    (D.zone?zoneMap():'<div class="card"><h2>도착하면 진입 → 하역중</h2><span class="cap">'+v.bay+'번 베이('+esc(v.cargo)+')로 유도선을 따라 후진 진입한 뒤 적재함을 올리세요. 뒤에 사람이 있으면 경고가 와요.</span></div>')+
+    '<p class="cap">유도선을 따라 후진 진입한 뒤 적재함을 올리세요. 뒤에 사람이 있으면 경고가 와요.</p>'+steps()+'</div>'+
     '<div class="dock"><button class="btn dark" id="arr">도착했어요</button></div>';
 }
 function working(v){
+  const w=v.await;
+  if(w) return bar()+'<div class="body"><div class="card dark"><span class="cap">'+esc(v.sector)+' '+v.bay+'번 베이 · '+vline(v)+'</span><h1>'+(w.not_yet?'하역 계속 중':'하역 100% · 완료 확인')+'</h1>'+
+    '<div style="height:8px;border-radius:999px;background:rgba(255,255,255,.2)"><div style="height:100%;width:100%;border-radius:999px;background:#fff"></div></div>'+
+    '<span class="cap">'+esc(w.since)+' 완료로 감지 (하차 '+w.detected_min+'분)'+(w.not_yet?' · '+esc(w.not_yet)+' ‘아직 안 끝났어요’':'')+'</span></div>'+
+    '<div class="card uc"><h2>'+(w.not_yet?'다 내리면 눌러 주세요':'실제로 다 내렸나요?')+'</h2><span class="cap">'+(w.not_yet?'적재함을 내리고 베이를 빠져나가기 전에 눌러 주세요.':'확인을 누르면 이탈(계근대 출)로 넘어가요. 남은 원료가 있으면 [아직 안 끝났어요].')+'</span>'+
+    '<div class="btns">'+(w.not_yet?'<button class="btn dark" data-uc="done_now">지금 끝났어요</button>':'<button class="btn dark" data-uc="ok">맞아요, 다 내렸어요</button><button class="btn" data-uc="not_yet">아직 안 끝났어요</button>')+'</div>'+
+    '<span class="cap" style="margin-top:6px">'+w.wait_left+'분 안에 누르지 않으면 관제실에 알리고 이탈로 처리해요 · 누른 결과로 원료별 하차 예상 시간을 고쳐요.</span></div>'+steps()+'</div>';
   return bar()+'<div class="body"><div class="card dark"><span class="cap">'+esc(v.sector)+' '+v.bay+'번 베이 · '+vline(v)+'</span><h1>하역 중 '+(v.progress_pct??0)+'%</h1>'+
     '<div style="height:8px;border-radius:999px;background:rgba(255,255,255,.2)"><div style="height:100%;width:'+Math.min(100,v.progress_pct||0)+'%;border-radius:999px;background:#fff"></div></div>'+
-    '<span class="cap">약 '+Math.ceil(v.remain_min||0)+'분 남음'+(v.dump_deg>=15?' · 적재함 상승 '+v.dump_deg+'°':'')+'</span></div>'+steps()+'</div>';
+    '<span class="cap">약 '+Math.ceil(v.remain_min||0)+'분 남음'+(v.dump_deg>=15?' · 적재함 상승 '+v.dump_deg+'°':'')+'</span></div>'+
+    '<p class="cap">진행률은 예측 하차 시간 기준이에요. 완료로 감지되면 실제로 다 내렸는지 확인 버튼이 떠요.</p>'+steps()+'</div>';
 }
-function finished(v){ return bar()+'<div class="body"><div class="card" style="background:#DDF0E5"><h1 style="color:#1F7A4F">하역 완료</h1><span class="cap">계근대(출)로 나가세요 · 오늘 운행 '+(D.trips_today+1)+'회째</span></div>'+steps()+'</div>'; }
+function finished(v){ return bar()+'<div class="body">'+uCheck()+'<div class="card" style="background:#DDF0E5"><h1 style="color:#1F7A4F">하역 완료</h1><span class="cap">계근대(출)로 나가세요 · 오늘 운행 '+(D.trips_today+1)+'회째</span></div>'+steps()+'</div>'; }
 function alarm(sf){
   return '<div class="alarm" role="alertdialog" aria-labelledby="alt"><div class="row k"><span>'+esc(D.plate)+' · 운전자</span><span>'+esc(sf.ts||'')+'</span></div>'+
     '<span class="k">안전 경고 · 자동</span><h1 id="alt">하역을 멈추세요</h1><p style="margin:0;font-size:16px;line-height:1.5">트럭 '+(sf.rule&&sf.rule.includes('후진')?'후진 경로':'뒤 '+sf.radius_m+'m')+' 안에 작업자가 있어요. 적재함을 그대로 두고 기다리세요.</p>'+
@@ -150,6 +238,10 @@ function field(){
     (D.safety||[]).forEach(x=>{ h+='<div class="card red"><span style="font-size:13px;opacity:.9">안전 경고 L3 자동 실행 '+esc(x.ts||'')+'</span><h2>'+esc(x.sector_name||x.sector_id)+' · '+esc(x.cargo||'')+' '+esc(x.rule_text||'덤프 반경')+' 진입</h2>'+
       '<span style="font-size:13.5px;opacity:.95">'+esc(x.vehicle_id)+' 뒤에 작업자 · 약 '+(x.dist_m??'—')+'m. 경고와 하역 중지 요청이 자동으로 나갔어요.'+(x.driver_stopped?' 운전자 멈춤 확인 '+esc(x.driver_stopped)+'.':'')+'</span>'+
       '<div class="btns" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn white" data-sa="'+esc(x.id)+'" data-how="ack">확인</button><button class="btn" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.6)" data-sa="'+esc(x.id)+'" data-how="dismiss">취소 · 오탐지</button></div></div>'; });
+    if((D.zones||[]).length){ const zs=D.zones, cur=zs.find(z=>z.id===fzone)||zs[0]; fzone=cur.id;
+      const ap=(D.approvals||[]).filter(a=>a.sector_id===cur.id).length;
+      h+='<div class="card mapc"><span class="tag">담당 구역 맵</span>'+(zs.length>1?'<div class="fzc">'+zs.map(z=>'<button data-fz="'+esc(z.id)+'" aria-pressed="'+(z.id===cur.id)+'">'+esc(z.name)+'</button>').join('')+'</div>':'')+
+        '<div id="fm3slot"></div><div class="fzq">대기 차량 '+cur.queue+'대 · 이동 '+cur.moving+'대 · 승인 대기 '+ap+'건</div><div class="foot">PC 구역 카드와 같은 그림 · 핀을 누르면 차량 · 시간</div></div>'; }
     h+='<div class="hops">'+(D.sectors||[]).map(s=>{ const lv=s.status==='down'?'down':s.level; return '<div class="hop"><div class="row"><b>'+esc(s.name)+'</b><span class="lv '+lv+'">'+({ok:'원활',warn:'주의',crit:'혼잡',down:'정지'}[lv])+'</span></div><div class="pct">'+(s.status==='down'?'정지':s.congestion_pct+'%')+'</div><span class="cap">하역 중 '+s.working+'/'+s.bays+' · 대기 '+s.queue+'</span></div>'; }).join('')+
       (D.yard!=null?'<div class="hop"><b>대기장</b><div class="pct">'+D.yard+'<small style="font-size:14px">대</small></div><span class="cap">대기</span></div>':'')+'</div>';
     h+=approvals((D.approvals||[]).slice(0,2),true);
@@ -174,21 +266,51 @@ function approvals(list,short){
     (a.effect!=null&&Math.abs(a.effect)>=0.05?'<span><span class="eff'+(a.effect>0?' bad':'')+'" title="'+(a.effect_confirmed?'확정':'예상')+' · PC 알림 패널과 같은 값">FIFO 대비 '+(a.effect>0?'+':'−')+Math.abs(a.effect).toFixed(1)+'분</span></span>':'')+
     '<div class="btns"><button class="btn" data-chg="'+esc(a.vehicle_id)+'">변경</button><button class="btn dark" data-ok="'+esc(a.vehicle_id)+'">승인</button></div></div>').join('');
 }
+/* 하역장 바꾸기: ① 하역장 → ② 사유(관제 화면과 같은 6가지) · 메모 → 운영 분석 '담당자가 바꾼 이유'에 현장 앱 건으로 쌓임 */
 function changeSheet(vid){
-  const opts=(D.hoppers||[]).filter(h=>h!=='YARD');
-  const s=document.createElement('div'); s.className='sheet'; s.innerHTML='<div class="in" role="dialog" aria-label="하역장 바꾸기"><h2>'+esc(vid)+' 하역장 바꾸기</h2><span class="cap">담당 하역장으로만 바꿀 수 있어요.</span>'+
-    opts.map(h=>'<button class="btn" data-to="'+h+'">호퍼 '+h+'</button>').join('')+'<button class="btn" data-x="1">닫기</button></div>';
-  s.onclick=async e=>{ const b=e.target.closest('[data-to],[data-x]'); if(!b&&e.target!==s) return; s.remove(); if(b&&b.dataset.to){ try{ await post('/api/field/change',{vehicle_id:vid,sector_id:b.dataset.to,reason:'현장 판단'}); toast('호퍼 '+b.dataset.to+'로 바꿨어요'); load(); }catch(err){ toast(err.message); } } };
-  document.body.appendChild(s);
+  const ap=(D.approvals||[]).find(a=>a.vehicle_id===vid)||{}, opts=(D.hoppers||[]).filter(h=>h!=='YARD'), cur=ap.sector_id, acc=ap.accept||opts;   // acc = 이 원료를 받는 호퍼
+  const reasons=D.reasons||['기사·차량 사정','현장 우선순위','영상 판정 오류','호퍼·설비 사정','긴급 반입 끼어듦','기타'];
+  let to=null, why=null;
+  const s=document.createElement('div'); s.className='sheet';
+  const paint=()=>{ s.innerHTML='<div class="in" role="dialog" aria-label="하역장 바꾸기"><h2>'+esc(vid)+' 하역장 바꾸기</h2>'+
+    '<span class="cap">① 하역장 '+(cur?'· 지금 '+esc(HN(cur)):'')+' · '+esc(ap.cargo||'')+'을(를) 받는 담당 하역장으로만 바꿀 수 있어요</span><div class="chips">'+opts.map(h=>'<button data-to="'+h+'" aria-pressed="'+(to===h)+'"'+(h===cur||!acc.includes(h)?' disabled title="'+(h===cur?'지금 하역장':'이 원료를 받지 않아요')+'"':'')+'>'+esc(HN(h))+'</button>').join('')+'</div>'+
+    (opts.filter(h=>h!==cur&&acc.includes(h)).length?'':'<span class="cap" style="color:#C2410C">이 원료를 받는 다른 담당 하역장이 없어요.</span>')+
+    '<span class="cap">② 바꾸는 이유 · 운영 분석에 쌓여요</span><div class="chips">'+reasons.map(r=>'<button data-why="'+esc(r)+'" aria-pressed="'+(why===r)+'">'+esc(r)+'</button>').join('')+'</div>'+
+    '<label class="fld">메모'+(why==='기타'?' (필수)':' (선택)')+'<input id="chgMemo" maxlength="200" placeholder="예: 기사가 B 호퍼 쪽 정비 대기"></label>'+
+    '<button class="btn dark" data-go="1"'+(to&&why?'':' disabled')+'>바꾸기</button><button class="btn" data-x="1">닫기</button></div>'; };
+  let memo='';
+  s.addEventListener('input',e=>{ if(e.target.id==='chgMemo') memo=e.target.value; });
+  s.onclick=async e=>{ const b=e.target.closest('[data-to],[data-why],[data-go],[data-x]');
+    if(!b){ if(e.target===s) s.remove(); return; }
+    if(b.dataset.x){ s.remove(); return; }
+    if(b.dataset.to){ to=b.dataset.to; paint(); $('#chgMemo').value=memo; return; }
+    if(b.dataset.why){ why=b.dataset.why; paint(); $('#chgMemo').value=memo; return; }
+    if(b.dataset.go){ if(why==='기타'&&!memo.trim()){ toast("'기타'는 메모에 이유를 적어 주세요"); $('#chgMemo').focus(); return; }
+      try{ await post('/api/field/change',{vehicle_id:vid,sector_id:to,reason:why,memo}); s.remove(); toast(HN(to)+'로 바꿨어요 · 사유 '+why); load(); }catch(err){ toast(err.message); } } };
+  paint(); document.body.appendChild(s);
 }
 
 /* ---------- 그리기 · 동작 ---------- */
 let lastKey='', lastHtml='';
 function draw(){ if(!D||!ME) return;
-  const key=ME.role==='driver'&&!D.safety&&!D.vehicle?'register:'+D.trips_today:'';
+  const uc=D.unload_check, key=ME.role==='driver'&&!D.safety&&!D.vehicle?'register:'+D.trips_today+':'+(uc?uc.key+uc.answer+uc.can_late:''):'';
   if(key&&key===lastKey){ const c=document.querySelector('.bar .live'); if(c){ c.classList.toggle('on',live); c.lastChild.textContent=D.clock?D.clock.slice(11,16):''; } return; }   // 입력 중인 등록 화면은 다시 그리지 않음
   const html=ME.role==='driver'?driver():field(); lastKey=key; if(html===lastHtml) return; lastHtml=html;
-  const y=window.scrollY; $('#app').innerHTML=html; window.scrollTo(0,y); if(key) accFor(cargoSel); }
+  const y=window.scrollY, keep=FM3&&FM3.el.parentNode?FM3.el:null; if(keep) keep.remove();
+  $('#app').innerHTML=html; window.scrollTo(0,y); if(key) accFor(cargoSel); fieldMap(); }
+/* 현장 담당자 담당 구역 3D 매핑: web/map3d.js 카드를 한 번 만들고 다시 그릴 때마다 같은 요소를 옮겨 붙인다(깜빡임 · 켬/끔 유지) */
+let FM3=null, fzone=null, fm3Key='';
+function fieldMap(){
+  const slot=$('#fm3slot'); if(!slot||!window.Map3D){ return; }
+  const z=(D.zones||[]).find(x=>x.id===fzone)||(D.zones||[])[0]; if(!z) return;
+  if(!FM3){ const el=document.createElement('div'); FM3={el,api:Map3D.mount(el,{zone:z.id,height:150,storageKey:'map3d.m.on'}),zone:z.id};
+    FM3.api.onAck=()=>{ const c=document.querySelector('.card.red'); if(c) c.scrollIntoView({behavior:'smooth',block:'center'}); };   // 확인 · 해제는 위 안전 경고 카드 버튼으로
+    fm3Key=''; }
+  slot.replaceWith(FM3.el);
+  if(FM3.zone!==z.id){ FM3.api.setZone(z.id); FM3.zone=z.id; fm3Key=''; }
+  const k=JSON.stringify([z.id,z.items.map(i=>[i.id,i.state,i.bay,i.ack]),z.bays]);
+  if(k!==fm3Key){ fm3Key=k; FM3.api.update(z.items,z.bays); }
+}
 async function accFor(c){ if(!c||!$('#acc')) return; try{ const r=await api('/api/driver/accept?cargo='+encodeURIComponent(c)); $('#acc').textContent=r.bays.length?r.bays.map(b=>b.name+' '+b.bay+'번 베이').join(' · ')+' · 베이는 호출 때 지정':'받는 하역장이 없어요'; }catch(e){} }
 
 /* ---------- 알림 (R13): 배너 · 소리 · 진동 · 알림함 ---------- */
@@ -243,6 +365,9 @@ $('#app').addEventListener('click',async e=>{
     else if(t.id==='ack'){ await post('/api/driver/ack'); toast('이동 시작 · 안전 운행하세요'); }
     else if(t.id==='arr'){ const r=await post('/api/driver/arrive'); toast(r.message); }
     else if(t.id==='stop'){ await post('/api/driver/stopped'); toast('관제실에 멈춤을 알렸어요'); }
+    else if(t.dataset.fz){ fzone=t.dataset.fz; busy=false; lastHtml=''; draw(); return; }
+    else if(t.dataset.uc){ const r=await post('/api/driver/unload',{answer:t.dataset.uc});
+      toast({ok:'확인했어요 · 고마워요',late:'실제 하차 '+r.actual_min+'분으로 기록했어요',not_yet:'다 내리면 [지금 끝났어요]를 눌러 주세요',skip:'건너뛰었어요'}[r.answer]||'기록했어요'); }
     else if(t.dataset.ok){ await post('/api/field/approve?vehicle_id='+encodeURIComponent(t.dataset.ok)); toast('승인했어요 · 운전자에게 호출이 가요'); }
     else if(t.dataset.chg){ busy=false; changeSheet(t.dataset.chg); return; }
     else if(t.dataset.sa){ await post('/api/field/safety/'+encodeURIComponent(t.dataset.sa)+'/'+t.dataset.how); toast(t.dataset.how==='ack'?'확인했어요 · 하역 재개':'오탐지로 해제했어요'); }
