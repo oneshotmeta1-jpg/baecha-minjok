@@ -27,7 +27,7 @@ py tools/users.py approve F2001           # 승인 대기 → 사용
 py tools/users.py reject F2001            # 반려
 py tools/users.py admin P1001             # 관리자로
 py tools/users.py add field F2002 김현장   # 비밀번호는 입력창에서
-py tools/users.py reset 261107            # 비밀번호를 잊었을 때: 임시 비밀번호를 이 창에만 한 번 표시
+py tools/users.py reset <아이디>           # 비밀번호를 잊었을 때: 임시 비밀번호를 이 창에만 한 번 표시
 ```
 
 ## 역할과 화면 · 권한 (app/auth.py `RULES`)
