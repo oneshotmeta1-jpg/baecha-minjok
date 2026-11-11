@@ -1,4 +1,6 @@
 @echo off
+rem 외부 공유 주소 열기 — Cloudflare 임시 터널(tools/share_tunnel.py)로 켜 둔 서버(8000)를 https://….trycloudflare.com 주소로 연다
+rem 창을 닫으면 주소가 없어진다(다시 켜면 주소가 바뀜)
 chcp 65001 >nul
 title 배차의 민족 - 외부 공유 주소 (Cloudflare)
 cd /d "%~dp0"

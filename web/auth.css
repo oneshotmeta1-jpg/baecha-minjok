@@ -1,3 +1,4 @@
+/* 파일 설명: 로그인 · 회원가입 화면 공통 스타일(login.html · signup.html) */
 /* 로그인 · 회원가입 · 모바일 공통 (R11, 시안 PC/모바일 로그인 · 회원가입) */
 :root{--ink:#141414;--ink-2:#3C4043;--muted:#5F6368;--bg:#EDEDEB;--card:#FFFFFF;--soft:#F3F3F1;--soft-2:#F6F6F4;--line:#E4E4E1;--red:#D7263D;--blue:#1D47B8;--blue-bg:#E6EDFF}
 *{box-sizing:border-box}

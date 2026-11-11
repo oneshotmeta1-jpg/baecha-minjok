@@ -1,4 +1,9 @@
 <!doctype html>
+<!-- 파일 설명: 관제 화면(PC) — 로그인한 관제 담당자가 http://서버/ 로 여는 한 페이지 대시보드
+  탭: 관제 화면(구내 관제 맵 · 평면도 · 호퍼 카드 · CAM 4채널) · 순번·배정 · 운영 분석 · 알림 이력 · 설정 · 구역 상세(#cam/CAM-0n)
+  데이터: /api/config(처음 한 번) + WebSocket /ws(실시간 상태) + 탭별 /api/* · 그리기 공통 파일 cam_view.js · map3d.js · safety-blink.js
+  서버: app/server.py · 상태 계산: app/runtime.py · app/sim.py
+-->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
